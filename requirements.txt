@@ -1,0 +1,8 @@
+requests
+tqdm
+python-dateutil
+python-dotenv
+SQLAlchemy
+psycopg2-binary
+beautifulsoup4
+PyMySQL

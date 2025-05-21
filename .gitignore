@@ -1,0 +1,11 @@
+*~
+.DS_Store
+*/.DS_Store
+logs
+*.log
+.env
+.ipynb_checkpoints
+ivod_local.db
+Test.ipynb
+test.py
+*.pyc
