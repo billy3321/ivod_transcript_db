@@ -112,16 +112,25 @@ def date_range(start_date: str, end_date: str):
     for dt in rrule.rrule(rrule.DAILY, dtstart=dt0, until=dt1):
         yield dt.strftime("%Y-%m-%d")
 
-def make_browser():
-    br = mechanize.Browser()
+def make_browser(skip_ssl: bool = False) -> mechanize.Browser:
+    """
+    建立 mechanize.Browser()，可選擇是否跳過 SSL 驗證，並設定 headers + cookie。
+    """
     cj = cookiejar.LWPCookieJar()
+    br = mechanize.Browser()
     br.set_cookiejar(cj)
+
+    # 不遵守 robots.txt，也不自動處理 <meta http-equiv="refresh">
     br.set_handle_robots(False)
-    br.set_handle_equiv(True)
-    br.set_handle_redirect(True)
-    br.set_handle_referer(True)
-    br.set_ca_data(context=ssl._create_unverified_context(cert_reqs=ssl.CERT_NONE))
+    br.set_handle_refresh(False)
+
     br.addheaders = HEADERS
+
+    if skip_ssl:
+        import urllib.request
+        ctx = ssl._create_unverified_context(cert_reqs=ssl.CERT_NONE)
+        br.add_handler(urllib.request.HTTPSHandler(context=ctx))
+
     return br
 
 def fetch_ivod_list(br: mechanize.Browser, date_str: str):
