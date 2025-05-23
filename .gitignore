@@ -6,6 +6,8 @@ logs
 .env
 .ipynb_checkpoints
 ivod_local.db
+# Ignore shared SQLite DB files
+db/*.db
 Test.ipynb
 test.py
 .pytest_cache/

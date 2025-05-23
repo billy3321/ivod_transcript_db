@@ -31,4 +31,6 @@ model IVODTranscript {
   ly_retries      Int       @default(0)
   last_updated    DateTime
   committee_names Json?
+
+  @@map("ivod_transcripts")
 }

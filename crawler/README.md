@@ -24,7 +24,8 @@ pip install -r requirements.txt
 
 # 3. 建置 .env
 cp .env.example .env   # 如尚未有 .env
-# 編輯 .env：設定 DB_BACKEND 及對應連線參數
+# (若使用 SQLite) 建立共享 DB 資料夾：mkdir -p db
+# 編輯 .env：設定 DB_BACKEND 及對應連線參數 (SQLITE_PATH 已預設為 db/ivod_local.db)
 ```
 
 ## 2. 模組化架構

@@ -31,7 +31,7 @@ app/
 │   └── api/
 │       ├── ivods.ts           # GET: list & filter IVODs with pagination
 │       ├── ivods/[id].ts      # GET: fetch IVOD metadata and transcripts by ID
-│       └── search.ts          # GET: full-text transcript search
+│       └── search.ts          # GET: full-text transcript search (fallback to DB if ES unavailable)
 ├── components/                # React UI components (List, SearchForm, Card, TranscriptViewer, etc.)
 ├── lib/
 │   ├── db.ts                  # Database client setup
@@ -82,7 +82,7 @@ DB_PROVIDER="postgresql"
 # Database connection to the IVOD metadata database
 DATABASE_URL="postgresql://user:pass@host:5432/dbname"
 # For MySQL: mysql://user:pass@host:3306/dbname
-# For SQLite (file path, use sqlite:/// prefix): sqlite:///./ivod.db
+# For SQLite (file path to shared DB file; use sqlite:/// prefix): sqlite:///../db/ivod_local.db
 
 # Elasticsearch connection settings
 ES_HOST="localhost"
@@ -102,6 +102,7 @@ NEXT_PUBLIC_ES_INDEX="ivod_transcripts"
 cd app
 npm install
 cp .env.example .env.local
+# (若使用 SQLite) 建立共享 DB 資料夾：mkdir -p ../db
 # Edit .env.local to configure DATABASE_URL, DB_PROVIDER, and Elasticsearch settings
 npx prisma generate
 npx prisma migrate dev --name init
@@ -262,24 +263,27 @@ sudo certbot --nginx -d your.domain.com
 
 Implement automated tests to ensure code quality and prevent regressions. Follow these best practices:
 
-### 10.1 Unit and Integration Testing
+### 10.1 Unit Testing with Jest and React Testing Library
 
-- Use Jest and React Testing Library for unit tests of React components and utility functions.
-- Organize tests in `__tests__` directories alongside components or in a central `tests/` folder.
-- Add `jest.config.js` for basic Jest setup, including support for TypeScript and module aliases.
+- Use Jest and React Testing Library for unit tests of React components, utility functions, and API route handlers.
+- Organize tests under the `__tests__` directory at the project root (`app/__tests__`).
+  Write tests for API routes (e.g., `search-api.test.ts`) mocking Elasticsearch and Prisma clients to verify fallback logic.
 
-Example snippets in `package.json`:
+Example scripts in `package.json`:
 
 ```json
 "scripts": {
   "test": "jest --passWithNoTests --watch",
-  "test:ci": "jest --runInBand --passWithNoTests"
+  "test:ci": "jest --runInBand --passWithNoTests",
+  "cypress:open": "cypress open",
+  "cypress:run": "cypress run"
 },
 "devDependencies": {
-  "jest": "^27.0.0",
-  "ts-jest": "^27.0.0",
-  "@testing-library/react": "^13.0.0",
-  "@testing-library/jest-dom": "^5.16.0"
+  "jest": "^29.4.3",
+  "ts-jest": "^29.0.5",
+  "@testing-library/react": "^13.4.0",
+  "@testing-library/jest-dom": "^5.16.5",
+  "cypress": "^14.4.0"
 }
 ```
 
@@ -295,22 +299,22 @@ Example snippets in `package.json`:
   "cypress:run": "cypress run"
 },
 "devDependencies": {
-  "cypress": "^9.0.0"
+  "cypress": "^14.4.0"
 }
 ```
 
 ### 10.3 Running Tests
 
 ```bash
-# Install dev dependencies
+# Install dependencies
 npm install
 
-# Run unit tests
+# Run unit tests (Jest)
 npm run test
 
-# Run E2E tests (interactive)
+# Run E2E tests (Cypress interactive)
 npm run cypress:open
 
-# Run E2E tests (headless CI)
+# Run E2E tests headless (CI)
 npm run cypress:run
 ```

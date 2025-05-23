@@ -23,7 +23,8 @@ DB_BACKEND = os.getenv("DB_BACKEND", "sqlite").lower()
 
 # 2. 建立 SQLAlchemy engine & Session
 if DB_BACKEND == "sqlite":
-    SQLITE_PATH = os.getenv("SQLITE_PATH", "ivod_local.db")
+    # Use shared DB file in project-level 'db' directory by default
+    SQLITE_PATH = os.getenv("SQLITE_PATH", "../db/ivod_local.db")
     DB_URL = f"sqlite:///{SQLITE_PATH}"
 elif DB_BACKEND == 'postgresql':
     PG = {
@@ -132,6 +133,14 @@ def make_browser(skip_ssl: bool = False) -> mechanize.Browser:
         br.add_handler(urllib.request.HTTPSHandler(context=ctx))
 
     return br
+
+def fetch_lastest_date(br: mechanize.Browser):
+    url = 'https://ly.govapi.tw/v2/ivods?limit=1'
+    resp = br.open(url)
+    raw = resp.read().decode('utf-8')
+    js = json.loads(raw)
+    date = datetime.fromisoformat(js.get('ivods')[0]['日期']).date()
+    return date
 
 def fetch_ivod_list(br: mechanize.Browser, date_str: str):
     url = f"https://ly.govapi.tw/v2/ivods?日期={date_str}&limit=600"
