@@ -12,8 +12,10 @@ This Next.js web application provides a user interface for browsing and searchin
 
 - [Next.js](https://nextjs.org/) with React and TypeScript
 - Node.js API routes for server-side data fetching
-- Relational database client (e.g., Prisma or native driver) for IVOD metadata
+- [Prisma](https://www.prisma.io/) ORM for relational database (PostgreSQL / MySQL / SQLite)
 - [Elasticsearch](https://www.elastic.co/) for full-text transcript search
+- [bodybuilder](https://github.com/moscajs/bodybuilder) for building Elasticsearch query DSL
+- [Searchkit](https://www.searchkit.co/) (optional) for building React search UIs with Elasticsearch
 - [Tailwind CSS](https://tailwindcss.com/) (optional) for styling
 - [React Query](https://react-query.tanstack.com/) (optional) for data fetching and caching
 
@@ -74,8 +76,13 @@ To ensure a responsive, modern, and user-friendly interface, follow these guidel
 Create a `.env.local` file in the `app/` directory based on `.env.example` and fill in your values:
 
 ```ini
+# Database provider: one of 'postgresql', 'mysql', 'sqlite'
+DB_PROVIDER="postgresql"
+
 # Database connection to the IVOD metadata database
 DATABASE_URL="postgresql://user:pass@host:5432/dbname"
+# For MySQL: mysql://user:pass@host:3306/dbname
+# For SQLite (file path, use sqlite:/// prefix): sqlite:///./ivod.db
 
 # Elasticsearch connection settings
 ES_HOST="localhost"
@@ -95,7 +102,9 @@ NEXT_PUBLIC_ES_INDEX="ivod_transcripts"
 cd app
 npm install
 cp .env.example .env.local
-# Edit .env.local to configure DATABASE_URL and Elasticsearch settings
+# Edit .env.local to configure DATABASE_URL, DB_PROVIDER, and Elasticsearch settings
+npx prisma generate
+npx prisma migrate dev --name init
 npm run dev
 ```
 

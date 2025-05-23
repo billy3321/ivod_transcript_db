@@ -1,0 +1,34 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = env("DB_PROVIDER")
+  url      = env("DATABASE_URL")
+}
+
+model IVODTranscript {
+  ivod_id         Int      @id
+  ivod_url        String
+  date            DateTime
+  meeting_code    String?
+  meeting_code_str String?
+  category        String?
+  video_type      String?
+  video_start     String?
+  video_end       String?
+  video_length    String?
+  video_url       String?
+  title           String?
+  speaker_name    String?
+  meeting_time    DateTime?
+  meeting_name    String?
+  ai_transcript   String?
+  ly_transcript   String?
+  ai_status       String    @default("pending")
+  ai_retries      Int       @default(0)
+  ly_status       String    @default("pending")
+  ly_retries      Int       @default(0)
+  last_updated    DateTime
+  committee_names Json?
+}
