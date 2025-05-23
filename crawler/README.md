@@ -93,3 +93,60 @@ mkdir logs
 ---
 
 *完成上述步驟，即可在 Ubuntu 環境下每日自動更新立法院逐字稿，並自動重試失敗紀錄，避免遺漏與 SSL 驗證錯誤*。
+
+## 6. Elasticsearch 設定與索引
+
+### 6.1 安裝中文分析插件
+
+建議安裝 IK Analyzer 插件以改善繁體中文分詞：  
+```bash
+bin/elasticsearch-plugin install analysis-ik
+```
+
+如欲使用 Smart Chinese Analyzer，可安裝：  
+```bash
+bin/elasticsearch-plugin install analysis-smartcn
+```
+
+### 6.2 .env 變數設定
+
+請在 `.env` 中設定：  
+```ini
+ES_HOST=localhost
+ES_PORT=9200
+ES_SCHEME=http
+# ES_USER=your_username
+# ES_PASS=your_password
+ES_INDEX=ivod_transcripts
+```
+
+### 6.3 執行索引更新
+
+```bash
+./ivod_es.py
+```
+
+## 7. Testing
+
+本專案使用 pytest 作為測試框架，並將開發相依 (dev dependencies) 集中於 `requirements-dev.txt`。
+
+```bash
+pip install -r requirements-dev.txt
+```
+
+### 7.1 單元測試 (Unit Tests)
+- 使用 pytest 測試核心函式，如 `make_browser`、`fetch_ivod_list`、`process_ivod`。
+- 建議於 `tests/unit/` 目錄下建立 `test_core.py`、`test_tasks.py` 等檔案。
+- 可透過 requests-mock 模擬 HTTP 回應，並利用 sqlite in-memory (`DB_BACKEND=sqlite`, `DB_URL=:memory:`) 測試資料庫操作。
+
+### 7.2 整合測試 (Integration Tests)
+- 建議於 `tests/integration/` 目錄下建立測試，包含資料庫與 Elasticsearch 的整合測試，測試 `ivod_es.py` 中的索引功能。
+- 可使用 Docker Compose 啟動測試用的資料庫與 Elasticsearch service，並於測試前自動初始化資料庫 schema (呼叫 `ivod_core.Base.metadata.create_all`)。
+
+### 7.3 執行所有測試
+
+```bash
+pytest --cov=ivod_core --cov=ivod_tasks --cov-report=term-missing
+```
+
+可將上述指令整合至 CI pipeline，自動執行測試並收集 coverage 報告。

@@ -6,3 +6,4 @@ SQLAlchemy
 psycopg2-binary
 beautifulsoup4
 PyMySQL
+elasticsearch>=7.0.0

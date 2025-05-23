@@ -7,10 +7,15 @@ ivod_tasks.py
 """
 import logging
 from datetime import datetime, timedelta
+import os
 
 from tqdm import tqdm
+try:
+    from elasticsearch import Elasticsearch
+except ImportError:
+    Elasticsearch = None
 
-from ivod_core import date_range, make_browser, fetch_ivod_list, process_ivod, Session, IVODTranscript
+from .core import date_range, make_browser, fetch_ivod_list, process_ivod, Session, IVODTranscript
 
 logger = logging.getLogger(__name__)
 
@@ -109,3 +114,57 @@ def run_retry(skip_ssl: bool = True):
 
     db.close()
     logger.info("Retry 任務完成。")
+
+
+def run_es():
+    """
+    更新 Elasticsearch 索引：將資料庫中的 ai_transcript 與 ly_transcript 欄位
+    建立至 Elasticsearch 索引。使用 ES_HOST、ES_PORT、ES_SCHEME、ES_USER、ES_PASS、
+    ES_INDEX 等環境變數進行連線，並採用 IK Analyzer 以改善繁體中文分詞。
+    """
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+    es_host = os.getenv("ES_HOST", "localhost")
+    es_port = int(os.getenv("ES_PORT", 9200))
+    es_scheme = os.getenv("ES_SCHEME", "http")
+    es_user = os.getenv("ES_USER")
+    es_pass = os.getenv("ES_PASS")
+    es_index = os.getenv("ES_INDEX", "ivod_transcripts")
+
+    auth = (es_user, es_pass) if es_user and es_pass else None
+    es = Elasticsearch([{"host": es_host, "port": es_port, "scheme": es_scheme}], http_auth=auth)
+
+    index_body = {
+        "settings": {
+            "analysis": {
+                "analyzer": {
+                    "chinese_analyzer": {
+                        "tokenizer": "ik_max_word",
+                        "filter": ["lowercase"]
+                    }
+                }
+            }
+        },
+        "mappings": {
+            "properties": {
+                "ivod_id": {"type": "integer"},
+                "ai_transcript": {"type": "text", "analyzer": "chinese_analyzer"},
+                "ly_transcript": {"type": "text", "analyzer": "chinese_analyzer"},
+                "title": {"type": "text", "analyzer": "chinese_analyzer"}
+            }
+        }
+    }
+
+    if not es.indices.exists(index=es_index):
+        es.indices.create(index=es_index, body=index_body)
+
+    db = Session()
+    for obj in tqdm(db.query(IVODTranscript).all(), desc="Indexing to Elasticsearch"):
+        doc = {
+            "ivod_id": obj.ivod_id,
+            "ai_transcript": obj.ai_transcript or "",
+            "ly_transcript": obj.ly_transcript or "",
+            "title": obj.title or ""
+        }
+        es.index(index=es_index, id=obj.ivod_id, body=doc)
+    db.close()
+    logger.info("Elasticsearch indexing 完成。")

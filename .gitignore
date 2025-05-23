@@ -8,4 +8,8 @@ logs
 ivod_local.db
 Test.ipynb
 test.py
+.pytest_cache/
+*.coverage
+__pycache__/
+coverage.xml
 *.pyc
