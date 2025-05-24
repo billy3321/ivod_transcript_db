@@ -71,45 +71,48 @@ To ensure a responsive, modern, and user-friendly interface, follow these guidel
 - Typography: Use system font stack or Google Fonts (e.g., Inter).
 - Spacing: Use consistent padding (4/8/16px) and margin scale.
 
-## 5. Environment Variables
+## 5. 環境變數
 
-Create a `.env.local` file in the `app/` directory based on `.env.example` and fill in your values:
+在 `app/` 目錄下，根據 `.env.example` 建立 `.env.local` 檔，並填入以下內容：
 
 ```ini
-# Database provider: one of 'postgresql', 'mysql', 'sqlite'
+# 資料庫提供者：可選 'postgresql'、'mysql' 或 'sqlite'
 DB_PROVIDER="postgresql"
 
-# Database connection to the IVOD metadata database
+# IVOD 元資料庫連線字串
 DATABASE_URL="postgresql://user:pass@host:5432/dbname"
-# For MySQL: mysql://user:pass@host:3306/dbname
-# For SQLite (file path to shared DB file; use sqlite:/// prefix): sqlite:///../db/ivod_local.db
+# 若使用 MySQL：mysql://user:pass@host:3306/dbname
+# 若使用 SQLite（檔案路徑；需使用 sqlite:/// 前綴）：sqlite:///../db/ivod_local.db
 
-# Elasticsearch connection settings
+# （可選）指定測試用資料庫連線字串，避免修改主要資料庫
+# TEST_DATABASE_URL="sqlite:///../db/ivod_test.db"
+
+# Elasticsearch 連線設定
 ES_HOST="localhost"
 ES_PORT="9200"
 ES_SCHEME="http"
-# ES_USER="username"
-# ES_PASS="password"
+# ES_USER（使用者名稱）
+# ES_PASS（密碼）
 ES_INDEX="ivod_transcripts"
 
-# (Optional) expose index name to browser
+# （可選）將索引名稱公開到瀏覽器端
 NEXT_PUBLIC_ES_INDEX="ivod_transcripts"
 ```
 
-## 6. Local Development
+## 6. 本地開發
 
 ```bash
 cd app
 npm install
 cp .env.example .env.local
-# (若使用 SQLite) 建立共享 DB 資料夾：mkdir -p ../db
-# Edit .env.local to configure DATABASE_URL, DB_PROVIDER, and Elasticsearch settings
+# 若使用 SQLite，建立共用資料庫資料夾：mkdir -p ../db
+# 編輯 .env.local，設定 DATABASE_URL、DB_PROVIDER 和 Elasticsearch 相關變數
 npx prisma generate
 npx prisma migrate dev --name init
 npm run dev
 ```
 
-Open http://localhost:3000 to view the application.
+在瀏覽器開啟 http://localhost:3000 查看應用程式。
 
 ## 7. Build and Production Deployment
 
