@@ -2,27 +2,29 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const { page = '1', pageSize = '10', meetingName, committee, speaker } = req.query;
+  const { q, page = '1', pageSize = '20', sort = 'date_desc' } = req.query;
   const pageNum = parseInt(page as string, 10);
   const size = parseInt(pageSize as string, 10);
   const skip = (pageNum - 1) * size;
 
-  const where: any = {};
-  if (meetingName) {
-    where.meeting_name = { contains: meetingName as string, mode: 'insensitive' };
-  }
-  if (committee) {
-    where.committee_names = { has: committee as string };
-  }
-  if (speaker) {
-    where.speaker_name = { contains: speaker as string, mode: 'insensitive' };
+  const orderBy: any = sort === 'date_asc' ? { date: 'asc' } : { date: 'desc' };
+
+  let where: any = {};
+  if (q && typeof q === 'string') {
+    where = {
+      OR: [
+        { meeting_name: { contains: q, mode: 'insensitive' } },
+        { speaker_name: { contains: q, mode: 'insensitive' } },
+        { committee_names: { has: q } },
+      ],
+    };
   }
 
   try {
     const [data, total] = await Promise.all([
       prisma.iVODTranscript.findMany({
         where,
-        orderBy: { date: 'desc' },
+        orderBy,
         skip,
         take: size,
         select: {

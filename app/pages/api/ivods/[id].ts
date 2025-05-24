@@ -17,6 +17,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         committee_names: true,
         speaker_name: true,
         video_length: true,
+        ivod_url: true,
+        video_url: true,
         ai_transcript: true,
         ly_transcript: true,
       },

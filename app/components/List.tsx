@@ -7,29 +7,27 @@ interface ListProps {
 
 export default function List({ items }: ListProps) {
   return (
-    <table className="min-w-full border-collapse">
-      <thead>
-        <tr>
-          <th className="px-2 py-1 text-left">Date</th>
-          <th className="px-2 py-1 text-left">Meeting</th>
-          <th className="px-2 py-1 text-left">Committee</th>
-          <th className="px-2 py-1 text-left">Speaker</th>
-          <th className="px-2 py-1 text-left">Duration</th>
-        </tr>
-      </thead>
-      <tbody>
-        {items.map(item => (
-          <tr key={item.ivod_id}>
-            <td className="px-2 py-1">{item.date}</td>
-            <td className="px-2 py-1">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+      {items.map(item => (
+        <div
+          key={item.ivod_id}
+          className="border rounded shadow p-4 flex flex-col justify-between hover:shadow-lg transition"
+        >
+          <div>
+            <h2 className="text-lg font-semibold mb-2">
               <Link href={`/ivod/${item.ivod_id}`}>{item.meeting_name}</Link>
-            </td>
-            <td className="px-2 py-1">{item.committee_names.join(', ')}</td>
-            <td className="px-2 py-1">{item.speaker_name}</td>
-            <td className="px-2 py-1">{item.video_length}</td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
+            </h2>
+            <p className="text-sm text-gray-600 mb-1">{item.date}</p>
+            <p className="text-sm mb-1">
+              <strong>Committee:</strong> {item.committee_names.join(', ')}
+            </p>
+            <p className="text-sm mb-2">
+              <strong>Speaker:</strong> {item.speaker_name}
+            </p>
+          </div>
+          <div className="text-sm text-gray-500">{item.video_length}</div>
+        </div>
+      ))}
+    </div>
   );
 }

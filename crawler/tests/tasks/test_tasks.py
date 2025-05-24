@@ -25,9 +25,9 @@ def test_run_full_noop(monkeypatch):
             calls.append("close")
 
     monkeypatch.setattr(tasks, "Session", lambda: DummyDB())
-    # execute without error
     run_full(skip_ssl=False)
     assert calls == ["close"]
+
 
 def test_run_incremental_noop(monkeypatch):
     import ivod.tasks as tasks
@@ -48,8 +48,9 @@ def test_run_incremental_noop(monkeypatch):
             return None
 
     monkeypatch.setattr(tasks, "Session", lambda: DummyDB())
-    tasks.run_incremental(skip_ssl=False)
+    run_incremental(skip_ssl=False)
     assert calls == ["commit", "close"]
+
 
 def test_run_retry_noop(monkeypatch):
     import ivod.tasks as tasks
@@ -74,8 +75,9 @@ def test_run_retry_noop(monkeypatch):
             calls.append("commit")
 
     monkeypatch.setattr(tasks, "Session", lambda: DummyDB())
-    tasks.run_retry(skip_ssl=False)
+    run_retry(skip_ssl=False)
     assert calls == ["close"]
+
 
 def test_run_retry_with_objects(monkeypatch):
     import ivod.tasks as tasks
@@ -111,8 +113,7 @@ def test_run_retry_with_objects(monkeypatch):
     processed = []
     monkeypatch.setattr(tasks, "Session", lambda: db_instance)
     monkeypatch.setattr(tasks, "process_ivod", lambda br, ivod_id, db: processed.append((ivod_id, db)))
-    tasks.run_retry(skip_ssl=True)
-    # Should retry each object for both AI and LY failure branches
+    run_retry(skip_ssl=True)
     expected = [(1111, db_instance), (2222, db_instance), (1111, db_instance), (2222, db_instance)]
     assert processed == expected
     assert db_instance.commits == len(expected)

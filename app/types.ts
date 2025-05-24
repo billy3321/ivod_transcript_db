@@ -10,4 +10,6 @@ export interface IVOD {
 export interface IVODDetail extends IVOD {
   ai_transcript: string;
   ly_transcript: string;
+  ivod_url: string;
+  video_url: string;
 }

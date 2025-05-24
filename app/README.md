@@ -32,7 +32,7 @@ app/
 │       ├── ivods.ts           # GET: list & filter IVODs with pagination
 │       ├── ivods/[id].ts      # GET: fetch IVOD metadata and transcripts by ID
 │       └── search.ts          # GET: full-text transcript search (fallback to DB if ES unavailable)
-├── components/                # React UI components (List, SearchForm, Card, TranscriptViewer, etc.)
+├── components/                # React UI components (List, SearchForm, Pagination, TranscriptViewer, etc.)
 ├── lib/
 │   ├── db.ts                  # Database client setup
 │   └── elastic.ts             # Elasticsearch client setup
@@ -56,13 +56,13 @@ To ensure a responsive, modern, and user-friendly interface, follow these guidel
 
 | Page            | Desktop View                             | Mobile View                                           |
 |-----------------|------------------------------------------|-------------------------------------------------------|
-| IVOD List       | Table with columns: Date, Meeting, etc.  | Stacked cards showing same fields with icons/actions. |
-| Search Form     | Horizontal filters and search input     | Collapsible accordion for filters, prominent search.  |
-| Pagination      | Footer pagination links                  | Infinite scroll or simplified next/prev buttons.      |
+| IVOD List       | Card grid showing date, meeting, committee, speaker, and duration | Cards stacked in single column for mobile |
+| Search Form     | Single search input with sort dropdown | Responsive search and sort controls |
+| Pagination      | Footer pagination links with numeric and prev/next buttons | Simplified prev/next buttons |
 | IVOD Detail     | Transcript viewer alongside metadata panel | Full-width metadata above collapsible transcript.     |
 
 - Use Tailwind CSS utility classes to implement breakpoints (`sm`, `md`, `lg`, `xl`).
-- Employ React components for List, Card, SearchForm, Pagination, and TranscriptViewer.
+- Employ React components for List, Pagination, and TranscriptViewer.
 - Leverage SVG icons (e.g., Heroicons) for actions (search, clear, expand/collapse).
 
 ### 4.3 Styling Recommendations
