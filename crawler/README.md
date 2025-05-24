@@ -144,7 +144,19 @@ pip install -r requirements-dev.txt
 - 建議於 `tests/integration/` 目錄下建立測試，包含資料庫與 Elasticsearch 的整合測試，測試 `ivod_es.py` 中的索引功能。
 - 可使用 Docker Compose 啟動測試用的資料庫與 Elasticsearch service，並於測試前自動初始化資料庫 schema (呼叫 `ivod_core.Base.metadata.create_all`)。
 
-### 7.3 執行所有測試
+### 7.3 Integration Test Script
+
+Run the following script to reset the test database and fetch IVOD transcripts for integration testing.
+By default it uses the SQLite path from your `.env` (e.g. `db/ivod_local.db`),
+but you can override the database file via the `TEST_SQLITE_PATH` environment variable
+(e.g. to use a separate `db/ivod_test.db`):
+
+```bash
+cd crawler
+TEST_SQLITE_PATH=../db/ivod_test.db python integration_test.py
+```
+
+### 7.4 執行所有測試
 
 ```bash
 pytest --cov=ivod_core --cov=ivod_tasks --cov-report=term-missing

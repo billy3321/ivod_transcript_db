@@ -1,5 +1,6 @@
 requests
 tqdm
+mechanize
 python-dateutil
 python-dotenv
 SQLAlchemy
