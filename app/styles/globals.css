@@ -5,18 +5,48 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Custom utilities */
+@layer utilities {
+  .line-clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  
+  .line-clamp-3 {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  
+  .font-roboto {
+    font-family: 'Roboto', 'Noto Sans TC', sans-serif;
+  }
+}
+
+/* Scrollbar styling */
 ::-webkit-scrollbar {
   width: 7px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #2D3748;
+  background: #f1f5f9;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #CBD5E0;
+  background: #cbd5e1;
+  border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #718096;
+  background: #94a3b8;
+}
+
+/* Loading animation */
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
