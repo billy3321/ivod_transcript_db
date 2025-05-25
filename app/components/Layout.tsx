@@ -10,11 +10,14 @@ interface LayoutProps {
 export default function Layout({ children }: LayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   return (
-    <div className="flex h-screen bg-gray-200 font-sans">
+    <div className="min-h-screen bg-gray-200 font-sans">
+      {/* Mobile Sidebar */}
       <Sidebar isOpen={sidebarOpen} setIsOpen={setSidebarOpen} />
-      <div className="flex-1 flex flex-col overflow-hidden">
+      
+      {/* Main Content */}
+      <div className="flex flex-col min-h-screen">
         <Header onMenuClick={() => setSidebarOpen(true)} />
-        <div className="flex-1 flex flex-col overflow-x-hidden overflow-y-auto bg-gray-200">
+        <div className="flex-1 flex flex-col bg-gray-200">
           <main className="flex-1">
             <div className="container mx-auto px-6 py-8">{children}</div>
           </main>

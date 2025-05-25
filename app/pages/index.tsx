@@ -57,7 +57,8 @@ export default function Home() {
       setSortOrder(sort as 'date_desc' | 'date_asc');
       setPage(parseInt(urlPage as string) || 1);
     }
-  }, [router.isReady, router.query]);
+  }, [router.isReady, router.asPath]); // Use asPath instead of router.query to avoid object reference changes  
+  // eslint-disable-next-line react-hooks/exhaustive-deps
 
   // Memoize search params to prevent unnecessary re-renders
   const searchParams = useMemo(() => {

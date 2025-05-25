@@ -15,8 +15,8 @@ const Sidebar: FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
     'border-gray-900 text-gray-500 hover:bg-gray-600 hover:bg-opacity-25 hover:text-gray-100'
 
   const navItems = [
-    { label: 'Home', href: '/' },
-    { label: 'About', href: '/about' },
+    { label: '首頁', href: '/' },
+    { label: '關於我們', href: '/about' },
   ]
 
   return (
@@ -28,9 +28,9 @@ const Sidebar: FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
         />
       )}
       <div
-        className={`fixed inset-y-0 left-0 z-30 w-64 overflow-y-auto bg-gray-900 transform transition duration-300 ${
+        className={`fixed inset-y-0 left-0 z-30 w-64 overflow-y-auto bg-gray-900 transform transition duration-300 lg:hidden ${
           isOpen ? 'translate-x-0 ease-out' : '-translate-x-full ease-in'
-        } lg:translate-x-0 lg:static lg:inset-0`}
+        }`}
       >
         <div className="flex items-center justify-center mt-8">
           <div className="flex items-center">

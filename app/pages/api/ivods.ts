@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
+import { getDbBackend } from '@/lib/utils';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { 
@@ -23,36 +24,57 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   let where: any = {};
   const conditions: any[] = [];
 
+  // Get database backend to determine search strategy
+  const dbBackend = getDbBackend();
+  const isInsensitiveSupported = dbBackend !== 'sqlite';
+  
   // General search in multiple fields
   if (q && typeof q === 'string') {
+    const searchFields = isInsensitiveSupported 
+      ? [
+          { title: { contains: q, mode: 'insensitive' as const } },
+          { meeting_name: { contains: q, mode: 'insensitive' as const } },
+          { speaker_name: { contains: q, mode: 'insensitive' as const } },
+          { committee_names: { contains: q, mode: 'insensitive' as const } },
+          { ai_transcript: { contains: q, mode: 'insensitive' as const } },
+          { ly_transcript: { contains: q, mode: 'insensitive' as const } },
+        ]
+      : [
+          { title: { contains: q } },
+          { meeting_name: { contains: q } },
+          { speaker_name: { contains: q } },
+          { committee_names: { contains: q } },
+          { ai_transcript: { contains: q } },
+          { ly_transcript: { contains: q } },
+        ];
+    
     conditions.push({
-      OR: [
-        { title: { contains: q, mode: 'insensitive' } },
-        { meeting_name: { contains: q, mode: 'insensitive' } },
-        { speaker_name: { contains: q, mode: 'insensitive' } },
-        { committee_names: { contains: q, mode: 'insensitive' } },
-        { ai_transcript: { contains: q, mode: 'insensitive' } },
-        { ly_transcript: { contains: q, mode: 'insensitive' } },
-      ],
+      OR: searchFields,
     });
   }
 
   // Specific field searches
   if (meeting_name && typeof meeting_name === 'string') {
     conditions.push({
-      meeting_name: { contains: meeting_name, mode: 'insensitive' }
+      meeting_name: isInsensitiveSupported 
+        ? { contains: meeting_name, mode: 'insensitive' as const }
+        : { contains: meeting_name }
     });
   }
 
   if (speaker && typeof speaker === 'string') {
     conditions.push({
-      speaker_name: { contains: speaker, mode: 'insensitive' }
+      speaker_name: isInsensitiveSupported 
+        ? { contains: speaker, mode: 'insensitive' as const }
+        : { contains: speaker }
     });
   }
 
   if (committee && typeof committee === 'string') {
     conditions.push({
-      committee_names: { contains: committee, mode: 'insensitive' }
+      committee_names: isInsensitiveSupported 
+        ? { contains: committee, mode: 'insensitive' as const }
+        : { contains: committee }
     });
   }
 

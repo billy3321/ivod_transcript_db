@@ -1,7 +1,9 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 jest.mock('@/lib/prisma', () => ({ __esModule: true, default: { iVODTranscript: { findMany: jest.fn(), count: jest.fn() } } }));
+jest.mock('@/lib/utils', () => ({ getDbBackend: jest.fn() }));
 import handler from '@/pages/api/ivods';
 import prisma from '@/lib/prisma';
+import { getDbBackend } from '@/lib/utils';
 
 describe('GET /api/ivods', () => {
   let statusMock: jest.Mock;
@@ -14,6 +16,7 @@ describe('GET /api/ivods', () => {
     statusMock = jest.fn(() => ({ json: jsonMock }));
     req = { query: {} };
     res = { status: statusMock };
+    (getDbBackend as jest.Mock).mockReturnValue('postgresql'); // Default to PostgreSQL for most tests
   });
 
   afterEach(() => {
@@ -255,6 +258,69 @@ describe('GET /api/ivods', () => {
       skip: 0,
       take: 20,
       select: expect.any(Object),
+    });
+  });
+
+  describe('SQLite database backend', () => {
+    beforeEach(() => {
+      (getDbBackend as jest.Mock).mockReturnValue('sqlite');
+    });
+
+    it('handles general search query without mode insensitive', async () => {
+      const mockFindMany = (prisma.iVODTranscript.findMany as unknown) as jest.Mock;
+      const mockCount = (prisma.iVODTranscript.count as unknown) as jest.Mock;
+      
+      req.query = { q: 'test search' };
+      mockFindMany.mockResolvedValue([]);
+      mockCount.mockResolvedValue(0);
+
+      await handler(req as NextApiRequest, res as NextApiResponse);
+
+      expect(mockFindMany).toHaveBeenCalledWith({
+        where: {
+          AND: [{
+            OR: [
+              { title: { contains: 'test search' } },
+              { meeting_name: { contains: 'test search' } },
+              { speaker_name: { contains: 'test search' } },
+              { committee_names: { contains: 'test search' } },
+              { ai_transcript: { contains: 'test search' } },
+              { ly_transcript: { contains: 'test search' } },
+            ],
+          }]
+        },
+        orderBy: { date: 'desc' },
+        skip: 0,
+        take: 20,
+        select: expect.any(Object),
+      });
+    });
+
+    it('handles specific field searches without mode insensitive', async () => {
+      const mockFindMany = (prisma.iVODTranscript.findMany as unknown) as jest.Mock;
+      const mockCount = (prisma.iVODTranscript.count as unknown) as jest.Mock;
+      
+      req.query = { 
+        meeting_name: 'Test Meeting',
+        speaker: 'Test Speaker'
+      };
+      mockFindMany.mockResolvedValue([]);
+      mockCount.mockResolvedValue(0);
+
+      await handler(req as NextApiRequest, res as NextApiResponse);
+
+      expect(mockFindMany).toHaveBeenCalledWith({
+        where: {
+          AND: [
+            { meeting_name: { contains: 'Test Meeting' } },
+            { speaker_name: { contains: 'Test Speaker' } },
+          ]
+        },
+        orderBy: { date: 'desc' },
+        skip: 0,
+        take: 20,
+        select: expect.any(Object),
+      });
     });
   });
 });
