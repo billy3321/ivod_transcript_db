@@ -22,7 +22,13 @@ jest.mock('next/head', () => {
 });
 
 // Mock fetch
-global.fetch = jest.fn();
+const mockFetch = jest.fn();
+
+// Ensure global fetch is always mocked
+Object.defineProperty(global, 'fetch', {
+  writable: true,
+  value: mockFetch,
+});
 
 const mockPush = jest.fn();
 const mockRouter = {
@@ -34,12 +40,20 @@ const mockRouter = {
 describe('Home Page', () => {
   beforeEach(() => {
     (useRouter as jest.Mock).mockReturnValue(mockRouter);
-    (fetch as jest.Mock).mockClear();
+    mockFetch.mockClear();
     mockPush.mockClear();
+    // Always provide a default mock to prevent undefined returns
+    mockFetch.mockImplementation(() => 
+      Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ data: [], total: 0 })
+      })
+    );
   });
 
   it('renders the main search interface', async () => {
-    (fetch as jest.Mock).mockResolvedValue({
+    mockFetch.mockResolvedValue({
+      ok: true,
       json: () => Promise.resolve({ data: [], total: 0 }),
     });
 
@@ -53,7 +67,8 @@ describe('Home Page', () => {
   });
 
   it('handles search input and updates URL', async () => {
-    (fetch as jest.Mock).mockResolvedValue({
+    mockFetch.mockResolvedValue({
+      ok: true,
       json: () => Promise.resolve({ data: [], total: 0 }),
     });
 
@@ -81,11 +96,16 @@ describe('Home Page', () => {
   });
 
   it('shows advanced search fields when toggled', async () => {
-    (fetch as jest.Mock).mockResolvedValue({
+    mockFetch.mockResolvedValue({
+      ok: true,
       json: () => Promise.resolve({ data: [], total: 0 }),
     });
 
     render(<Home />);
+
+    await waitFor(() => {
+      expect(screen.getByText('進階搜尋')).toBeInTheDocument();
+    });
 
     const advancedSearchToggle = screen.getByText('進階搜尋');
     fireEvent.click(advancedSearchToggle);
@@ -114,18 +134,20 @@ describe('Home Page', () => {
       total: 1,
     };
 
-    (fetch as jest.Mock)
+    mockFetch
       .mockResolvedValueOnce({
+        ok: true,
         json: () => Promise.resolve(mockData),
       })
       .mockResolvedValueOnce({
+        ok: true,
         json: () => Promise.resolve({ data: [] }),
       });
 
     render(<Home />);
 
     await waitFor(() => {
-      expect(fetch).toHaveBeenCalledWith(
+      expect(mockFetch).toHaveBeenCalledWith(
         expect.stringContaining('/api/ivods?sort=date_desc&page=1&pageSize=20')
       );
     });
@@ -139,18 +161,20 @@ describe('Home Page', () => {
     };
     (useRouter as jest.Mock).mockReturnValue(mockRouter);
 
-    (fetch as jest.Mock)
+    mockFetch
       .mockResolvedValueOnce({
+        ok: true,
         json: () => Promise.resolve({ data: [], total: 0 }),
       })
       .mockResolvedValueOnce({
+        ok: true,
         json: () => Promise.resolve({ data: [{ id: 1, transcript: 'test transcript' }] }),
       });
 
     render(<Home />);
 
     await waitFor(() => {
-      expect(fetch).toHaveBeenCalledWith(
+      expect(mockFetch).toHaveBeenCalledWith(
         expect.stringContaining('/api/search?q=%E6%B8%AC%E8%A9%A6')
       );
     });
@@ -169,7 +193,8 @@ describe('Home Page', () => {
       total: 100,
     };
 
-    (fetch as jest.Mock).mockResolvedValue({
+    mockFetch.mockResolvedValue({
+      ok: true,
       json: () => Promise.resolve(mockData),
     });
 
@@ -197,7 +222,7 @@ describe('Home Page', () => {
   });
 
   it('handles network errors gracefully', async () => {
-    (fetch as jest.Mock).mockRejectedValue(new Error('Network error'));
+    mockFetch.mockRejectedValue(new Error('Network error'));
 
     render(<Home />);
 
@@ -215,11 +240,13 @@ describe('Home Page', () => {
     };
     (useRouter as jest.Mock).mockReturnValue(mockRouter);
 
-    (fetch as jest.Mock)
+    mockFetch
       .mockResolvedValueOnce({
+        ok: true,
         json: () => Promise.resolve({ data: [], total: 0 }),
       })
       .mockResolvedValueOnce({
+        ok: true,
         json: () => Promise.resolve({ 
           data: [{ id: 1, transcript: 'test transcript' }],
           fallback: true 
@@ -235,11 +262,16 @@ describe('Home Page', () => {
   });
 
   it('handles sort option changes', async () => {
-    (fetch as jest.Mock).mockResolvedValue({
+    mockFetch.mockResolvedValue({
+      ok: true,
       json: () => Promise.resolve({ data: [], total: 0 }),
     });
 
     render(<Home />);
+
+    await waitFor(() => {
+      expect(screen.getByDisplayValue('最新優先')).toBeInTheDocument();
+    });
 
     const sortSelect = screen.getByDisplayValue('最新優先');
     fireEvent.change(sortSelect, { target: { value: 'date_asc' } });
@@ -265,11 +297,16 @@ describe('Home Page', () => {
     };
     (useRouter as jest.Mock).mockReturnValue(mockRouter);
 
-    (fetch as jest.Mock).mockResolvedValue({
+    mockFetch.mockResolvedValue({
+      ok: true,
       json: () => Promise.resolve({ data: [], total: 0 }),
     });
 
     render(<Home />);
+
+    await waitFor(() => {
+      expect(screen.getByText('清除篩選')).toBeInTheDocument();
+    });
 
     const clearButton = screen.getByText('清除篩選');
     fireEvent.click(clearButton);
@@ -287,7 +324,8 @@ describe('Home Page', () => {
   });
 
   it('shows no results message when no data found', async () => {
-    (fetch as jest.Mock).mockResolvedValue({
+    mockFetch.mockResolvedValue({
+      ok: true,
       json: () => Promise.resolve({ data: [], total: 0 }),
     });
 

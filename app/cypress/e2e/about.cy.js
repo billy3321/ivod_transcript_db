@@ -1,12 +1,10 @@
 describe('About Page', () => {
-  it('should navigate to about page and display content correctly', () => {
+  it('should navigate to about page from home page', () => {
     // Visit home page
     cy.visit('/')
     
-    // Click on About link in sidebar
-    cy.get('[data-cy="sidebar"]').within(() => {
-      cy.contains('About').click()
-    })
+    // Click on About link in header
+    cy.contains('關於本站').click()
     
     // Check URL
     cy.url().should('include', '/about')
@@ -34,12 +32,32 @@ describe('About Page', () => {
     cy.contains('關於我們').should('be.visible')
   })
 
-  it('should highlight About nav item when active', () => {
+  it('should navigate back to home page', () => {
+    // Visit about page
     cy.visit('/about')
     
-    // Check if About nav item has active styling
-    cy.get('[data-cy="sidebar"]').within(() => {
-      cy.contains('About').parent().should('have.class', 'bg-gray-600')
-    })
+    // Click return to home link
+    cy.contains('返回首頁').click()
+    
+    // Check URL
+    cy.url().should('eq', Cypress.config().baseUrl + '/')
+    
+    // Check we're back on home page
+    cy.contains('IVOD 逐字稿檢索系統').should('be.visible')
+  })
+
+  it('should display all content sections correctly', () => {
+    cy.visit('/about')
+    
+    // Check main sections
+    cy.contains('h1', '關於本站').should('be.visible')
+    cy.contains('h2', '關於我們').should('be.visible')
+    cy.contains('h3', '開發者').should('be.visible')
+    cy.contains('h3', '授權條款').should('be.visible')
+    cy.contains('h3', '特別感謝').should('be.visible')
+    
+    // Check specific content
+    cy.contains('本站為IVOD搜尋網站').should('be.visible')
+    cy.contains('本網站為g0v專案，以MIT License釋出').should('be.visible')
   })
 })

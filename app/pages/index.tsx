@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
+import Link from 'next/link';
 import { IVOD } from '@/types';
 import List from '@/components/List';
 import Pagination from '@/components/Pagination';
@@ -170,16 +171,44 @@ export default function Home() {
   return (
     <>
       <Head>
-        <title>IVOD 逐字稿檢索系統</title>
-        <meta name="description" content="台灣立法院 IVOD 逐字稿檢索與瀏覽系統" />
+        <title>IVOD 逐字稿檢索系統 - 台灣立法院會議錄影與逐字稿搜尋</title>
+        <meta name="description" content="台灣立法院 IVOD 逐字稿檢索與瀏覽系統，提供第11屆立法院會議錄影、逐字稿搜尋與下載。包含委員會會議、全院會議等完整記錄，支援關鍵字搜尋、立委姓名查詢。" />
+        <meta name="keywords" content="立法院,IVOD,逐字稿,會議記錄,立法委員,委員會,台灣政治,政府透明,會議錄影,立法過程" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        
+        {/* Open Graph */}
+        <meta property="og:title" content="IVOD 逐字稿檢索系統 - 台灣立法院會議錄影與逐字稿搜尋" />
+        <meta property="og:description" content="台灣立法院 IVOD 逐字稿檢索與瀏覽系統，提供第11屆立法院會議錄影、逐字稿搜尋與下載。" />
+        <meta property="og:url" content={process.env.NEXT_PUBLIC_SITE_URL || 'https://ivod-search.g0v.tw'} />
+        <meta property="og:type" content="website" />
+        <meta property="og:image" content={`${process.env.NEXT_PUBLIC_SITE_URL || 'https://ivod-search.g0v.tw'}/og-image.jpg`} />
+        
+        {/* Twitter Card */}
+        <meta name="twitter:title" content="IVOD 逐字稿檢索系統" />
+        <meta name="twitter:description" content="台灣立法院 IVOD 逐字稿檢索與瀏覽系統，提供完整會議記錄搜尋功能。" />
+        <meta name="twitter:image" content={`${process.env.NEXT_PUBLIC_SITE_URL || 'https://ivod-search.g0v.tw'}/twitter-image.jpg`} />
+        
+        {/* Additional meta tags */}
+        <meta name="application-name" content="IVOD 逐字稿檢索系統" />
+        <meta name="msapplication-TileColor" content="#4F46E5" />
+        
+        {/* Canonical URL */}
+        <link rel="canonical" href={process.env.NEXT_PUBLIC_SITE_URL || 'https://ivod-search.g0v.tw'} />
       </Head>
       
       <div className="min-h-screen bg-gray-50">
         {/* Simple Header */}
         <header className="bg-white shadow-sm border-b border-gray-200">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-            <h1 className="text-3xl font-bold text-gray-900">IVOD 逐字稿檢索系統</h1>
-            <p className="mt-1 text-gray-600">台灣立法院會議錄影與逐字稿檢索</p>
+            <div className="flex justify-between items-start">
+              <div>
+                <h1 className="text-3xl font-bold text-gray-900">IVOD 逐字稿檢索系統</h1>
+                <p className="mt-1 text-gray-600">台灣立法院會議錄影與逐字稿檢索</p>
+              </div>
+              <Link href="/about" className="text-blue-600 hover:text-blue-800 text-sm font-medium">
+                關於本站
+              </Link>
+            </div>
           </div>
         </header>
 

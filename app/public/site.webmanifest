@@ -1,0 +1,30 @@
+{
+  "name": "IVOD 逐字稿檢索系統",
+  "short_name": "IVOD Search",
+  "description": "台灣立法院 IVOD 逐字稿檢索與瀏覽系統",
+  "icons": [
+    {
+      "src": "/favicon-32x32.png",
+      "sizes": "32x32",
+      "type": "image/png"
+    },
+    {
+      "src": "/favicon-16x16.png", 
+      "sizes": "16x16",
+      "type": "image/png"
+    },
+    {
+      "src": "/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    }
+  ],
+  "theme_color": "#4F46E5",
+  "background_color": "#ffffff",
+  "display": "standalone",
+  "orientation": "portrait",
+  "scope": "/",
+  "start_url": "/",
+  "lang": "zh-TW",
+  "categories": ["government", "politics", "education"]
+}

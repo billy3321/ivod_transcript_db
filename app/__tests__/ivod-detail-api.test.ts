@@ -25,14 +25,25 @@ describe('GET /api/ivods/[id]', () => {
     const mockData = {
       ivod_id: 123,
       date: '2023-01-01',
+      title: 'Test Title',
       meeting_name: 'Test Meeting',
       committee_names: ['Committee A'],
       speaker_name: 'Test Speaker',
       video_length: '30:00',
+      video_start: '09:00:00',
+      video_end: '09:30:00',
+      video_type: 'speech',
+      category: '質詢',
+      meeting_code: 'TEST001',
+      meeting_code_str: null,
+      meeting_time: '2023-01-01 09:00:00+08:00',
       ivod_url: 'https://example.com/ivod',
       video_url: 'https://example.com/video',
       ai_transcript: 'AI generated transcript',
-      ly_transcript: 'Legislative Yuan transcript'
+      ly_transcript: 'Legislative Yuan transcript',
+      ai_status: 'success',
+      ly_status: 'success',
+      last_updated: '2023-01-01 10:00:00+08:00'
     };
     
     req.query = { id: '123' };
@@ -45,14 +56,25 @@ describe('GET /api/ivods/[id]', () => {
       select: {
         ivod_id: true,
         date: true,
+        title: true,
         meeting_name: true,
         committee_names: true,
         speaker_name: true,
         video_length: true,
+        video_start: true,
+        video_end: true,
+        video_type: true,
+        category: true,
+        meeting_code: true,
+        meeting_code_str: true,
+        meeting_time: true,
         ivod_url: true,
         video_url: true,
         ai_transcript: true,
         ly_transcript: true,
+        ai_status: true,
+        ly_status: true,
+        last_updated: true,
       },
     });
     expect(statusMock).toHaveBeenCalledWith(200);

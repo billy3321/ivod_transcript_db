@@ -1,0 +1,42 @@
+# robots.txt for IVOD 逐字稿檢索系統
+
+User-agent: *
+Allow: /
+
+# Allow search engines to crawl all content
+Allow: /ivod/
+Allow: /about
+
+# Disallow admin and API endpoints
+Disallow: /api/
+Disallow: /admin/
+Disallow: /_next/
+Disallow: /_vercel/
+
+# Sitemap location
+Sitemap: https://ivod-search.g0v.tw/sitemap.xml
+
+# Crawl-delay for better server performance
+Crawl-delay: 1
+
+# Specific rules for major search engines
+User-agent: Googlebot
+Allow: /
+Crawl-delay: 1
+
+User-agent: Bingbot  
+Allow: /
+Crawl-delay: 2
+
+# Chinese search engines
+User-agent: Baiduspider
+Allow: /
+Crawl-delay: 2
+
+User-agent: Sogou web spider
+Allow: /
+Crawl-delay: 3
+
+User-agent: 360Spider
+Allow: /
+Crawl-delay: 3

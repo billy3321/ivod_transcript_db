@@ -5,7 +5,8 @@ dotenv.config();
 const backend = process.env.DB_BACKEND;
 if (backend) {
   if (backend === 'sqlite') {
-    process.env.DATABASE_URL = `file://${resolve(process.env.SQLITE_PATH)}`;
+    const sqlitePath = process.env.SQLITE_PATH || '../db/ivod_test.db';
+    process.env.DATABASE_URL = `file://${resolve(sqlitePath)}`;
   } else if (backend === 'postgresql') {
     const { PG_USER, PG_PASS, PG_HOST, PG_PORT, PG_DB } = process.env;
     process.env.DATABASE_URL = `${backend}://${PG_USER}:${PG_PASS}@${PG_HOST}:${PG_PORT}/${PG_DB}`;

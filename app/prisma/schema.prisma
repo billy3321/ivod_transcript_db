@@ -22,7 +22,7 @@ model IVODTranscript {
   video_url       String?
   title           String?
   speaker_name    String?
-  meeting_time    DateTime?
+  meeting_time    String?
   meeting_name    String?
   ai_transcript   String?
   ly_transcript   String?
@@ -30,7 +30,7 @@ model IVODTranscript {
   ai_retries      Int       @default(0)
   ly_status       String    @default("pending")
   ly_retries      Int       @default(0)
-  last_updated    DateTime
+  last_updated    String
   committee_names String?
 
   @@map("ivod_transcripts")

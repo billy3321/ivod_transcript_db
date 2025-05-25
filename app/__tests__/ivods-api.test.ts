@@ -39,10 +39,18 @@ describe('GET /api/ivods', () => {
       select: {
         ivod_id: true,
         date: true,
+        title: true,
         meeting_name: true,
         committee_names: true,
         speaker_name: true,
         video_length: true,
+        video_start: true,
+        video_end: true,
+        video_type: true,
+        category: true,
+        meeting_code: true,
+        meeting_code_str: true,
+        meeting_time: true,
       },
     });
     expect(statusMock).toHaveBeenCalledWith(200);
@@ -85,6 +93,7 @@ describe('GET /api/ivods', () => {
       where: {
         AND: [{
           OR: [
+            { title: { contains: 'test search', mode: 'insensitive' } },
             { meeting_name: { contains: 'test search', mode: 'insensitive' } },
             { speaker_name: { contains: 'test search', mode: 'insensitive' } },
             { committee_names: { contains: 'test search', mode: 'insensitive' } },
@@ -194,6 +203,7 @@ describe('GET /api/ivods', () => {
         AND: [
           {
             OR: [
+              { title: { contains: 'general search', mode: 'insensitive' } },
               { meeting_name: { contains: 'general search', mode: 'insensitive' } },
               { speaker_name: { contains: 'general search', mode: 'insensitive' } },
               { committee_names: { contains: 'general search', mode: 'insensitive' } },

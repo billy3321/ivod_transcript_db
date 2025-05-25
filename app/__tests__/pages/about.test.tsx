@@ -1,11 +1,15 @@
 import { render, screen } from '@testing-library/react'
 import About from '../../pages/about'
 
-// Mock the Layout component
-jest.mock('../../components/Layout', () => {
-  return function MockLayout({ children }: { children: React.ReactNode }) {
-    return <div data-testid="layout">{children}</div>
+// Mock Next.js components
+jest.mock('next/link', () => {
+  return ({ children, href }: { children: React.ReactNode; href: string }) => {
+    return <a href={href}>{children}</a>
   }
+})
+
+jest.mock('next/head', () => {
+  return ({ children }: { children: React.ReactNode }) => <>{children}</>
 })
 
 describe('About Page', () => {
@@ -45,13 +49,28 @@ describe('About Page', () => {
   it('has proper styling classes applied', () => {
     render(<About />)
     
-    // Check container structure
-    const container = screen.getByTestId('layout')
-    expect(container).toBeInTheDocument()
-    
     // Check if GitHub link has proper styling
     const githubLink = screen.getByRole('link', { name: /github.com\/billy3321\/ivod_transcript_db/ })
     expect(githubLink).toHaveClass('text-blue-600', 'hover:text-blue-800', 'underline')
+  })
+
+  it('renders return to home link', () => {
+    render(<About />)
+    
+    const homeLink = screen.getByRole('link', { name: /返回首頁/ })
+    expect(homeLink).toBeInTheDocument()
+    expect(homeLink).toHaveAttribute('href', '/')
+  })
+
+  it('has proper page title and meta description', () => {
+    render(<About />)
+    
+    // Check title element is rendered (even though it's mocked)
+    expect(screen.getByText('關於本站 - IVOD 逐字稿檢索系統')).toBeInTheDocument()
+    
+    // Check meta description element is rendered (even though it's mocked)
+    const metaDescription = document.querySelector('meta[name="description"]')
+    expect(metaDescription).toBeInTheDocument()
   })
 
   it('displays all required content sections', () => {

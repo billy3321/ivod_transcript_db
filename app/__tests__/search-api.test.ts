@@ -2,9 +2,14 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 // Mock Elasticsearch and Prisma clients before importing the handler
 jest.mock('@/lib/elastic', () => ({ __esModule: true, default: { search: jest.fn() } }));
 jest.mock('@/lib/prisma', () => ({ __esModule: true, default: { iVODTranscript: { findMany: jest.fn() } } }));
+jest.mock('@/lib/utils', () => ({
+  ...jest.requireActual('@/lib/utils'),
+  getDbBackend: jest.fn(),
+}));
 import handler from '@/pages/api/search';
 import client from '@/lib/elastic';
 import prisma from '@/lib/prisma';
+import { getDbBackend } from '@/lib/utils';
 
 describe('GET /api/search', () => {
   let statusMock: jest.Mock;
@@ -50,7 +55,8 @@ describe('GET /api/search', () => {
     });
   });
 
-  it('falls back to DB when Elasticsearch throws error', async () => {
+  it('falls back to DB when Elasticsearch throws error (PostgreSQL/MySQL)', async () => {
+    (getDbBackend as jest.Mock).mockReturnValue('postgresql');
     const mockSearch = (client.search as unknown) as jest.Mock;
     mockSearch.mockRejectedValue(new Error('ES down'));
     const mockFind = (prisma.iVODTranscript.findMany as unknown) as jest.Mock;
@@ -142,7 +148,36 @@ describe('GET /api/search', () => {
     });
   });
 
+  it('falls back to DB when Elasticsearch throws error (SQLite)', async () => {
+    (getDbBackend as jest.Mock).mockReturnValue('sqlite');
+    const mockSearch = (client.search as unknown) as jest.Mock;
+    mockSearch.mockRejectedValue(new Error('ES down'));
+    const mockFind = (prisma.iVODTranscript.findMany as unknown) as jest.Mock;
+    mockFind.mockResolvedValue([
+      { ivod_id: 3, ai_transcript: null, ly_transcript: 'fallback' },
+    ]);
+
+    await handler(req as NextApiRequest, res as NextApiResponse);
+
+    expect(mockSearch).toHaveBeenCalled();
+    expect(mockFind).toHaveBeenCalledWith({
+      where: {
+        OR: [
+          { ai_transcript: { contains: 'test' } },
+          { ly_transcript: { contains: 'test' } },
+        ],
+      },
+      select: { ivod_id: true, ai_transcript: true, ly_transcript: true },
+    });
+    expect(statusMock).toHaveBeenCalledWith(200);
+    expect(jsonMock).toHaveBeenCalledWith({
+      data: [{ id: 3, transcript: 'fallback' }],
+      fallback: true,
+    });
+  });
+
   it('prioritizes ai_transcript over ly_transcript in DB fallback', async () => {
+    (getDbBackend as jest.Mock).mockReturnValue('postgresql');
     const mockSearch = (client.search as unknown) as jest.Mock;
     mockSearch.mockRejectedValue(new Error('ES unavailable'));
     const mockFind = (prisma.iVODTranscript.findMany as unknown) as jest.Mock;
@@ -165,6 +200,7 @@ describe('GET /api/search', () => {
   });
 
   it('handles Elasticsearch connection timeout', async () => {
+    (getDbBackend as jest.Mock).mockReturnValue('postgresql');
     const mockSearch = (client.search as unknown) as jest.Mock;
     mockSearch.mockRejectedValue(new Error('Connection timeout'));
     const mockFind = (prisma.iVODTranscript.findMany as unknown) as jest.Mock;
@@ -181,6 +217,7 @@ describe('GET /api/search', () => {
   });
 
   it('handles database error during fallback', async () => {
+    (getDbBackend as jest.Mock).mockReturnValue('postgresql');
     const mockSearch = (client.search as unknown) as jest.Mock;
     mockSearch.mockRejectedValue(new Error('ES down'));
     const mockFind = (prisma.iVODTranscript.findMany as unknown) as jest.Mock;
@@ -206,6 +243,7 @@ describe('GET /api/search', () => {
   });
 
   it('handles empty results from database fallback', async () => {
+    (getDbBackend as jest.Mock).mockReturnValue('postgresql');
     const mockSearch = (client.search as unknown) as jest.Mock;
     mockSearch.mockRejectedValue(new Error('ES error'));
     const mockFind = (prisma.iVODTranscript.findMany as unknown) as jest.Mock;

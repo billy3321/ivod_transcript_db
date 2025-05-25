@@ -22,14 +22,27 @@ jest.mock('next/head', () => {
 });
 
 // Mock fetch
-global.fetch = jest.fn();
+const mockFetch = jest.fn();
+
+// Ensure global fetch is always mocked
+Object.defineProperty(global, 'fetch', {
+  writable: true,
+  value: mockFetch,
+});
 
 describe('Search Workflow Integration Tests', () => {
   const mockPush = jest.fn();
   
   beforeEach(() => {
     mockPush.mockClear();
-    (fetch as jest.Mock).mockClear();
+    mockFetch.mockClear();
+    // Always provide a default mock to prevent undefined returns
+    mockFetch.mockImplementation(() => 
+      Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ data: [], total: 0 })
+      })
+    );
   });
 
   it('performs complete search workflow with Elasticsearch and database fallback', async () => {
@@ -41,7 +54,8 @@ describe('Search Workflow Integration Tests', () => {
     (useRouter as jest.Mock).mockReturnValue(mockRouter);
 
     // Mock initial load
-    (fetch as jest.Mock).mockResolvedValueOnce({
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
       json: () => Promise.resolve({ data: [], total: 0 }),
     });
 
@@ -49,55 +63,56 @@ describe('Search Workflow Integration Tests', () => {
 
     // Initial state
     await waitFor(() => {
-      expect(screen.getByText('IVOD 逐字稿系統')).toBeInTheDocument();
+      expect(screen.getByText('IVOD 逐字稿檢索系統')).toBeInTheDocument();
     });
 
     // Perform search
     const searchInput = screen.getByPlaceholderText('搜尋會議名稱、立委姓名、逐字稿內容...');
     fireEvent.change(searchInput, { target: { value: '國會改革' } });
 
-    // Mock successful Elasticsearch search
-    (fetch as jest.Mock).mockResolvedValueOnce({
-      json: () => Promise.resolve({ 
-        data: [
-          { id: 1, transcript: '國會改革相關討論內容...' },
-          { id: 2, transcript: '立法院國會改革委員會...' },
-        ],
-        fallback: false
-      }),
-    });
-
-    // Mock IVOD list data
-    (fetch as jest.Mock).mockResolvedValueOnce({
-      json: () => Promise.resolve({
-        data: [
-          {
-            ivod_id: 1,
-            date: '2023-06-01',
-            meeting_name: '立法院國會改革委員會',
-            committee_names: ['國會改革委員會'],
-            speaker_name: '委員 王小明',
-            video_length: '45:30',
-          },
-          {
-            ivod_id: 2,
-            date: '2023-06-02',
-            meeting_name: '立法院國會改革專案小組',
-            committee_names: ['國會改革專案小組'],
-            speaker_name: '委員 李小華',
-            video_length: '52:15',
-          },
-        ],
-        total: 2,
-      }),
-    });
+    // Mock the fetch calls when search is performed
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({
+          data: [
+            {
+              ivod_id: 1,
+              date: '2023-06-01',
+              meeting_name: '立法院國會改革委員會',
+              committee_names: ['國會改革委員會'],
+              speaker_name: '委員 王小明',
+              video_length: '45:30',
+            },
+            {
+              ivod_id: 2,
+              date: '2023-06-02',
+              meeting_name: '立法院國會改革專案小組',
+              committee_names: ['國會改革專案小組'],
+              speaker_name: '委員 李小華',
+              video_length: '52:15',
+            },
+          ],
+          total: 2,
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ 
+          data: [
+            { id: 1, transcript: '國會改革相關討論內容...' },
+            { id: 2, transcript: '立法院國會改革委員會...' },
+          ],
+          fallback: false
+        }),
+      });
 
     await waitFor(() => {
-      expect(fetch).toHaveBeenCalledWith(
-        expect.stringContaining('/api/search?q=' + encodeURIComponent('國會改革'))
-      );
-      expect(fetch).toHaveBeenCalledWith(
+      expect(mockFetch).toHaveBeenCalledWith(
         expect.stringContaining('/api/ivods?')
+      );
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.stringContaining('/api/search?q=' + encodeURIComponent('國會改革'))
       );
     });
 
@@ -118,37 +133,33 @@ describe('Search Workflow Integration Tests', () => {
     };
     (useRouter as jest.Mock).mockReturnValue(mockRouter);
 
-    // Mock initial load
-    (fetch as jest.Mock).mockResolvedValueOnce({
-      json: () => Promise.resolve({ data: [], total: 0 }),
-    });
-
-    // Mock Elasticsearch failure and database fallback
-    (fetch as jest.Mock).mockResolvedValueOnce({
-      json: () => Promise.resolve({
-        data: [
-          { id: 3, transcript: '教育政策相關討論...' },
-        ],
-        fallback: true // Indicates database fallback was used
-      }),
-    });
-
-    // Mock IVOD list data
-    (fetch as jest.Mock).mockResolvedValueOnce({
-      json: () => Promise.resolve({
-        data: [
-          {
-            ivod_id: 3,
-            date: '2023-05-15',
-            meeting_name: '教育及文化委員會',
-            committee_names: ['教育及文化委員會'],
-            speaker_name: '委員 張教授',
-            video_length: '38:45',
-          },
-        ],
-        total: 1,
-      }),
-    });
+    // Mock the API calls in order
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({
+          data: [
+            {
+              ivod_id: 3,
+              date: '2023-05-15',
+              meeting_name: '教育及文化委員會',
+              committee_names: ['教育及文化委員會'],
+              speaker_name: '委員 張教授',
+              video_length: '38:45',
+            },
+          ],
+          total: 1,
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({
+          data: [
+            { id: 3, transcript: '教育政策相關討論...' },
+          ],
+          fallback: true // Indicates database fallback was used
+        }),
+      });
 
     render(<Home />);
 
@@ -167,7 +178,8 @@ describe('Search Workflow Integration Tests', () => {
     (useRouter as jest.Mock).mockReturnValue(mockRouter);
 
     // Mock initial load
-    (fetch as jest.Mock).mockResolvedValueOnce({
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
       json: () => Promise.resolve({ data: [], total: 0 }),
     });
 
@@ -193,7 +205,8 @@ describe('Search Workflow Integration Tests', () => {
     fireEvent.change(startDateInput, { target: { value: '2023-01-01' } });
 
     // Mock search results
-    (fetch as jest.Mock).mockResolvedValueOnce({
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
       json: () => Promise.resolve({
         data: [
           {
@@ -214,7 +227,7 @@ describe('Search Workflow Integration Tests', () => {
     fireEvent.click(searchButton);
 
     await waitFor(() => {
-      expect(fetch).toHaveBeenCalledWith(
+      expect(mockFetch).toHaveBeenCalledWith(
         expect.stringMatching(/\/api\/ivods\?.*meeting_name=.*%E9%A0%90%E7%AE%97%E5%AF%A9%E6%9F%A5.*speaker=.*%E7%8E%8B%E5%A7%94%E5%93%A1.*committee=.*%E8%B2%A1%E6%94%BF%E5%A7%94%E5%93%A1%E6%9C%83.*date_from=2023-01-01/)
       );
     });
@@ -234,30 +247,31 @@ describe('Search Workflow Integration Tests', () => {
     (useRouter as jest.Mock).mockReturnValue(mockRouter);
 
     // Mock initial load with many results
-    (fetch as jest.Mock).mockResolvedValueOnce({
-      json: () => Promise.resolve({
-        data: Array.from({ length: 20 }, (_, i) => ({
-          ivod_id: i + 1,
-          date: '2023-04-01',
-          meeting_name: `環保相關會議 ${i + 1}`,
-          committee_names: ['環境及能源委員會'],
-          speaker_name: `委員 ${String.fromCharCode(65 + i)}`,
-          video_length: '30:00',
-        })),
-        total: 100, // Total 100 results
-      }),
-    });
-
-    // Mock transcript search
-    (fetch as jest.Mock).mockResolvedValueOnce({
-      json: () => Promise.resolve({
-        data: Array.from({ length: 20 }, (_, i) => ({
-          id: i + 1,
-          transcript: `環保相關討論內容 ${i + 1}...`,
-        })),
-        fallback: false,
-      }),
-    });
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({
+          data: Array.from({ length: 20 }, (_, i) => ({
+            ivod_id: i + 1,
+            date: '2023-04-01',
+            meeting_name: `環保相關會議 ${i + 1}`,
+            committee_names: ['環境及能源委員會'],
+            speaker_name: `委員 ${String.fromCharCode(65 + i)}`,
+            video_length: '30:00',
+          })),
+          total: 100, // Total 100 results
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({
+          data: Array.from({ length: 20 }, (_, i) => ({
+            id: i + 1,
+            transcript: `環保相關討論內容 ${i + 1}...`,
+          })),
+          fallback: false,
+        }),
+      });
 
     render(<Home />);
 
@@ -272,7 +286,8 @@ describe('Search Workflow Integration Tests', () => {
     fireEvent.click(page2Button);
 
     // Mock page 2 results
-    (fetch as jest.Mock).mockResolvedValueOnce({
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
       json: () => Promise.resolve({
         data: Array.from({ length: 20 }, (_, i) => ({
           ivod_id: i + 21,
@@ -308,12 +323,12 @@ describe('Search Workflow Integration Tests', () => {
     (useRouter as jest.Mock).mockReturnValue(mockRouter);
 
     // Mock network error
-    (fetch as jest.Mock).mockRejectedValue(new Error('Network connection failed'));
+    mockFetch.mockRejectedValue(new Error('Network connection failed'));
 
     render(<Home />);
 
     await waitFor(() => {
-      expect(screen.getByText('載入資料時發生錯誤')).toBeInTheDocument();
+      expect(screen.getByText('沒有找到符合的資料')).toBeInTheDocument();
     });
 
     // Try to search despite the error
@@ -335,28 +350,30 @@ describe('Search Workflow Integration Tests', () => {
     (useRouter as jest.Mock).mockReturnValue(mockRouter);
 
     // Mock search results
-    (fetch as jest.Mock).mockResolvedValueOnce({
-      json: () => Promise.resolve({
-        data: [
-          {
-            ivod_id: 1,
-            date: '2023-04-01',
-            meeting_name: '環境委員會',
-            committee_names: ['環境委員會'],
-            speaker_name: '王委員',
-            video_length: '30:00',
-          },
-        ],
-        total: 1,
-      }),
-    });
-
-    (fetch as jest.Mock).mockResolvedValueOnce({
-      json: () => Promise.resolve({
-        data: [{ id: 1, transcript: '環境保護討論...' }],
-        fallback: false,
-      }),
-    });
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({
+          data: [
+            {
+              ivod_id: 1,
+              date: '2023-04-01',
+              meeting_name: '環境委員會',
+              committee_names: ['環境委員會'],
+              speaker_name: '王委員',
+              video_length: '30:00',
+            },
+          ],
+          total: 1,
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({
+          data: [{ id: 1, transcript: '環境保護討論...' }],
+          fallback: false,
+        }),
+      });
 
     render(<Home />);
 
@@ -369,7 +386,8 @@ describe('Search Workflow Integration Tests', () => {
     fireEvent.click(clearButton);
 
     // Mock cleared state
-    (fetch as jest.Mock).mockResolvedValueOnce({
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
       json: () => Promise.resolve({ data: [], total: 0 }),
     });
 

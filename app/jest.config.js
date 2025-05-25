@@ -8,11 +8,8 @@ module.exports = {
   setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
   testPathIgnorePatterns: ['<rootDir>/node_modules/', '<rootDir>/cypress/'],
   transform: {
-    '^.+\\.(ts|tsx)$': 'ts-jest'
-  },
-  globals: {
-    'ts-jest': {
+    '^.+\\.(ts|tsx)$': ['ts-jest', {
       tsconfig: { jsx: 'react-jsx' }
-    }
+    }]
   },
 };

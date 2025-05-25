@@ -27,6 +27,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (q && typeof q === 'string') {
     conditions.push({
       OR: [
+        { title: { contains: q, mode: 'insensitive' } },
         { meeting_name: { contains: q, mode: 'insensitive' } },
         { speaker_name: { contains: q, mode: 'insensitive' } },
         { committee_names: { contains: q, mode: 'insensitive' } },
@@ -83,10 +84,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         select: {
           ivod_id: true,
           date: true,
+          title: true,
           meeting_name: true,
           committee_names: true,
           speaker_name: true,
           video_length: true,
+          video_start: true,
+          video_end: true,
+          video_type: true,
+          category: true,
+          meeting_code: true,
+          meeting_code_str: true,
+          meeting_time: true,
         },
       }),
       prisma.iVODTranscript.count({ where }),

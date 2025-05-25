@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import client from '@/lib/elastic';
 import bodybuilder from 'bodybuilder';
 import prisma from '@/lib/prisma';
+import { getDbBackend } from '@/lib/utils';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { q = '' } = req.query;
@@ -27,12 +28,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   } catch (error: any) {
     // Elasticsearch failed or not reachable; fallback to DB search
     usedES = false;
+    const dbBackend = getDbBackend();
+    
+    // Build search conditions based on database backend
+    const searchConditions = dbBackend === 'sqlite' 
+      ? [
+          { ai_transcript: { contains: q } },
+          { ly_transcript: { contains: q } },
+        ]
+      : [
+          { ai_transcript: { contains: q, mode: 'insensitive' as const } },
+          { ly_transcript: { contains: q, mode: 'insensitive' as const } },
+        ];
+    
     const records = await prisma.iVODTranscript.findMany({
       where: {
-        OR: [
-          { ai_transcript: { contains: q, mode: 'insensitive' } },
-          { ly_transcript: { contains: q, mode: 'insensitive' } },
-        ],
+        OR: searchConditions,
       },
       select: {
         ivod_id: true,

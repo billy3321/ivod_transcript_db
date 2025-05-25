@@ -46,6 +46,36 @@ if (backend === 'sqlite') {
   );
 }
 
+// Handle meeting_time field based on backend
+if (backend === 'sqlite') {
+  // SQLite stores timestamp as string
+  schema = schema.replace(
+    /^\s*meeting_time\s+.*$/m,
+    '  meeting_time    String?'
+  );
+} else {
+  // PostgreSQL and MySQL use proper timestamp with timezone
+  schema = schema.replace(
+    /^\s*meeting_time\s+.*$/m,
+    '  meeting_time    DateTime?'
+  );
+}
+
+// Handle last_updated field based on backend
+if (backend === 'sqlite') {
+  // SQLite stores timestamp as string
+  schema = schema.replace(
+    /^\s*last_updated\s+.*$/m,
+    '  last_updated    String'
+  );
+} else {
+  // PostgreSQL and MySQL use proper timestamp with timezone
+  schema = schema.replace(
+    /^\s*last_updated\s+.*$/m,
+    '  last_updated    DateTime'
+  );
+}
+
 // Handle committee_names field based on backend
 if (backend === 'postgresql') {
   schema = schema.replace(
