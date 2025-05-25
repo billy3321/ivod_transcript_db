@@ -112,7 +112,7 @@ export default function Home() {
     if (q || meeting_name || speaker || committee || date_from || date_to) {
       setPage(1);
     }
-  }, [filters.q, filters.meeting_name, filters.speaker, filters.committee, filters.date_from, filters.date_to]);
+  }, [filters]);
 
   // Fetch data when search params change
   useEffect(() => {
