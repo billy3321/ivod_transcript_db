@@ -15,7 +15,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       OR: [
         { meeting_name: { contains: q, mode: 'insensitive' } },
         { speaker_name: { contains: q, mode: 'insensitive' } },
-        { committee_names: { has: q } },
+        { committee_names: { contains: q, mode: 'insensitive' } },
       ],
     };
   }

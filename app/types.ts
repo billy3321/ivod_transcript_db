@@ -2,7 +2,7 @@ export interface IVOD {
   ivod_id: number;
   date: string;
   meeting_name: string;
-  committee_names: string[];
+  committee_names: string[] | string | null;
   speaker_name: string;
   video_length: string;
 }

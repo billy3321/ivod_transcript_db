@@ -11,7 +11,7 @@ datasource db {
 model IVODTranscript {
   ivod_id         Int      @id
   ivod_url        String
-  date            DateTime
+  date            String
   meeting_code    String?
   meeting_code_str String?
   category        String?

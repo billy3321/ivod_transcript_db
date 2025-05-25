@@ -45,6 +45,31 @@ cp .env.example .env
 ./ivod_retry.py
 ```
 
+### Web Application Commands
+
+```bash
+# Development server
+npm run dev
+
+# Build for production
+npm run build
+
+# Start production server
+npm run start
+
+# Run tests
+npm run test        # Watch mode
+npm run test:ci     # CI mode
+
+# Cypress tests
+npm run cypress:open
+npm run cypress:run
+
+# Prisma database commands
+npm run prisma:prepare
+npm run prisma:generate
+```
+
 ### Configuration Options
 
 The system uses environment variables for configuration:

@@ -2,6 +2,7 @@ import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
 import { IVODDetail } from '@/types';
 import TranscriptViewer from '@/components/TranscriptViewer';
+import { formatCommitteeNames } from '@/lib/utils';
 
 export default function IvodDetail() {
   const router = useRouter();
@@ -51,7 +52,7 @@ export default function IvodDetail() {
             <strong>Speaker:</strong> {data.speaker_name}
           </p>
           <p className="mb-2">
-            <strong>Committees:</strong> {data.committee_names.join(', ')}
+            <strong>Committees:</strong> {formatCommitteeNames(data.committee_names)}
           </p>
           <p className="mb-4">
             <strong>Duration:</strong> {data.video_length}

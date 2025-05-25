@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { IVOD } from '@/types';
+import { formatCommitteeNames } from '@/lib/utils';
 
 interface ListProps {
   items: IVOD[];
@@ -19,7 +20,7 @@ export default function List({ items }: ListProps) {
             </h2>
             <p className="text-sm text-gray-600 mb-1">{item.date}</p>
             <p className="text-sm mb-1">
-              <strong>Committee:</strong> {item.committee_names.join(', ')}
+              <strong>Committee:</strong> {formatCommitteeNames(item.committee_names)}
             </p>
             <p className="text-sm mb-2">
               <strong>Speaker:</strong> {item.speaker_name}

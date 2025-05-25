@@ -31,6 +31,22 @@ schema = schema.replace(
   `$1${backend}$2`
 );
 
+// Handle date field based on backend
+if (backend === 'sqlite') {
+  // SQLite stores Date as string, so use String type in Prisma
+  schema = schema.replace(
+    /^\s*date\s+.*$/m,
+    '  date            String'
+  );
+} else {
+  // PostgreSQL and MySQL properly support Date type
+  schema = schema.replace(
+    /^\s*date\s+.*$/m,
+    '  date            DateTime'
+  );
+}
+
+// Handle committee_names field based on backend
 if (backend === 'postgresql') {
   schema = schema.replace(
     /^\s*committee_names\s+.*$/m,
