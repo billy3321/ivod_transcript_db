@@ -3,7 +3,7 @@ dotenv.config();
 const backend = process.env.DB_BACKEND;
 if (backend) {
   if (backend === 'sqlite') {
-    process.env.DATABASE_URL = `sqlite://${process.env.SQLITE_PATH}`;
+    process.env.DATABASE_URL = `file://${process.env.SQLITE_PATH}`;
   } else if (backend === 'postgresql') {
     const { PG_USER, PG_PASS, PG_HOST, PG_PORT, PG_DB } = process.env;
     process.env.DATABASE_URL = `${backend}://${PG_USER}:${PG_PASS}@${PG_HOST}:${PG_PORT}/${PG_DB}`;
