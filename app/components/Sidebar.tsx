@@ -16,6 +16,7 @@ const Sidebar: FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
 
   const navItems = [
     { label: 'Home', href: '/' },
+    { label: 'About', href: '/about' },
   ]
 
   return (
@@ -57,7 +58,7 @@ const Sidebar: FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
             </span>
           </div>
         </div>
-        <nav className="mt-10">
+        <nav className="mt-10" data-cy="sidebar">
           {navItems.map(item => (
             <Link key={item.href} href={item.href} className={`flex items-center px-6 py-2 mt-4 duration-200 border-l-4 ${
                   router.pathname === item.href ? activeClass : inactiveClass
