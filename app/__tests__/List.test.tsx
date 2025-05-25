@@ -85,9 +85,9 @@ describe('List', () => {
   it('handles empty items array', () => {
     render(<List items={[]} />);
     
-    // Should render empty grid without errors
-    const grid = document.querySelector('.grid');
-    expect(grid).toBeInTheDocument();
-    expect(grid?.children).toHaveLength(0);
+    // Should render empty container without errors
+    const container = document.querySelector('.space-y-4');
+    expect(container).toBeInTheDocument();
+    expect(container?.children).toHaveLength(0);
   });
 });
