@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import '@testing-library/jest-dom';
 import { ReactNode } from 'react';
 import { TextEncoder, TextDecoder } from 'util';

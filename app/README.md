@@ -73,30 +73,46 @@ To ensure a responsive, modern, and user-friendly interface, follow these guidel
 
 ## 5. 環境變數
 
-在 `app/` 目錄下，根據 `.env.example` 建立 `.env.local` 檔，並填入以下內容：
+在 `app/` 目錄下，根據 `.env.example` 建立 `.env` 檔，並填入以下內容：
 
 ```ini
-# 資料庫提供者：可選 'postgresql'、'mysql' 或 'sqlite'
-DB_PROVIDER="postgresql"
+# DB backend: sqlite / postgresql / mysql
+DB_BACKEND=sqlite
 
-# IVOD 元資料庫連線字串
-DATABASE_URL="postgresql://user:pass@host:5432/dbname"
-# 若使用 MySQL：mysql://user:pass@host:3306/dbname
-# 若使用 SQLite（檔案路徑；需使用 sqlite:/// 前綴）：sqlite:///../db/ivod_local.db
+# For SQLite (only if DB_BACKEND=sqlite).
+# Recommend using shared DB file in project-level 'db' directory:
+SQLITE_PATH=../db/ivod_local.db
 
-# （可選）指定測試用資料庫連線字串，避免修改主要資料庫
-# TEST_DATABASE_URL="sqlite:///../db/ivod_test.db"
+# For PostgreSQL (only if DB_BACKEND=postgresql)
+# PG_HOST=localhost
+# PG_PORT=5432
+# PG_DB=ivod_db
+# PG_USER=ivod_user
+# PG_PASS=ivod_password
 
-# Elasticsearch 連線設定
-ES_HOST="localhost"
-ES_PORT="9200"
-ES_SCHEME="http"
-# ES_USER（使用者名稱）
-# ES_PASS（密碼）
-ES_INDEX="ivod_transcripts"
+# For MySQL (only if DB_BACKEND=mysql)
+# MYSQL_HOST=localhost
+# MYSQL_PORT=3306
+# MYSQL_DB=ivod_db
+# MYSQL_USER=ivod_user
+# MYSQL_PASS=ivod_password
 
-# （可選）將索引名稱公開到瀏覽器端
-NEXT_PUBLIC_ES_INDEX="ivod_transcripts"
+# (Optional) Override SQLite path for integration tests to avoid modifying your primary DB
+# TEST_SQLITE_PATH=../db/ivod_test.db
+
+# (Optional) Skip SSL cert verification if encountering SSL errors
+# SKIP_SSL=True
+
+# Elasticsearch settings (可選，設定 ES 連線與索引名稱)
+# ES_HOST=localhost
+# ES_PORT=9200
+# ES_SCHEME=http
+# ES_USER=your_username
+# ES_PASS=your_password
+# ES_INDEX=ivod_transcripts
+
+# (Optional) Expose index to browser side
+# NEXT_PUBLIC_ES_INDEX=ivod_transcripts
 ```
 
 ## 6. 本地開發
@@ -104,11 +120,12 @@ NEXT_PUBLIC_ES_INDEX="ivod_transcripts"
 ```bash
 cd app
 npm install
-cp .env.example .env.local
+cp .env.example .env
 # 若使用 SQLite，建立共用資料庫資料夾：mkdir -p ../db
-# 編輯 .env.local，設定 DATABASE_URL、DB_PROVIDER 和 Elasticsearch 相關變數
-npx prisma generate
-npx prisma migrate dev --name init
+# 編輯 .env，設定 DB_BACKEND、對應連線參數及 Elasticsearch 相關變數
+# 若使用非 SQLite 後端，執行下列命令會自動更新 prisma/schema.prisma 內的 provider 以符合 .env 的 DB_BACKEND
+npm run prisma:generate
+# npx prisma migrate dev --name init
 npm run dev
 ```
 

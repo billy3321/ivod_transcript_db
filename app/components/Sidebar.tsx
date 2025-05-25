@@ -59,14 +59,10 @@ const Sidebar: FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
         </div>
         <nav className="mt-10">
           {navItems.map(item => (
-            <Link key={item.href} href={item.href}>
-              <a
-                className={`flex items-center px-6 py-2 mt-4 duration-200 border-l-4 ${
+            <Link key={item.href} href={item.href} className={`flex items-center px-6 py-2 mt-4 duration-200 border-l-4 ${
                   router.pathname === item.href ? activeClass : inactiveClass
-                }`}
-              >
-                <span className="mx-4">{item.label}</span>
-              </a>
+                }`}>
+              <span className="mx-4">{item.label}</span>
             </Link>
           ))}
         </nav>

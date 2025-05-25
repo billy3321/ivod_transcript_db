@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { IVOD } from '@/types';
 import List from '@/components/List';
+import Pagination from '@/components/Pagination';
 
 export default function Home() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -26,7 +27,6 @@ export default function Home() {
       .finally(() => setLoading(false));
   }, [searchTerm, sortOrder, page]);
 
-  const totalPages = data ? Math.ceil(data.total / 20) : 0;
 
   if (loading && !data) {
     return <div className="container mx-auto p-4">Loading...</div>;
@@ -52,30 +52,13 @@ export default function Home() {
         </select>
       </div>
       <List items={data?.data || []} />
-      <div className="flex justify-center items-center space-x-2 mt-4">
-        <button
-          onClick={() => setPage(page - 1)}
-          disabled={page <= 1}
-          className="px-3 py-1 border rounded disabled:opacity-50"
-        >
-          Previous
-        </button>
-        {[...Array(totalPages)].map((_, i) => (
-          <button
-            key={i}
-            onClick={() => setPage(i + 1)}
-            className={`px-3 py-1 border rounded ${page === i + 1 ? 'bg-blue-600 text-white' : ''}`}
-          >
-            {i + 1}
-          </button>
-        ))}
-        <button
-          onClick={() => setPage(page + 1)}
-          disabled={page >= totalPages}
-          className="px-3 py-1 border rounded disabled:opacity-50"
-        >
-          Next
-        </button>
+      <div className="flex justify-center items-center">
+        <Pagination
+          currentPage={page}
+          total={data?.total || 0}
+          pageSize={20}
+          onPageChange={setPage}
+        />
       </div>
     </div>
   );

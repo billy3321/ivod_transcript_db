@@ -10,31 +10,37 @@
     "test": "jest --passWithNoTests --watch",
     "test:ci": "jest --runInBand --passWithNoTests",
     "cypress:open": "cypress open",
-    "cypress:run": "cypress run"
+    "cypress:run": "cypress run",
+    "prisma:prepare": "node scripts/updatePrismaSchema.js",
+    "prisma:generate": "npm run prisma:prepare && prisma generate"
   },
   "dependencies": {
     "@elastic/elasticsearch": "^8.8.0",
     "@prisma/client": "^4.15.0",
+    "@tailwindcss/postcss": "^4.1.7",
+    "@tanstack/react-query": "^5.77.0",
+    "autoprefixer": "^10.4.21",
     "bodybuilder": "^2.1.0",
     "mysql2": "^3.2.4",
     "next": "^15.2.3",
     "pg": "^8.8.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "sqlite3": "^5.1.6"
+    "sqlite3": "^5.1.6",
+    "tailwindcss": "^4.1.7"
   },
   "devDependencies": {
-    "dotenv": "^16.0.0",
     "@testing-library/jest-dom": "^5.16.5",
     "@testing-library/react": "^13.4.0",
     "@types/jest": "^29.2.1",
     "cypress": "^14.4.0",
+    "dotenv": "^16.0.0",
     "eslint": "^8.0.0",
     "eslint-config-next": "^13.4.0",
     "jest": "^29.4.3",
+    "jest-environment-jsdom": "^29.4.3",
     "prisma": "^4.15.0",
     "ts-jest": "^29.0.5",
-    "typescript": "^4.9.5",
-    "jest-environment-jsdom": "^29.4.3"
+    "typescript": "^4.9.5"
   }
 }

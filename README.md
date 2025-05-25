@@ -19,7 +19,6 @@ crawler/
 ├── .env(.example)、openssl.cnf、requirements*.txt
 └── tests/              # pytest tests: core/、crawler/、db/、tasks/
 ```
-
 ### 1.3 使用範例
 ```
 # 首次或重置：全量拉取
@@ -108,3 +107,7 @@ npm start
 - `package.json` 已定義 `test`、`test:ci`、`cypress:open`、`cypress:run`
 
 詳細使用與開發說明請參考 [app/README.md](app/README.md)。
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.

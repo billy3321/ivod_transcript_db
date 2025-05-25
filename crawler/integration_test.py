@@ -31,7 +31,8 @@ from ivod.core import (
 
 # Reset test database (delete all existing records)
 db = Session()
-print("Resetting test database: deleting all records...")
+bind = db.get_bind()
+print("⚙️ 使用的 DB URL:", bind.engine.url)
 db.query(IVODTranscript).delete()
 db.commit()
 

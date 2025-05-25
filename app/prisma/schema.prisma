@@ -2,8 +2,9 @@ generator client {
   provider = "prisma-client-js"
 }
 
+/// Prisma currently requires a static provider value; update this line to match your DB_BACKEND (sqlite / postgresql / mysql)
 datasource db {
-  provider = env("DB_PROVIDER")
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
@@ -30,7 +31,7 @@ model IVODTranscript {
   ly_status       String    @default("pending")
   ly_retries      Int       @default(0)
   last_updated    DateTime
-  committee_names Json?
+  committee_names String?
 
   @@map("ivod_transcripts")
 }
