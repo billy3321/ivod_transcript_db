@@ -124,6 +124,138 @@ describe('Home Page', () => {
     });
   });
 
+  it('does not trigger search automatically when typing in advanced search fields', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ data: [], total: 0 }),
+    });
+
+    render(<Home />);
+
+    await waitFor(() => {
+      expect(screen.getByText('進階搜尋')).toBeInTheDocument();
+    });
+
+    // Open advanced search
+    const advancedSearchToggle = screen.getByText('進階搜尋');
+    fireEvent.click(advancedSearchToggle);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('會議名稱')).toBeInTheDocument();
+    });
+
+    // Clear any initial fetch calls
+    mockFetch.mockClear();
+    mockPush.mockClear();
+
+    // Type in advanced search fields
+    const meetingNameInput = screen.getByLabelText('會議名稱');
+    const speakerInput = screen.getByLabelText('立委姓名');
+    
+    fireEvent.change(meetingNameInput, { target: { value: '委員會' } });
+    fireEvent.change(speakerInput, { target: { value: '王委員' } });
+
+    // Wait a bit to ensure no automatic search is triggered
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    // Should not have made new API calls or router pushes
+    expect(mockFetch).not.toHaveBeenCalled();
+    expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  it('triggers search only when search button is clicked with advanced search data', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ data: [], total: 0 }),
+    });
+
+    render(<Home />);
+
+    await waitFor(() => {
+      expect(screen.getByText('進階搜尋')).toBeInTheDocument();
+    });
+
+    // Open advanced search
+    const advancedSearchToggle = screen.getByText('進階搜尋');
+    fireEvent.click(advancedSearchToggle);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('會議名稱')).toBeInTheDocument();
+    });
+
+    // Clear any initial fetch calls
+    mockFetch.mockClear();
+    mockPush.mockClear();
+
+    // Fill in advanced search fields
+    const meetingNameInput = screen.getByLabelText('會議名稱');
+    const speakerInput = screen.getByLabelText('立委姓名');
+    const searchButton = screen.getByText('搜尋');
+    
+    fireEvent.change(meetingNameInput, { target: { value: '委員會會議' } });
+    fireEvent.change(speakerInput, { target: { value: '王委員' } });
+
+    // Click search button
+    fireEvent.click(searchButton);
+
+    await waitFor(() => {
+      expect(mockPush).toHaveBeenCalledWith(
+        expect.objectContaining({
+          pathname: '/',
+          query: expect.objectContaining({
+            meeting_name: '委員會會議',
+            speaker: '王委員',
+          }),
+        }),
+        undefined,
+        { shallow: true }
+      );
+    });
+  });
+
+  it('triggers search when Enter key is pressed in advanced search fields', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ data: [], total: 0 }),
+    });
+
+    render(<Home />);
+
+    await waitFor(() => {
+      expect(screen.getByText('進階搜尋')).toBeInTheDocument();
+    });
+
+    // Open advanced search
+    const advancedSearchToggle = screen.getByText('進階搜尋');
+    fireEvent.click(advancedSearchToggle);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('會議名稱')).toBeInTheDocument();
+    });
+
+    // Clear any initial fetch calls
+    mockFetch.mockClear();
+    mockPush.mockClear();
+
+    // Fill in advanced search field and press Enter
+    const meetingNameInput = screen.getByLabelText('會議名稱');
+    fireEvent.change(meetingNameInput, { target: { value: '委員會會議' } });
+    fireEvent.keyPress(meetingNameInput, { key: 'Enter', code: 'Enter' });
+
+    await waitFor(() => {
+      expect(mockPush).toHaveBeenCalledWith(
+        expect.objectContaining({
+          pathname: '/',
+          query: expect.objectContaining({
+            meeting_name: '委員會會議',
+          }),
+        }),
+        undefined,
+        { shallow: true }
+      );
+    });
+  });
+
   it('makes API calls with correct parameters', async () => {
     const mockData = {
       data: [

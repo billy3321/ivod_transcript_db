@@ -1,6 +1,7 @@
 import { FC } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/router'
+import NavText from './NavText'
 
 interface HeaderProps {
   onMenuClick: () => void
@@ -76,7 +77,7 @@ const Header: FC<HeaderProps> = ({ onMenuClick }) => {
                 : 'text-gray-600 hover:text-indigo-600 hover:bg-gray-50'
             }`}
           >
-            {item.label}
+            <NavText text={item.label} />
           </Link>
         ))}
       </nav>

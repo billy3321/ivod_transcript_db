@@ -23,6 +23,21 @@ const nextConfig = {
   // Generate ETags for better caching
   generateEtags: true,
   
+  // Reduce Fast Refresh frequency to prevent constant reloading
+  experimental: {
+    optimizeCss: false,
+  },
+  
+  // Development configuration
+  ...(process.env.NODE_ENV === 'development' && {
+    onDemandEntries: {
+      // Period (in ms) where the server will keep pages in the buffer
+      maxInactiveAge: 25 * 1000,
+      // Number of pages that should be kept simultaneously without being disposed
+      pagesBufferLength: 2,
+    }
+  }),
+  
   // Optimize images
   images: {
     formats: ['image/webp', 'image/avif'],

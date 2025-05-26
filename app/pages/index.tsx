@@ -5,9 +5,20 @@ import Link from 'next/link';
 import { IVOD } from '@/types';
 import List from '@/components/List';
 import Pagination from '@/components/Pagination';
+import Icon from '@/components/Icon';
+import ChevronIcon from '@/components/ChevronIcon';
+import ClientOnly from '@/components/ClientOnly';
 
 interface SearchFilters {
   q: string;
+  meeting_name: string;
+  speaker: string;
+  committee: string;
+  date_from: string;
+  date_to: string;
+}
+
+interface AdvancedSearchInput {
   meeting_name: string;
   speaker: string;
   committee: string;
@@ -21,6 +32,13 @@ export default function Home() {
   const router = useRouter();
   const [filters, setFilters] = useState<SearchFilters>({
     q: '',
+    meeting_name: '',
+    speaker: '',
+    committee: '',
+    date_from: '',
+    date_to: ''
+  });
+  const [advancedInput, setAdvancedInput] = useState<AdvancedSearchInput>({
     meeting_name: '',
     speaker: '',
     committee: '',
@@ -53,6 +71,13 @@ export default function Home() {
 
       setFilters({
         q: q as string,
+        meeting_name: meeting_name as string,
+        speaker: speaker as string,
+        committee: committee as string,
+        date_from: date_from as string,
+        date_to: date_to as string
+      });
+      setAdvancedInput({
         meeting_name: meeting_name as string,
         speaker: speaker as string,
         committee: committee as string,
@@ -185,18 +210,21 @@ export default function Home() {
     }
   }, [searchParams, filters, sortOrder, page, searchScope, router.isReady]);
 
-  const handleFilterChange = (key: keyof SearchFilters, value: string) => {
-    setFilters(prev => ({ ...prev, [key]: value }));
+  const handleAdvancedInputChange = (key: keyof AdvancedSearchInput, value: string) => {
+    setAdvancedInput(prev => ({ ...prev, [key]: value }));
   };
 
   const handleSearch = () => {
-    if (searchScope === 'all') {
-      // For 'all' scope, use q parameter in /api/ivods to search all fields
-      setFilters(prev => ({ ...prev, q: searchQuery }));
-    } else {
-      // For 'transcript' scope, only use /api/search, clear q from ivods API
-      setFilters(prev => ({ ...prev, q: searchQuery }));
-    }
+    // Update filters with both main search and advanced search inputs
+    setFilters(prev => ({
+      ...prev,
+      q: searchQuery,
+      meeting_name: advancedInput.meeting_name,
+      speaker: advancedInput.speaker,
+      committee: advancedInput.committee,
+      date_from: advancedInput.date_from,
+      date_to: advancedInput.date_to
+    }));
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -214,12 +242,19 @@ export default function Home() {
       date_from: '',
       date_to: ''
     });
+    setAdvancedInput({
+      meeting_name: '',
+      speaker: '',
+      committee: '',
+      date_from: '',
+      date_to: ''
+    });
     setSearchQuery('');
     setSearchScope('all');
     setSortOrder('date_desc');
   };
 
-  const hasActiveFilters = Object.values(filters).some(Boolean);
+  const hasActiveFilters = Object.values(filters).some(Boolean) || Object.values(advancedInput).some(Boolean);
 
   if (loading && !data) {
     return (
@@ -261,22 +296,7 @@ export default function Home() {
       </Head>
       
       <div className="min-h-screen bg-gray-50">
-        {/* Simple Header */}
-        <header className="bg-white shadow-sm border-b border-gray-200">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-            <div className="flex justify-between items-start">
-              <div>
-                <h1 className="text-3xl font-bold text-gray-900">IVOD 逐字稿檢索系統</h1>
-                <p className="mt-1 text-gray-600">台灣立法院會議錄影與逐字稿檢索</p>
-              </div>
-              <Link href="/about" className="text-blue-600 hover:text-blue-800 text-sm font-medium">
-                關於本站
-              </Link>
-            </div>
-          </div>
-        </header>
-
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           {/* Search Section */}
           <div className="bg-white rounded-lg shadow-sm p-6 mb-8">
             {/* Main Search */}
@@ -296,9 +316,7 @@ export default function Home() {
                 {/* Search Input */}
                 <div className="relative flex-1">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <svg className="h-5 w-5 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
-                    </svg>
+                    <Icon type="search" className="h-5 w-5 text-gray-400" />
                   </div>
                   <input
                     type="text"
@@ -326,9 +344,7 @@ export default function Home() {
                 onClick={() => setShowAdvancedSearch(!showAdvancedSearch)}
                 className="inline-flex items-center text-sm text-blue-600 hover:text-blue-800"
               >
-                <svg className={`w-4 h-4 mr-1 transform transition-transform ${showAdvancedSearch ? 'rotate-180' : ''}`} fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
-                </svg>
+                <ChevronIcon isRotated={showAdvancedSearch} className="w-4 h-4 mr-1" />
                 進階搜尋
               </button>
               
@@ -364,8 +380,9 @@ export default function Home() {
                     id="meeting_name"
                     type="text"
                     placeholder="例：委員會全體會議"
-                    value={filters.meeting_name}
-                    onChange={(e) => handleFilterChange('meeting_name', e.target.value)}
+                    value={advancedInput.meeting_name}
+                    onChange={(e) => handleAdvancedInputChange('meeting_name', e.target.value)}
+                    onKeyPress={handleKeyPress}
                     className="block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
                 </div>
@@ -378,8 +395,9 @@ export default function Home() {
                     id="speaker"
                     type="text"
                     placeholder="例：王委員"
-                    value={filters.speaker}
-                    onChange={(e) => handleFilterChange('speaker', e.target.value)}
+                    value={advancedInput.speaker}
+                    onChange={(e) => handleAdvancedInputChange('speaker', e.target.value)}
+                    onKeyPress={handleKeyPress}
                     className="block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
                 </div>
@@ -392,8 +410,9 @@ export default function Home() {
                     id="committee"
                     type="text"
                     placeholder="例：教育文化"
-                    value={filters.committee}
-                    onChange={(e) => handleFilterChange('committee', e.target.value)}
+                    value={advancedInput.committee}
+                    onChange={(e) => handleAdvancedInputChange('committee', e.target.value)}
+                    onKeyPress={handleKeyPress}
                     className="block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
                 </div>
@@ -405,8 +424,8 @@ export default function Home() {
                   <input
                     id="date_from"
                     type="date"
-                    value={filters.date_from}
-                    onChange={(e) => handleFilterChange('date_from', e.target.value)}
+                    value={advancedInput.date_from}
+                    onChange={(e) => handleAdvancedInputChange('date_from', e.target.value)}
                     className="block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
                 </div>
@@ -418,8 +437,8 @@ export default function Home() {
                   <input
                     id="date_to"
                     type="date"
-                    value={filters.date_to}
-                    onChange={(e) => handleFilterChange('date_to', e.target.value)}
+                    value={advancedInput.date_to}
+                    onChange={(e) => handleAdvancedInputChange('date_to', e.target.value)}
                     className="block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
                 </div>
@@ -463,15 +482,15 @@ export default function Home() {
             {data?.data && data.data.length > 0 ? (
               <List items={data.data} />
             ) : (
-              !loading && (
-                <div className="bg-white rounded-lg shadow-sm p-12 text-center">
-                  <svg className="w-12 h-12 text-gray-400 mx-auto mb-4" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
-                  </svg>
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">沒有找到符合的資料</h3>
-                  <p className="text-gray-500">請嘗試調整搜尋條件或清除篩選</p>
-                </div>
-              )
+              <ClientOnly>
+                {!loading && (
+                  <div className="bg-white rounded-lg shadow-sm p-12 text-center">
+                    <Icon type="search" className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">沒有找到符合的資料</h3>
+                    <p className="text-gray-500">請嘗試調整搜尋條件或清除篩選</p>
+                  </div>
+                )}
+              </ClientOnly>
             )}
           </div>
 
@@ -486,7 +505,7 @@ export default function Home() {
               />
             </div>
           )}
-        </main>
+        </div>
       </div>
     </>
   );

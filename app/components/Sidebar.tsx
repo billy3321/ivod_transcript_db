@@ -1,6 +1,7 @@
 import { FC } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/router'
+import NavText from './NavText'
 
 interface SidebarProps {
   isOpen: boolean
@@ -63,7 +64,7 @@ const Sidebar: FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
             <Link key={item.href} href={item.href} className={`flex items-center px-6 py-2 mt-4 duration-200 border-l-4 ${
                   router.pathname === item.href ? activeClass : inactiveClass
                 }`}>
-              <span className="mx-4">{item.label}</span>
+              <span className="mx-4"><NavText text={item.label} /></span>
             </Link>
           ))}
         </nav>
