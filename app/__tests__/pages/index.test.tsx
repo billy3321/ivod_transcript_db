@@ -63,10 +63,12 @@ describe('Home Page', () => {
       expect(screen.getByText('IVOD 逐字稿檢索系統')).toBeInTheDocument();
       expect(screen.getByPlaceholderText('搜尋會議名稱、立委姓名、逐字稿內容...')).toBeInTheDocument();
       expect(screen.getByText('進階搜尋')).toBeInTheDocument();
+      expect(screen.getByText('搜尋全部欄位')).toBeInTheDocument();
+      expect(screen.getByText('搜尋')).toBeInTheDocument();
     });
   });
 
-  it('handles search input and updates URL', async () => {
+  it('handles search input and button click', async () => {
     mockFetch.mockResolvedValue({
       ok: true,
       json: () => Promise.resolve({ data: [], total: 0 }),
@@ -79,7 +81,10 @@ describe('Home Page', () => {
     });
 
     const searchInput = screen.getByPlaceholderText('搜尋會議名稱、立委姓名、逐字稿內容...');
+    const searchButton = screen.getByText('搜尋');
+    
     fireEvent.change(searchInput, { target: { value: '測試搜尋' } });
+    fireEvent.click(searchButton);
 
     await waitFor(() => {
       expect(mockPush).toHaveBeenCalledWith(
@@ -153,10 +158,31 @@ describe('Home Page', () => {
     });
   });
 
-  it('handles search with transcript search', async () => {
+  it('handles search scope changes', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ data: [], total: 0 }),
+    });
+
+    render(<Home />);
+
+    await waitFor(() => {
+      expect(screen.getByDisplayValue('搜尋全部欄位')).toBeInTheDocument();
+    });
+
+    const scopeSelect = screen.getByDisplayValue('搜尋全部欄位');
+    fireEvent.change(scopeSelect, { target: { value: 'transcript' } });
+
+    await waitFor(() => {
+      expect(screen.getByDisplayValue('僅搜尋逐字稿')).toBeInTheDocument();
+      expect(screen.getByPlaceholderText('搜尋逐字稿內容...')).toBeInTheDocument();
+    });
+  });
+
+  it('handles search with transcript scope', async () => {
     const mockRouter = {
       push: mockPush,
-      query: { q: '測試' },
+      query: { q: '測試', scope: 'transcript' },
       isReady: true,
     };
     (useRouter as jest.Mock).mockReturnValue(mockRouter);
@@ -176,6 +202,37 @@ describe('Home Page', () => {
     await waitFor(() => {
       expect(mockFetch).toHaveBeenCalledWith(
         expect.stringContaining('/api/search?q=%E6%B8%AC%E8%A9%A6')
+      );
+    });
+  });
+
+  it('handles Enter key press in search input', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ data: [], total: 0 }),
+    });
+
+    render(<Home />);
+
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText('搜尋會議名稱、立委姓名、逐字稿內容...')).toBeInTheDocument();
+    });
+
+    const searchInput = screen.getByPlaceholderText('搜尋會議名稱、立委姓名、逐字稿內容...');
+    
+    fireEvent.change(searchInput, { target: { value: '測試搜尋' } });
+    fireEvent.keyPress(searchInput, { key: 'Enter', code: 'Enter', charCode: 13 });
+
+    await waitFor(() => {
+      expect(mockPush).toHaveBeenCalledWith(
+        expect.objectContaining({
+          pathname: '/',
+          query: expect.objectContaining({
+            q: '測試搜尋',
+          }),
+        }),
+        undefined,
+        { shallow: true }
       );
     });
   });
@@ -292,7 +349,7 @@ describe('Home Page', () => {
   it('clears all filters when clear button is clicked', async () => {
     const mockRouter = {
       push: mockPush,
-      query: { q: '測試', speaker: '測試立委' },
+      query: { q: '測試', speaker: '測試立委', scope: 'transcript' },
       isReady: true,
     };
     (useRouter as jest.Mock).mockReturnValue(mockRouter);
@@ -320,6 +377,8 @@ describe('Home Page', () => {
         undefined,
         { shallow: true }
       );
+      // Verify that search scope is reset to 'all'
+      expect(screen.getByDisplayValue('搜尋全部欄位')).toBeInTheDocument();
     });
   });
 

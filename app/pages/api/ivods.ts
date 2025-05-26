@@ -12,7 +12,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     date_to,
     page = '1', 
     pageSize = '20', 
-    sort = 'date_desc' 
+    sort = 'date_desc',
+    ids
   } = req.query;
   
   const pageNum = parseInt(page as string, 10);
@@ -36,6 +37,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           { meeting_name: { contains: q, mode: 'insensitive' as const } },
           { speaker_name: { contains: q, mode: 'insensitive' as const } },
           { committee_names: { contains: q, mode: 'insensitive' as const } },
+          { meeting_code_str: { contains: q, mode: 'insensitive' as const } },
           { ai_transcript: { contains: q, mode: 'insensitive' as const } },
           { ly_transcript: { contains: q, mode: 'insensitive' as const } },
         ]
@@ -44,6 +46,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           { meeting_name: { contains: q } },
           { speaker_name: { contains: q } },
           { committee_names: { contains: q } },
+          { meeting_code_str: { contains: q } },
           { ai_transcript: { contains: q } },
           { ly_transcript: { contains: q } },
         ];
@@ -89,6 +92,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     conditions.push({
       date: { lte: date_to }
     });
+  }
+
+  // Filter by specific IVOD IDs (for transcript search results)
+  if (ids && typeof ids === 'string') {
+    const ivodIds = ids.split(',').map(id => parseInt(id.trim(), 10)).filter(id => !isNaN(id));
+    if (ivodIds.length > 0) {
+      conditions.push({
+        ivod_id: { in: ivodIds }
+      });
+    }
   }
 
   // Combine all conditions with AND

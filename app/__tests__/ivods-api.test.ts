@@ -100,6 +100,7 @@ describe('GET /api/ivods', () => {
             { meeting_name: { contains: 'test search', mode: 'insensitive' } },
             { speaker_name: { contains: 'test search', mode: 'insensitive' } },
             { committee_names: { contains: 'test search', mode: 'insensitive' } },
+            { meeting_code_str: { contains: 'test search', mode: 'insensitive' } },
             { ai_transcript: { contains: 'test search', mode: 'insensitive' } },
             { ly_transcript: { contains: 'test search', mode: 'insensitive' } },
           ],
@@ -210,6 +211,7 @@ describe('GET /api/ivods', () => {
               { meeting_name: { contains: 'general search', mode: 'insensitive' } },
               { speaker_name: { contains: 'general search', mode: 'insensitive' } },
               { committee_names: { contains: 'general search', mode: 'insensitive' } },
+              { meeting_code_str: { contains: 'general search', mode: 'insensitive' } },
               { ai_transcript: { contains: 'general search', mode: 'insensitive' } },
               { ly_transcript: { contains: 'general search', mode: 'insensitive' } },
             ],
@@ -284,6 +286,7 @@ describe('GET /api/ivods', () => {
               { meeting_name: { contains: 'test search' } },
               { speaker_name: { contains: 'test search' } },
               { committee_names: { contains: 'test search' } },
+              { meeting_code_str: { contains: 'test search' } },
               { ai_transcript: { contains: 'test search' } },
               { ly_transcript: { contains: 'test search' } },
             ],
@@ -314,6 +317,52 @@ describe('GET /api/ivods', () => {
           AND: [
             { meeting_name: { contains: 'Test Meeting' } },
             { speaker_name: { contains: 'Test Speaker' } },
+          ]
+        },
+        orderBy: { date: 'desc' },
+        skip: 0,
+        take: 20,
+        select: expect.any(Object),
+      });
+    });
+
+    it('handles IVOD ID filtering', async () => {
+      const mockFindMany = (prisma.iVODTranscript.findMany as unknown) as jest.Mock;
+      const mockCount = (prisma.iVODTranscript.count as unknown) as jest.Mock;
+      
+      req.query = { ids: '123,456,789' };
+      mockFindMany.mockResolvedValue([]);
+      mockCount.mockResolvedValue(0);
+
+      await handler(req as NextApiRequest, res as NextApiResponse);
+
+      expect(mockFindMany).toHaveBeenCalledWith({
+        where: {
+          AND: [
+            { ivod_id: { in: [123, 456, 789] } },
+          ]
+        },
+        orderBy: { date: 'desc' },
+        skip: 0,
+        take: 20,
+        select: expect.any(Object),
+      });
+    });
+
+    it('ignores invalid IVOD IDs', async () => {
+      const mockFindMany = (prisma.iVODTranscript.findMany as unknown) as jest.Mock;
+      const mockCount = (prisma.iVODTranscript.count as unknown) as jest.Mock;
+      
+      req.query = { ids: 'abc,123,def,456' };
+      mockFindMany.mockResolvedValue([]);
+      mockCount.mockResolvedValue(0);
+
+      await handler(req as NextApiRequest, res as NextApiResponse);
+
+      expect(mockFindMany).toHaveBeenCalledWith({
+        where: {
+          AND: [
+            { ivod_id: { in: [123, 456] } },
           ]
         },
         orderBy: { date: 'desc' },

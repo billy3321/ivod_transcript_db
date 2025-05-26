@@ -10,10 +10,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     res.status(400).json({ error: 'Invalid query' });
     return;
   }
-  // Try Elasticsearch search, fallback to DB if unavailable
+  
+  // For transcript searches, use Elasticsearch if available, otherwise fallback to DB
+  // For general searches (all fields), primarily use database search
   let hits: Array<{ id: number; transcript: string | null }> = [];
   let usedES = true;
+  
   try {
+    // Try Elasticsearch for transcript-specific search
     const body = bodybuilder()
       .query('multi_match', { query: q, fields: ['ai_transcript', 'ly_transcript'] })
       .build();
@@ -26,11 +30,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       transcript: (hit._source as any).ai_transcript || (hit._source as any).ly_transcript,
     }));
   } catch (error: any) {
-    // Elasticsearch failed or not reachable; fallback to DB search
+    // Elasticsearch failed or not reachable; fallback to DB search for transcripts only
     usedES = false;
     const dbBackend = getDbBackend();
     
-    // Build search conditions based on database backend
+    // Build search conditions for transcripts based on database backend
     const searchConditions = dbBackend === 'sqlite' 
       ? [
           { ai_transcript: { contains: q } },

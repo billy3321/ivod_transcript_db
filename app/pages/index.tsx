@@ -15,6 +15,8 @@ interface SearchFilters {
   date_to: string;
 }
 
+type SearchScope = 'all' | 'transcript';
+
 export default function Home() {
   const router = useRouter();
   const [filters, setFilters] = useState<SearchFilters>({
@@ -25,6 +27,8 @@ export default function Home() {
     date_from: '',
     date_to: ''
   });
+  const [searchScope, setSearchScope] = useState<SearchScope>('all');
+  const [searchQuery, setSearchQuery] = useState(''); // Input field value
   const [sortOrder, setSortOrder] = useState<'date_desc' | 'date_asc'>('date_desc');
   const [page, setPage] = useState(1);
   const [data, setData] = useState<{ data: IVOD[]; total: number } | null>(null);
@@ -43,6 +47,7 @@ export default function Home() {
         date_from = '',
         date_to = '',
         sort = 'date_desc',
+        scope = 'all',
         page: urlPage = '1'
       } = router.query;
 
@@ -54,19 +59,22 @@ export default function Home() {
         date_from: date_from as string,
         date_to: date_to as string
       });
+      setSearchQuery(q as string);
+      setSearchScope(scope as SearchScope);
       setSortOrder(sort as 'date_desc' | 'date_asc');
       setPage(parseInt(urlPage as string) || 1);
     }
-  }, [router.isReady, router.asPath]); // Use asPath instead of router.query to avoid object reference changes  
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [router.isReady, router.asPath, router.query]); // Include router.query but asPath should prevent unnecessary re-renders
 
   // Memoize search params to prevent unnecessary re-renders
   const searchParams = useMemo(() => {
     const params = new URLSearchParams();
     
-    // Add all active filters to params
+    // Add all active filters to params, but exclude 'q' for transcript-only search
     Object.entries(filters).forEach(([key, value]) => {
-      if (value) params.append(key, value);
+      if (value && !(searchScope === 'transcript' && key === 'q')) {
+        params.append(key, value);
+      }
     });
     
     params.append('sort', sortOrder);
@@ -74,7 +82,7 @@ export default function Home() {
     params.append('pageSize', '20');
     
     return params.toString();
-  }, [filters, sortOrder, page]);
+  }, [filters, sortOrder, page, searchScope]);
 
   // Memoize URL query params to prevent unnecessary router updates
   const urlQueryParams = useMemo(() => {
@@ -83,11 +91,12 @@ export default function Home() {
       if (value) queryParams[key] = value;
     });
     
+    if (searchScope !== 'all') queryParams.scope = searchScope;
     if (sortOrder !== 'date_desc') queryParams.sort = sortOrder;
     if (page !== 1) queryParams.page = page.toString();
     
     return queryParams;
-  }, [filters, sortOrder, page]);
+  }, [filters, searchScope, sortOrder, page]);
 
   // Update URL when filters change (debounced)
   useEffect(() => {
@@ -122,26 +131,78 @@ export default function Home() {
     
     setLoading(true);
     
-    Promise.all([
-      fetch(`/api/ivods?${searchParams}`).then(res => res.json()),
-      filters.q 
-        ? fetch(`/api/search?q=${encodeURIComponent(filters.q)}`).then(res => res.json())
-        : Promise.resolve({ data: [] })
-    ])
-    .then(([ivodData, searchData]) => {
-      setData(ivodData);
-      setTranscriptSearchResults(searchData.data || []);
-    })
-    .catch(error => {
-      console.error('Error fetching data:', error);
-      setData({ data: [], total: 0 });
-      setTranscriptSearchResults([]);
-    })
-    .finally(() => setLoading(false));
-  }, [searchParams, filters.q, router.isReady]);
+    if (searchScope === 'transcript' && filters.q) {
+      // For transcript-only search, use /api/search first, then get IVOD details
+      fetch(`/api/search?q=${encodeURIComponent(filters.q)}`)
+        .then(res => res.json())
+        .then(searchData => {
+          setTranscriptSearchResults(searchData.data || []);
+          
+          if (searchData.data && searchData.data.length > 0) {
+            // Get IVOD IDs from search results
+            const ivodIds = searchData.data.map((item: any) => item.id);
+            
+            // Create search params without q parameter for /api/ivods
+            const transcriptSearchParams = new URLSearchParams();
+            Object.entries(filters).forEach(([key, value]) => {
+              if (value && key !== 'q') transcriptSearchParams.append(key, value);
+            });
+            transcriptSearchParams.append('sort', sortOrder);
+            transcriptSearchParams.append('page', page.toString());
+            transcriptSearchParams.append('pageSize', '20');
+            transcriptSearchParams.append('ids', ivodIds.join(','));
+            
+            return fetch(`/api/ivods?${transcriptSearchParams.toString()}`).then(res => res.json());
+          } else {
+            return { data: [], total: 0 };
+          }
+        })
+        .then(ivodData => {
+          setData(ivodData);
+        })
+        .catch(error => {
+          console.error('Error fetching transcript search data:', error);
+          setData({ data: [], total: 0 });
+          setTranscriptSearchResults([]);
+        })
+        .finally(() => setLoading(false));
+    } else {
+      // For general search or no query, use /api/ivods normally
+      Promise.all([
+        fetch(`/api/ivods?${searchParams}`).then(res => res.json()),
+        Promise.resolve({ data: [] })
+      ])
+      .then(([ivodData, searchData]) => {
+        setData(ivodData);
+        setTranscriptSearchResults([]);
+      })
+      .catch(error => {
+        console.error('Error fetching data:', error);
+        setData({ data: [], total: 0 });
+        setTranscriptSearchResults([]);
+      })
+      .finally(() => setLoading(false));
+    }
+  }, [searchParams, filters, sortOrder, page, searchScope, router.isReady]);
 
   const handleFilterChange = (key: keyof SearchFilters, value: string) => {
     setFilters(prev => ({ ...prev, [key]: value }));
+  };
+
+  const handleSearch = () => {
+    if (searchScope === 'all') {
+      // For 'all' scope, use q parameter in /api/ivods to search all fields
+      setFilters(prev => ({ ...prev, q: searchQuery }));
+    } else {
+      // For 'transcript' scope, only use /api/search, clear q from ivods API
+      setFilters(prev => ({ ...prev, q: searchQuery }));
+    }
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleSearch();
+    }
   };
 
   const clearFilters = () => {
@@ -153,6 +214,8 @@ export default function Home() {
       date_from: '',
       date_to: ''
     });
+    setSearchQuery('');
+    setSearchScope('all');
     setSortOrder('date_desc');
   };
 
@@ -217,19 +280,44 @@ export default function Home() {
           {/* Search Section */}
           <div className="bg-white rounded-lg shadow-sm p-6 mb-8">
             {/* Main Search */}
-            <div className="relative mb-4">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <svg className="h-5 w-5 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
-                </svg>
+            <div className="space-y-4 mb-4">
+              {/* Search Input Row */}
+              <div className="flex gap-3">
+                {/* Search Scope Dropdown */}
+                <select
+                  value={searchScope}
+                  onChange={(e) => setSearchScope(e.target.value as SearchScope)}
+                  className="flex-shrink-0 border border-gray-300 rounded-lg px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+                >
+                  <option value="all">搜尋全部欄位</option>
+                  <option value="transcript">僅搜尋逐字稿</option>
+                </select>
+
+                {/* Search Input */}
+                <div className="relative flex-1">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <svg className="h-5 w-5 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                  <input
+                    type="text"
+                    placeholder={searchScope === 'all' ? "搜尋會議名稱、立委姓名、逐字稿內容..." : "搜尋逐字稿內容..."}
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onKeyPress={handleKeyPress}
+                    className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg text-lg placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+
+                {/* Search Button */}
+                <button
+                  onClick={handleSearch}
+                  className="flex-shrink-0 bg-blue-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
+                >
+                  搜尋
+                </button>
               </div>
-              <input
-                type="text"
-                placeholder="搜尋會議名稱、立委姓名、逐字稿內容..."
-                value={filters.q}
-                onChange={(e) => handleFilterChange('q', e.target.value)}
-                className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg text-lg placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
             </div>
 
             {/* Search Controls */}
@@ -344,9 +432,19 @@ export default function Home() {
             <div className="mb-6 flex items-center justify-between">
               <p className="text-sm text-gray-700">
                 找到 <span className="font-semibold">{data.total}</span> 筆 IVOD 紀錄
-                {transcriptSearchResults.length > 0 && (
+                {searchScope === 'transcript' && transcriptSearchResults.length > 0 && (
                   <span className="ml-2 text-blue-600">
                     ・{transcriptSearchResults.length} 筆逐字稿符合關鍵字
+                  </span>
+                )}
+                {searchScope === 'all' && filters.q && (
+                  <span className="ml-2 text-green-600">
+                    ・搜尋範圍：全部欄位
+                  </span>
+                )}
+                {searchScope === 'transcript' && filters.q && (
+                  <span className="ml-2 text-orange-600">
+                    ・搜尋範圍：僅逐字稿
                   </span>
                 )}
               </p>
