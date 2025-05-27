@@ -18,7 +18,7 @@ const Sidebar: FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
   const navItems = [
     { label: '首頁', href: '/' },
     { label: '關於我們', href: '/about' },
-  ]
+  ] as const
 
   return (
     <div className="flex">

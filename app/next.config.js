@@ -23,13 +23,16 @@ const nextConfig = {
   // Generate ETags for better caching
   generateEtags: true,
   
-  // Reduce Fast Refresh frequency to prevent constant reloading
+  // Development-specific settings to help with debugging
   experimental: {
     optimizeCss: false,
   },
   
   // Development configuration
   ...(process.env.NODE_ENV === 'development' && {
+    // Enable strict mode but disable Fast Refresh auto-reload
+    reactStrictMode: true,
+    
     onDemandEntries: {
       // Period (in ms) where the server will keep pages in the buffer
       maxInactiveAge: 25 * 1000,
@@ -119,9 +122,72 @@ const nextConfig = {
   //   // Add experimental features here as needed
   // },
   
-  // Webpack optimization for smaller bundles
+  // Webpack optimization and development debugging
   webpack: (config, { dev, isServer }) => {
-    // Optimize bundle size in production
+    // Development: Conditionally disable Fast Refresh to prevent auto-reload on errors
+    if (dev && !isServer && process.env.DISABLE_ALL_HMR === 'true') {
+      console.log('🚫 ALL HMR and Fast Refresh completely disabled - no auto-reload')
+      
+      // Completely remove all HMR and Fast Refresh plugins
+      config.plugins = config.plugins.filter((plugin) => {
+        const name = plugin.constructor.name
+        return !name.includes('HotModuleReplacement') &&
+               !name.includes('ReactRefresh') &&
+               !name.includes('NextJsRequireCacheHotReloader') &&
+               !name.includes('HotModuleReplacementPlugin') &&
+               !name.includes('ReactRefreshPlugin')
+      })
+      
+      // Disable webpack-dev-server hot reloading completely
+      if (config.devServer) {
+        config.devServer.hot = false
+        config.devServer.liveReload = false
+        config.devServer.client = {
+          overlay: false,
+          reconnect: false,
+        }
+      }
+      
+      // Disable caching and optimization for debugging
+      config.mode = 'development'
+      config.cache = false
+      config.optimization = {
+        ...config.optimization,
+        removeAvailableModules: false,
+        removeEmptyChunks: false,
+        splitChunks: false,
+      }
+      
+      // Remove any HMR related entries from webpack entry points
+      if (config.entry && typeof config.entry === 'object') {
+        Object.keys(config.entry).forEach(key => {
+          if (Array.isArray(config.entry[key])) {
+            config.entry[key] = config.entry[key].filter(entry => 
+              typeof entry !== 'string' || (
+                !entry.includes('webpack-hot-middleware') &&
+                !entry.includes('react-refresh') &&
+                !entry.includes('next/dist/client/dev/hot-dev-client') &&
+                !entry.includes('next/dist/client/dev/amp-dev')
+              )
+            )
+          }
+        })
+      }
+      
+    } else if (dev && !isServer && process.env.DISABLE_FAST_REFRESH === 'true') {
+      console.log('🚫 Fast Refresh disabled - errors will not trigger auto-reload')
+      
+      // Partially disable Fast Refresh but keep some HMR for CSS
+      config.plugins = config.plugins.filter((plugin) => {
+        const name = plugin.constructor.name
+        return !name.includes('ReactRefresh')
+      })
+      
+    } else if (dev && !isServer) {
+      console.log('⚡ Fast Refresh enabled - normal auto-reload behavior')
+    }
+    
+    // Production: Optimize bundle size
     if (!dev && !isServer) {
       config.optimization.splitChunks.cacheGroups = {
         ...config.optimization.splitChunks.cacheGroups,

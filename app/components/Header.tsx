@@ -13,7 +13,7 @@ const Header: FC<HeaderProps> = ({ onMenuClick }) => {
   const navItems = [
     { label: '首頁', href: '/' },
     { label: '關於我們', href: '/about' },
-  ]
+  ] as const
   
   return (
     <header className="flex items-center justify-between px-6 py-4 bg-white border-b-4 border-indigo-600">
@@ -76,6 +76,7 @@ const Header: FC<HeaderProps> = ({ onMenuClick }) => {
                 ? 'bg-indigo-100 text-indigo-700'
                 : 'text-gray-600 hover:text-indigo-600 hover:bg-gray-50'
             }`}
+            suppressHydrationWarning
           >
             <NavText text={item.label} />
           </Link>

@@ -256,17 +256,6 @@ export default function Home() {
 
   const hasActiveFilters = Object.values(filters).some(Boolean) || Object.values(advancedInput).some(Boolean);
 
-  if (loading && !data) {
-    return (
-      <div className="min-h-screen bg-gray-200 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
-          <p className="text-gray-700">載入中...</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <>
       <Head>
@@ -479,18 +468,19 @@ export default function Home() {
 
           {/* IVOD List */}
           <div className="mb-8">
-            {data?.data && data.data.length > 0 ? (
+            {loading && !data ? (
+              <div className="bg-white rounded-lg shadow-sm p-12 text-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+                <p className="text-gray-700">載入中...</p>
+              </div>
+            ) : data?.data && data.data.length > 0 ? (
               <List items={data.data} />
             ) : (
-              <ClientOnly>
-                {!loading && (
-                  <div className="bg-white rounded-lg shadow-sm p-12 text-center">
-                    <Icon type="search" className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">沒有找到符合的資料</h3>
-                    <p className="text-gray-500">請嘗試調整搜尋條件或清除篩選</p>
-                  </div>
-                )}
-              </ClientOnly>
+              <div className="bg-white rounded-lg shadow-sm p-12 text-center" suppressHydrationWarning>
+                <Icon type="search" className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">沒有找到符合的資料</h3>
+                <p className="text-gray-500">請嘗試調整搜尋條件或清除篩選</p>
+              </div>
             )}
           </div>
 

@@ -21,10 +21,11 @@ This is a dual-component system for scraping and serving Taiwan Legislative Yuan
 
 ### Web Application Architecture (`app/`)
 - **Framework**: Next.js with TypeScript, API routes for backend logic
-- **Database**: Prisma ORM connecting to same database as crawler
+- **Database**: Prisma ORM with multi-backend support (SQLite/PostgreSQL/MySQL)
 - **Search**: Elasticsearch integration with fallback to database search
 - **UI Components**: Modular React components for list, search, pagination, transcript viewing
-- **Styling**: Tailwind CSS with responsive design
+- **Styling**: Tailwind CSS v4 with responsive design and Chinese font support
+- **Testing**: Jest + React Testing Library + Cypress E2E
 
 ## Development Commands
 
@@ -34,7 +35,9 @@ This is a dual-component system for scraping and serving Taiwan Legislative Yuan
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env  # Configure DB_BACKEND and connection parameters
+pip install -r requirements-dev.txt  # For testing
+cp .env.example .env                  # Configure DB_BACKEND and connection parameters
+mkdir -p ../db                        # For shared SQLite database
 
 # Data collection workflows
 ./ivod_full.py          # Full data capture (first run or reset)
@@ -46,6 +49,7 @@ cp .env.example .env  # Configure DB_BACKEND and connection parameters
 
 # Testing
 pytest --cov=ivod --cov-report=term-missing
+pytest -m integration  # Run integration tests only
 TEST_SQLITE_PATH=../db/ivod_test.db python integration_test.py
 ```
 
@@ -54,16 +58,13 @@ TEST_SQLITE_PATH=../db/ivod_test.db python integration_test.py
 # Setup and development
 npm install
 cp .env.example .env.local  # Configure database and Elasticsearch
+npm run prisma:prepare     # Update schema based on .env DB_BACKEND
 npm run prisma:generate     # Generate Prisma client
 npm run dev                 # Development server (localhost:3000)
 
 # Production
 npm run build              # Build for production
 npm start                  # Start production server
-
-# Database operations
-npm run prisma:prepare     # Update schema based on .env DB_BACKEND
-npm run prisma:generate    # Generate Prisma client
 
 # Testing
 npm run test              # Jest unit tests (watch mode)

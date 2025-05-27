@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:no-hmr": "node start-no-hmr.js",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
@@ -12,7 +13,11 @@
     "cypress:open": "cypress open",
     "cypress:run": "cypress run",
     "prisma:prepare": "node scripts/updatePrismaSchema.js",
-    "prisma:generate": "npm run prisma:prepare && prisma generate"
+    "prisma:generate": "npm run prisma:prepare && prisma generate",
+    "clean": "rm -rf .next",
+    "clean:all": "rm -rf .next node_modules/.cache .cache",
+    "clean:hard": "rm -rf .next node_modules/.cache .cache && npm run prisma:generate",
+    "fresh-start": "npm run clean:all && npm install && npm run prisma:generate"
   },
   "dependencies": {
     "@elastic/elasticsearch": "^8.8.0",

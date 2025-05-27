@@ -4,6 +4,7 @@ interface NavTextProps {
   text: string;
 }
 
+// Component that handles hydration mismatches by suppressing hydration warnings
 export default function NavText({ text }: NavTextProps) {
   const [mounted, setMounted] = useState(false);
 
@@ -11,6 +12,6 @@ export default function NavText({ text }: NavTextProps) {
     setMounted(true);
   }, []);
 
-  // Always return the same text to prevent hydration mismatch
-  return <span>{text}</span>;
+  // Always render the provided text to ensure consistency
+  return <span suppressHydrationWarning>{text}</span>;
 }
