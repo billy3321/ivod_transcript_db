@@ -1,6 +1,5 @@
 import time
 import json
-import datetime
 from datetime import datetime, date
 
 import mechanize
@@ -191,8 +190,8 @@ def test_fetch_available_dates_success():
     br = DummyBr(data)
     dates = fetch_available_dates(br, session=4)
     assert dates == [
-        datetime.date(2023, 1, 1),
-        datetime.date(2023, 1, 2),
+        date(2023, 1, 1),
+        date(2023, 1, 2),
     ]
     assert any('%E6%9C%83%E6%9C%9F=4' in url for url in br.opened_urls)
 
@@ -233,7 +232,7 @@ def test_fetch_available_dates_fallback(monkeypatch):
 
     monkeypatch.setattr('ivod.crawler.requests.get', fake_get)
     dates = fetch_available_dates(dummy_br, session=7)
-    assert dates == [datetime.date(2022, 12, 31)]
+    assert dates == [date(2022, 12, 31)]
     assert captured.get("verify") is False
     assert '%E6%9C%83%E6%9C%9F=7' in captured.get("url", "")
 
