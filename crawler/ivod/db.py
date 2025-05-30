@@ -45,6 +45,8 @@ else:
 from sqlalchemy import (
     create_engine, Column, Integer, Text, Date, ARRAY, TIMESTAMP, JSON
 )
+from sqlalchemy.dialects.mysql import LONGTEXT
+from sqlalchemy.dialects.postgresql import TEXT as PG_TEXT
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
@@ -70,8 +72,16 @@ class IVODTranscript(Base):
     speaker_name     = Column(Text)
     meeting_time     = Column(TIMESTAMP(timezone=True)) if DB_BACKEND!="sqlite" else Column(Text)
     meeting_name     = Column(Text)
-    ai_transcript    = Column(Text)
-    ly_transcript    = Column(Text)
+    # Use appropriate text type for large content based on backend
+    if DB_BACKEND == "mysql":
+        ai_transcript = Column(LONGTEXT)
+        ly_transcript = Column(LONGTEXT) 
+    elif DB_BACKEND == "postgresql":
+        ai_transcript = Column(PG_TEXT)  # PostgreSQL TEXT has no length limit
+        ly_transcript = Column(PG_TEXT)
+    else:  # sqlite
+        ai_transcript = Column(Text)  # SQLite TEXT has no length limit
+        ly_transcript = Column(Text)
     ai_status  = Column(Text,   nullable=False, default="pending")
     ai_retries = Column(Integer, nullable=False, default=0)
     ly_status  = Column(Text,   nullable=False, default="pending")

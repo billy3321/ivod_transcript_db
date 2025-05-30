@@ -127,21 +127,29 @@ def run_full(skip_ssl: bool = True):
             try:
                 logger.info(f"處理影片 {ivod_id}")
                 rec = process_ivod(br, ivod_id)
-                obj = db.get(IVODTranscript, ivod_id)
+                
+                # Check if record exists
+                obj = db.query(IVODTranscript).filter_by(ivod_id=ivod_id).first()
                 if obj:
+                    # Update existing record
                     for k, v in rec.items():
                         setattr(obj, k, v)
                     obj.last_updated = datetime.now()
                 else:
+                    # Create new record
                     rec["last_updated"] = datetime.now()
                     db.add(IVODTranscript(**rec))
+                
+                # Commit this single record
+                db.commit()
                 logger.info(f"影片 {ivod_id} 處理完成")
+                
             except Exception as e:
                 logger.error(f"處理影片 {ivod_id} 時發生錯誤: {e}", exc_info=True)
+                # Rollback any pending changes for this record
+                db.rollback()
                 log_failed_ivod(ivod_id, "processing")
                 continue
-
-        db.commit()
     db.close()
     logger.info("全量拉取完成。")
 

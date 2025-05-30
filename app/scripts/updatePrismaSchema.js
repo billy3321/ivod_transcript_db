@@ -76,6 +76,29 @@ if (backend === 'sqlite') {
   );
 }
 
+// Handle ai_transcript and ly_transcript fields for large text content
+if (backend === 'mysql') {
+  // MySQL needs @db.LongText for large content
+  schema = schema.replace(
+    /^\s*ai_transcript\s+.*$/m,
+    '  ai_transcript   String? @db.LongText'
+  );
+  schema = schema.replace(
+    /^\s*ly_transcript\s+.*$/m,
+    '  ly_transcript   String? @db.LongText'
+  );
+} else {
+  // PostgreSQL and SQLite TEXT can handle large content without special annotation
+  schema = schema.replace(
+    /^\s*ai_transcript\s+.*$/m,
+    '  ai_transcript   String?'
+  );
+  schema = schema.replace(
+    /^\s*ly_transcript\s+.*$/m,
+    '  ly_transcript   String?'
+  );
+}
+
 // Handle committee_names field based on backend
 if (backend === 'postgresql') {
   schema = schema.replace(

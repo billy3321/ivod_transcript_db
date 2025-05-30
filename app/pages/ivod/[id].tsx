@@ -4,6 +4,7 @@ import Head from 'next/head';
 import { IVODDetail } from '@/types';
 import TranscriptViewer from '@/components/TranscriptViewer';
 import StructuredData from '@/components/StructuredData';
+import HLSPlayer from '@/components/HLSPlayer';
 import { formatCommitteeNames, formatIVODTitle, formatVideoTime, formatVideoType, formatTimestamp } from '@/lib/utils';
 import Link from 'next/link';
 
@@ -242,11 +243,15 @@ export default function IvodDetail() {
             <h2 className="text-lg font-semibold text-gray-900 mb-4">影片播放</h2>
             
             {data.video_url ? (
-              <video 
-                controls 
-                src={data.video_url} 
-                className="w-full rounded-lg mb-4 bg-gray-100"
-              />
+              <div className="mb-4">
+                <HLSPlayer 
+                  src={data.video_url}
+                  className="mb-2"
+                />
+                <p className="text-xs text-gray-500 mt-2">
+                  📺 使用HLS播放器支援立法院IVOD串流格式
+                </p>
+              </div>
             ) : (
               <div className="w-full h-48 bg-gray-100 rounded-lg flex items-center justify-center mb-4">
                 <div className="text-center text-gray-500">

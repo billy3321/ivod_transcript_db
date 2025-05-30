@@ -4,14 +4,14 @@ generator client {
 
 /// Prisma currently requires a static provider value; update this line to match your DB_BACKEND (sqlite / postgresql / mysql)
 datasource db {
-  provider = "sqlite"
+  provider = "mysql"
   url      = env("DATABASE_URL")
 }
 
 model IVODTranscript {
   ivod_id         Int      @id
   ivod_url        String
-  date            String
+  date            DateTime
   meeting_code    String?
   meeting_code_str String?
   category        String?
@@ -22,16 +22,16 @@ model IVODTranscript {
   video_url       String?
   title           String?
   speaker_name    String?
-  meeting_time    String?
+  meeting_time    DateTime?
   meeting_name    String?
-  ai_transcript   String?
-  ly_transcript   String?
+  ai_transcript   String? @db.LongText
+  ly_transcript   String? @db.LongText
   ai_status       String    @default("pending")
   ai_retries      Int       @default(0)
   ly_status       String    @default("pending")
   ly_retries      Int       @default(0)
-  last_updated    String
-  committee_names String?
+  last_updated    DateTime
+  committee_names Json?
 
   @@map("ivod_transcripts")
 }
