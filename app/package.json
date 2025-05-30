@@ -14,6 +14,7 @@
     "cypress:run": "cypress run",
     "prisma:prepare": "node scripts/updatePrismaSchema.js",
     "prisma:generate": "npm run prisma:prepare && prisma generate",
+    "db:test": "node scripts/db-test.js",
     "clean": "rm -rf .next",
     "clean:all": "rm -rf .next node_modules/.cache .cache",
     "clean:hard": "rm -rf .next node_modules/.cache .cache && npm run prisma:generate",
