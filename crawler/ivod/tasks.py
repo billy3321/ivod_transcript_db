@@ -8,6 +8,7 @@ ivod_tasks.py
 import logging
 from datetime import datetime, timedelta
 import os
+from pathlib import Path
 
 from tqdm import tqdm
 try:
@@ -19,12 +20,29 @@ from .core import date_range, make_browser, fetch_ivod_list, process_ivod, Sessi
 
 logger = logging.getLogger(__name__)
 
+def setup_logging():
+    """設置日誌配置"""
+    log_path = os.getenv("LOG_PATH", "logs/")
+    log_dir = Path(log_path)
+    log_dir.mkdir(exist_ok=True)
+    
+    log_file = log_dir / f"crawler_{datetime.now().strftime('%Y%m%d')}.log"
+    
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+        handlers=[
+            logging.FileHandler(log_file, encoding='utf-8'),
+            logging.StreamHandler()
+        ]
+    )
+
 
 def run_full(skip_ssl: bool = True):
     """
     全量拉取：從固定起始日跑到今天，逐筆 upsert 到資料庫。
     """
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+    setup_logging()
     br = make_browser(skip_ssl=skip_ssl)
     db = Session()
 
@@ -37,15 +55,21 @@ def run_full(skip_ssl: bool = True):
             continue
 
         for ivod_id in tqdm(ids, desc=f"{date_str} 影片", leave=False):
-            rec = process_ivod(br, ivod_id)
-            obj = db.get(IVODTranscript, ivod_id)
-            if obj:
-                for k, v in rec.items():
-                    setattr(obj, k, v)
-                obj.last_updated = datetime.now()
-            else:
-                rec["last_updated"] = datetime.now()
-                db.add(IVODTranscript(**rec))
+            try:
+                logger.info(f"處理影片 {ivod_id}")
+                rec = process_ivod(br, ivod_id)
+                obj = db.get(IVODTranscript, ivod_id)
+                if obj:
+                    for k, v in rec.items():
+                        setattr(obj, k, v)
+                    obj.last_updated = datetime.now()
+                else:
+                    rec["last_updated"] = datetime.now()
+                    db.add(IVODTranscript(**rec))
+                logger.info(f"影片 {ivod_id} 處理完成")
+            except Exception as e:
+                logger.error(f"處理影片 {ivod_id} 時發生錯誤: {e}", exc_info=True)
+                continue
 
         db.commit()
     db.close()
@@ -56,7 +80,7 @@ def run_incremental(skip_ssl: bool = True):
     """
     增量更新：只檢查過去兩週的新 ID，並針對缺漏的 AI 或 LY 逐字稿進行補抓。
     """
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+    setup_logging()
     br = make_browser(skip_ssl=skip_ssl)
     db = Session()
 
@@ -70,20 +94,28 @@ def run_incremental(skip_ssl: bool = True):
             continue
 
     for ivod_id in tqdm(ids, desc="增量更新影片"):
-        obj = db.get(IVODTranscript, ivod_id)
-        if not obj:
-            rec = process_ivod(br, ivod_id)
-            rec["last_updated"] = datetime.now()
-            db.add(IVODTranscript(**rec))
+        try:
+            logger.info(f"增量更新影片 {ivod_id}")
+            obj = db.get(IVODTranscript, ivod_id)
+            if not obj:
+                rec = process_ivod(br, ivod_id)
+                rec["last_updated"] = datetime.now()
+                db.add(IVODTranscript(**rec))
+                logger.info(f"新增影片 {ivod_id}")
+                continue
+            if not obj.ai_transcript:
+                rec = process_ivod(br, ivod_id)
+                obj.ai_transcript = rec["ai_transcript"]
+                obj.last_updated = datetime.now()
+                logger.info(f"更新影片 {ivod_id} AI逐字稿")
+            if not obj.ly_transcript:
+                rec = process_ivod(br, ivod_id)
+                obj.ly_transcript = rec["ly_transcript"]
+                obj.last_updated = datetime.now()
+                logger.info(f"更新影片 {ivod_id} LY逐字稿")
+        except Exception as e:
+            logger.error(f"增量更新影片 {ivod_id} 時發生錯誤: {e}", exc_info=True)
             continue
-        if not obj.ai_transcript:
-            rec = process_ivod(br, ivod_id)
-            obj.ai_transcript = rec["ai_transcript"]
-            obj.last_updated = datetime.now()
-        if not obj.ly_transcript:
-            rec = process_ivod(br, ivod_id)
-            obj.ly_transcript = rec["ly_transcript"]
-            obj.last_updated = datetime.now()
 
     db.commit()
     db.close()
@@ -94,7 +126,7 @@ def run_retry(skip_ssl: bool = True):
     """
     重新嘗試失敗的任務：AI 或 LY 逐字稿之前發生錯誤，且重試次數尚未超過上限。
     """
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+    setup_logging()
     br = make_browser(skip_ssl=skip_ssl)
     db = Session()
 
@@ -109,8 +141,14 @@ def run_retry(skip_ssl: bool = True):
     ).all()
 
     for obj in to_retry:
-        process_ivod(br, obj.ivod_id, db)
-        db.commit()
+        try:
+            logger.info(f"重試影片 {obj.ivod_id}")
+            process_ivod(br, obj.ivod_id, db)
+            db.commit()
+            logger.info(f"重試影片 {obj.ivod_id} 完成")
+        except Exception as e:
+            logger.error(f"重試影片 {obj.ivod_id} 時發生錯誤: {e}", exc_info=True)
+            continue
 
     db.close()
     logger.info("Retry 任務完成。")
@@ -122,7 +160,7 @@ def run_es():
     建立至 Elasticsearch 索引。使用 ES_HOST、ES_PORT、ES_SCHEME、ES_USER、ES_PASS、
     ES_INDEX 等環境變數進行連線，並採用 IK Analyzer 以改善繁體中文分詞。
     """
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+    setup_logging()
     es_host = os.getenv("ES_HOST", "localhost")
     es_port = int(os.getenv("ES_PORT", 9200))
     es_scheme = os.getenv("ES_SCHEME", "http")
