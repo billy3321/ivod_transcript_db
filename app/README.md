@@ -253,7 +253,7 @@ docker run -p 3000:3000 \
 
 ```bash
 # 安裝 Node.js 18.x
-curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
 sudo apt-get update
 sudo apt-get install -y nodejs build-essential
 
