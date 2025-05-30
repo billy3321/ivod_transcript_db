@@ -22,10 +22,30 @@ def process_ivod(br, ivod_id):
     """Fetch and assemble a single IVOD record into a dict."""
     js = fetch_ivod_info(br, ivod_id)
     md = js.get("會議資料", {})
+    
+    # Validate required fields
+    date_str = js.get("日期")
+    if not date_str:
+        raise ValueError(f"Missing date field for IVOD_ID {ivod_id}")
+    
+    meeting_time_str = js.get("會議時間")
+    if not meeting_time_str:
+        raise ValueError(f"Missing meeting_time field for IVOD_ID {ivod_id}")
+    
+    try:
+        parsed_date = datetime.fromisoformat(date_str).date()
+    except (ValueError, TypeError) as e:
+        raise ValueError(f"Invalid date format for IVOD_ID {ivod_id}: {date_str} - {e}")
+    
+    try:
+        parsed_meeting_time = datetime.fromisoformat(meeting_time_str)
+    except (ValueError, TypeError) as e:
+        raise ValueError(f"Invalid meeting_time format for IVOD_ID {ivod_id}: {meeting_time_str} - {e}")
+    
     rec = {
         "ivod_id": ivod_id,
         "ivod_url": js.get("IVOD_URL"),
-        "date": datetime.fromisoformat(js.get("日期")).date(),
+        "date": parsed_date,
         "meeting_code": md.get("會議代碼"),
         "meeting_code_str": md.get("會議代碼:str"),
         "category": md.get("種類"),
@@ -37,7 +57,7 @@ def process_ivod(br, ivod_id):
         "video_url": js.get("video_url"),
         "title": md.get("標題"),
         "speaker_name": js.get("委員名稱"),
-        "meeting_time": datetime.fromisoformat(js.get("會議時間")),
+        "meeting_time": parsed_meeting_time,
         "meeting_name": js.get("會議名稱"),
         "ai_transcript": "".join(
             item.get("text", "")

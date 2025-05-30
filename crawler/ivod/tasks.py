@@ -168,7 +168,11 @@ def run_retry(skip_ssl: bool = True):
     for obj in to_retry:
         try:
             logger.info(f"重試影片 {obj.ivod_id}")
-            process_ivod(br, obj.ivod_id, db)
+            rec = process_ivod(br, obj.ivod_id)
+            # Update the existing object with new data
+            for k, v in rec.items():
+                setattr(obj, k, v)
+            obj.last_updated = datetime.now()
             db.commit()
             logger.info(f"重試影片 {obj.ivod_id} 完成")
         except Exception as e:

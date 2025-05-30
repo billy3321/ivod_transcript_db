@@ -110,8 +110,22 @@ def fetch_ivod_info(br: mechanize.Browser, ivod_id: int):
         raw = resp.read().decode('utf-8')
     except Exception:
         raw = requests.get(url, verify=False).text
-    js = json.loads(raw).get("data", {})
-    return js
+    
+    try:
+        js = json.loads(raw)
+    except json.JSONDecodeError as e:
+        raise ValueError(f"Invalid JSON response for IVOD_ID {ivod_id} from URL {url}: {e}")
+    
+    # Check if API returned an error
+    if js.get("error", False):
+        error_msg = js.get("message", "Unknown error")
+        raise ValueError(f"API error for IVOD_ID {ivod_id}: {error_msg}")
+    
+    data = js.get("data", {})
+    if not data:
+        raise ValueError(f"No data found for IVOD_ID {ivod_id}")
+    
+    return data
 
 def fetch_ivod_list(br: mechanize.Browser, date_str: str):
     url = f"https://ly.govapi.tw/v2/ivods?日期={date_str}&limit=600"
