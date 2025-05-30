@@ -117,12 +117,7 @@ const nextConfig = {
     ];
   },
   
-  // PWA support (optional future enhancement)
-  // experimental: {
-  //   // Add experimental features here as needed
-  // },
-  
-  // Webpack optimization and development debugging
+  // Simplified webpack configuration to avoid production build issues
   webpack: (config, { dev, isServer }) => {
     // Development: Conditionally disable Fast Refresh to prevent auto-reload on errors
     if (dev && !isServer && process.env.DISABLE_ALL_HMR === 'true') {
@@ -187,19 +182,7 @@ const nextConfig = {
       console.log('⚡ Fast Refresh enabled - normal auto-reload behavior')
     }
     
-    // Production: Optimize bundle size
-    if (!dev && !isServer) {
-      config.optimization.splitChunks.cacheGroups = {
-        ...config.optimization.splitChunks.cacheGroups,
-        vendor: {
-          test: /[\\/]node_modules[\\/]/,
-          chunks: 'all',
-          name: 'vendor',
-          priority: 20,
-          enforce: true,
-        },
-      };
-    }
+    // Removed complex production optimization that might cause the hash error
     
     return config;
   },
