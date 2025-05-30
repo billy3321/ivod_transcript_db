@@ -233,8 +233,10 @@ export function parseAdvancedSearchQuery(query: string): AdvancedSearchQuery {
 
   } catch (error) {
     logger.warn('Failed to parse advanced search query, falling back to simple search', {
-      query,
-      error: error instanceof Error ? error.message : 'Unknown error'
+      error: error instanceof Error ? error.message : 'Unknown error',
+      metadata: {
+        query
+      }
     });
 
     // Fallback: treat entire query as general search terms

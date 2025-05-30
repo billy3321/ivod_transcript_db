@@ -128,7 +128,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         logger.info('Log file deleted via admin interface', {
           component: 'admin',
           action: 'delete_log_file',
-          fileName: file
+          metadata: {
+            fileName: file
+          }
         });
         res.status(200).json({ success: true });
       } else {

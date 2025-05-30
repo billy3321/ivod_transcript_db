@@ -3,8 +3,6 @@
  * Provides structured logging for API errors, database issues, and user interactions
  */
 
-import fs from 'fs';
-import path from 'path';
 import { NextApiRequest } from 'next';
 
 export type LogLevel = 'error' | 'warn' | 'info' | 'debug';
@@ -71,6 +69,7 @@ class Logger {
 
   private ensureLogDirectory(): void {
     try {
+      const fs = require('fs');
       if (!fs.existsSync(this.options.logDirectory)) {
         fs.mkdirSync(this.options.logDirectory, { recursive: true });
       }
@@ -134,6 +133,7 @@ class Logger {
     if (!this.options.logToFile) return;
 
     try {
+      const path = require('path');
       const logFileName = `app_${new Date().toISOString().split('T')[0]}.log`;
       const logFilePath = path.join(this.options.logDirectory, logFileName);
       const logLine = this.formatLogEntry(entry) + '\n';
@@ -141,6 +141,7 @@ class Logger {
       // Check file size and rotate if necessary
       this.rotateLogFile(logFilePath);
 
+      const fs = require('fs');
       fs.appendFileSync(logFilePath, logLine, 'utf8');
     } catch (error) {
       console.error('Failed to write to log file:', error);
@@ -149,6 +150,7 @@ class Logger {
 
   private rotateLogFile(logFilePath: string): void {
     try {
+      const fs = require('fs');
       if (!fs.existsSync(logFilePath)) return;
 
       const stats = fs.statSync(logFilePath);
@@ -167,18 +169,20 @@ class Logger {
 
   private cleanupOldLogs(): void {
     try {
+      const fs = require('fs');
+      const path = require('path');
       const files = fs.readdirSync(this.options.logDirectory)
-        .filter(file => file.startsWith('app_') && file.endsWith('.log'))
-        .map(file => ({
+        .filter((file: string) => file.startsWith('app_') && file.endsWith('.log'))
+        .map((file: string) => ({
           name: file,
           path: path.join(this.options.logDirectory, file),
           mtime: fs.statSync(path.join(this.options.logDirectory, file)).mtime,
         }))
-        .sort((a, b) => b.mtime.getTime() - a.mtime.getTime());
+        .sort((a: any, b: any) => b.mtime.getTime() - a.mtime.getTime());
 
       // Keep only the most recent files
       if (files.length > this.options.maxFiles) {
-        files.slice(this.options.maxFiles).forEach(file => {
+        files.slice(this.options.maxFiles).forEach((file: any) => {
           fs.unlinkSync(file.path);
         });
       }
@@ -300,36 +304,3 @@ export const logger = new Logger({
 // Export class for custom instances
 export { Logger };
 
-// Helper function for client-side logging
-export function logClientError(
-  error: Error | string, 
-  component?: string, 
-  context?: Record<string, any>
-): void {
-  const errorMessage = typeof error === 'string' ? error : error.message;
-  const errorStack = typeof error === 'object' && error.stack ? error.stack : undefined;
-
-  // Send to API endpoint for server-side logging
-  fetch('/api/logs', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      level: 'error',
-      message: `Client Error: ${errorMessage}`,
-      context: {
-        component,
-        error: errorMessage,
-        stack: errorStack,
-        url: window.location.href,
-        userAgent: navigator.userAgent,
-        metadata: context,
-      },
-    }),
-  }).catch(err => {
-    // Fallback to console if API call fails
-    console.error('Failed to log client error:', err);
-    console.error('Original error:', error);
-  });
-}

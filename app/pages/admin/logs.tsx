@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import Layout from '@/components/Layout';
 import { useErrorHandler } from '@/lib/useErrorHandler';
 
@@ -26,11 +26,14 @@ export default function AdminLogs() {
   const [lines, setLines] = useState(100);
   const { handleAsyncError } = useErrorHandler({ component: 'AdminLogs' });
 
-  const headers = token ? { Authorization: `Bearer ${token}` } : {};
+  const headers = useMemo(() => 
+    token ? { Authorization: `Bearer ${token}` } : undefined,
+    [token]
+  );
 
   const loadFiles = async () => {
     const result = await handleAsyncError(async () => {
-      const response = await fetch('/api/admin/logs', { headers });
+      const response = await fetch('/api/admin/logs', headers ? { headers } : {});
       if (!response.ok) {
         if (response.status === 401) {
           setAuthenticated(false);
@@ -44,10 +47,10 @@ export default function AdminLogs() {
     });
   };
 
-  const loadLogEntries = async (fileName: string, numLines: number = 100) => {
+  const loadLogEntries = useCallback(async (fileName: string, numLines: number = 100) => {
     setLoading(true);
     const result = await handleAsyncError(async () => {
-      const response = await fetch(`/api/admin/logs?file=${fileName}&lines=${numLines}`, { headers });
+      const response = await fetch(`/api/admin/logs?file=${fileName}&lines=${numLines}`, headers ? { headers } : {});
       if (!response.ok) {
         throw new Error('Failed to load log entries');
       }
@@ -55,7 +58,7 @@ export default function AdminLogs() {
       setEntries(data.entries);
     });
     setLoading(false);
-  };
+  }, [handleAsyncError, headers]);
 
   const deleteLogFile = async (fileName: string) => {
     if (!confirm(`確定要刪除日誌檔案 ${fileName} 嗎？`)) {
@@ -67,7 +70,7 @@ export default function AdminLogs() {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
-          ...headers,
+          ...(headers || {}),
         },
         body: JSON.stringify({ file: fileName }),
       });

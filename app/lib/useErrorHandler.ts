@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { logClientError } from './logger';
+import { logClientError } from './logger-client';
 
 export interface UseErrorHandlerOptions {
   component?: string;

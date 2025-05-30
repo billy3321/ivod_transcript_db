@@ -34,7 +34,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       ...context,
       ip: logger['getClientIP'](req),
       userAgent: req.headers['user-agent'],
-      timestamp: new Date().toISOString(),
+      metadata: {
+        ...(context?.metadata || {}),
+        timestamp: new Date().toISOString(),
+      }
     };
 
     // Log the message using the appropriate level

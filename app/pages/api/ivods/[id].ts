@@ -11,7 +11,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     logger.warn('Invalid IVOD ID provided', {
       method: req.method,
       url: req.url,
-      providedId: id
+      metadata: {
+        providedId: id
+      }
     });
     res.status(400).json({ error: 'Invalid id' });
     return;
@@ -46,15 +48,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     
     if (!data) {
       logger.warn('IVOD not found', {
-        ivodId: id,
-        action: 'ivod_detail_not_found'
+        action: 'ivod_detail_not_found',
+        metadata: {
+          ivodId: id
+        }
       });
       res.status(404).json({ error: 'Not found' });
     } else {
       logger.info('IVOD detail retrieved successfully', {
-        ivodId: id,
-        hasAiTranscript: !!data.ai_transcript,
-        hasLyTranscript: !!data.ly_transcript
+        metadata: {
+          ivodId: id,
+          hasAiTranscript: !!data.ai_transcript,
+          hasLyTranscript: !!data.ly_transcript
+        }
       });
       res.status(200).json({ data });
     }

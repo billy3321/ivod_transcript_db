@@ -12,7 +12,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     logger.warn('Invalid query parameter received', {
       method: req.method,
       url: req.url,
-      query: q
+      metadata: {
+        query: q
+      }
     });
     res.status(400).json({ error: 'Invalid query' });
     return;
@@ -50,17 +52,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }));
     
     logger.info('Elasticsearch search completed', {
-      query: q,
-      resultsCount: hits.length,
-      hasAdvancedSyntax: parsedQuery.hasAdvancedSyntax
+      metadata: {
+        query: q,
+        resultsCount: hits.length,
+        hasAdvancedSyntax: parsedQuery.hasAdvancedSyntax
+      }
     });
   } catch (error: any) {
     // Elasticsearch failed or not reachable; fallback to DB search
     logger.warn('Elasticsearch search failed, falling back to database', {
-      query: q,
       error: error.message,
       action: 'elasticsearch_fallback',
-      hasAdvancedSyntax: parsedQuery.hasAdvancedSyntax
+      metadata: {
+        query: q,
+        hasAdvancedSyntax: parsedQuery.hasAdvancedSyntax
+      }
     });
     usedES = false;
     const dbBackend = getDbBackend();
@@ -85,10 +91,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }));
       
       logger.info('Database fallback search completed', {
-        query: q,
-        resultsCount: hits.length,
-        dbBackend,
-        hasAdvancedSyntax: parsedQuery.hasAdvancedSyntax
+        metadata: {
+          query: q,
+          resultsCount: hits.length,
+          dbBackend: dbBackend,
+          hasAdvancedSyntax: parsedQuery.hasAdvancedSyntax
+        }
       });
     } catch (dbError: any) {
       logger.logDatabaseError(dbError, 'search', {
@@ -101,10 +109,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
   
   logger.info('Search completed successfully', {
-    query: q,
-    resultsCount: hits.length,
-    usedElasticsearch: usedES,
-    hasAdvancedSyntax: parsedQuery.hasAdvancedSyntax
+    metadata: {
+      query: q,
+      resultsCount: hits.length,
+      usedElasticsearch: usedES,
+      hasAdvancedSyntax: parsedQuery.hasAdvancedSyntax
+    }
   });
   
   res.status(200).json({ 

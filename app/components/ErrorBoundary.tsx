@@ -1,5 +1,5 @@
 import React, { Component, ReactNode } from 'react'
-import { logClientError } from '@/lib/logger'
+import { logClientError } from '@/lib/logger-client'
 
 interface Props {
   children: ReactNode

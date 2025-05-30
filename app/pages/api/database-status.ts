@@ -25,7 +25,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     logger.info('Database status check completed successfully', {
-      lastUpdated: result.last_updated
+      metadata: {
+        lastUpdated: result.last_updated
+      }
     });
 
     res.status(200).json({ 

@@ -145,10 +145,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     ]);
     
     logger.info('IVOD list query completed successfully', {
-      resultsCount: data.length,
-      totalCount: total,
-      page: pageNum,
-      pageSize: size
+      metadata: {
+        resultsCount: data.length,
+        totalCount: total,
+        page: pageNum,
+        pageSize: size
+      }
     });
     
     res.status(200).json({ data, total });
