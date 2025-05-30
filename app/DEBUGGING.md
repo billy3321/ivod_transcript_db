@@ -71,13 +71,13 @@ npm run dev
 
 ## 環境變數控制
 
-在 `.env.local` 中設定：
+在 `.env` 中設定：
 
 ```bash
 # 部分禁用 Fast Refresh
 DISABLE_FAST_REFRESH=true
 
-# 完全禁用所有 HMR（不建議在 .env.local 中設定，請使用 npm run dev:no-hmr）
+# 完全禁用所有 HMR（不建議在 .env 中設定，請使用 npm run dev:no-hmr）
 # DISABLE_ALL_HMR=true
 ```
 

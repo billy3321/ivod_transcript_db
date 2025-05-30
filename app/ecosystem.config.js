@@ -12,7 +12,7 @@ module.exports = {
       NODE_ENV: 'production',
       PORT: 3000
     },
-    env_file: '/home/ubuntu/ivod_transcript_db/app/.env.local',
+    env_file: '/home/ubuntu/ivod_transcript_db/app/.env',
     error_file: '/var/log/pm2/ivod-app-error.log',
     out_file: '/var/log/pm2/ivod-app-out.log',
     log_file: '/var/log/pm2/ivod-app.log',

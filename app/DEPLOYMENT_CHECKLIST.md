@@ -21,7 +21,7 @@
 
 ### 程式碼部署
 - [ ] 程式碼已克隆到伺服器
-- [ ] `.env.local` 檔案已建立並設定
+- [ ] `.env` 檔案已建立並設定
 - [ ] 依賴套件已安裝 (`npm ci --only=production`)
 - [ ] Prisma 客戶端已產生 (`npm run prisma:generate`)
 - [ ] 應用程式已建置 (`npm run build`)
@@ -187,7 +187,7 @@ SSL 證書商：
 
 ```
 應用程式目錄：/home/ubuntu/ivod_transcript_db/app
-環境變數檔案：/home/ubuntu/ivod_transcript_db/app/.env.local
+環境變數檔案：/home/ubuntu/ivod_transcript_db/app/.env
 nginx 配置：/etc/nginx/sites-available/ivod-app
 PM2 配置：/home/ubuntu/ivod_transcript_db/app/ecosystem.config.js
 應用程式日誌：/var/log/pm2/

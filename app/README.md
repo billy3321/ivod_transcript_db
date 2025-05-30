@@ -80,7 +80,7 @@ app/
 
 ## 5. 環境變數
 
-在 `app/` 目錄下，根據 `.env.example` 建立 `.env.local` 檔，並填入以下內容：
+在 `app/` 目錄下，根據 `.env.example` 建立 `.env` 檔，並填入以下內容：
 
 ```ini
 # 資料庫後端：sqlite / postgresql / mysql
@@ -132,9 +132,9 @@ ADMIN_TOKEN=your_secure_admin_token_here  # 管理員日誌介面存取金鑰
 ```bash
 cd app
 npm install
-cp .env.example .env.local
+cp .env.example .env
 # 若使用 SQLite，建立共用資料庫資料夾：mkdir -p ../db
-# 編輯 .env.local，設定 DB_BACKEND、對應連線參數及 Elasticsearch 相關變數
+# 編輯 .env，設定 DB_BACKEND、對應連線參數及 Elasticsearch 相關變數
 # 若使用非 SQLite 後端，執行下列命令會自動更新 prisma/schema.prisma 內的 provider 以符合 .env 的 DB_BACKEND
 npm run prisma:generate
 # npx prisma migrate dev --name init  # 如果需要建立新的遷移
@@ -279,8 +279,8 @@ git clone https://github.com/yourorg/ivod_transcript_db.git
 cd ivod_transcript_db/app
 
 # 複製並編輯環境變數
-cp .env.example .env.local
-# 編輯 .env.local 並填入 DB_BACKEND、資料庫連線參數、ES_HOST、ES_PORT、ES_SCHEME、ES_INDEX 等
+cp .env.example .env
+# 編輯 .env 並填入 DB_BACKEND、資料庫連線參數、ES_HOST、ES_PORT、ES_SCHEME、ES_INDEX 等
 
 # 安裝依賴（只安裝正式環境依賴）
 npm ci --only=production
@@ -306,7 +306,7 @@ CREATE USER ivod_user WITH PASSWORD 'your_secure_password';
 GRANT ALL PRIVILEGES ON DATABASE ivod_db TO ivod_user;
 \q
 
-# 在 .env.local 中設定：
+# 在 .env 中設定：
 # DB_BACKEND=postgresql
 # PG_HOST=localhost
 # PG_PORT=5432
@@ -331,7 +331,7 @@ GRANT ALL PRIVILEGES ON ivod_db.* TO 'ivod_user'@'localhost';
 FLUSH PRIVILEGES;
 EXIT;
 
-# 在 .env.local 中設定：
+# 在 .env 中設定：
 # DB_BACKEND=mysql
 # MYSQL_HOST=localhost
 # MYSQL_PORT=3306

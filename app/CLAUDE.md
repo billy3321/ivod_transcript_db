@@ -39,7 +39,7 @@ This is a Next.js TypeScript application that provides a web interface for searc
 ```bash
 # Setup and development
 npm install
-cp .env.example .env.local
+cp .env.example .env
 npm run prisma:prepare     # Update schema for current DB_BACKEND
 npm run prisma:generate    # Generate Prisma client
 npm run dev               # Development server (localhost:3000)
@@ -60,7 +60,7 @@ npm run lint              # ESLint checks
 
 ## Environment Configuration
 
-Required `.env.local` variables:
+Required `.env` variables:
 ```bash
 # Database backend selection
 DB_BACKEND=sqlite|postgresql|mysql
@@ -90,7 +90,7 @@ ADMIN_TOKEN=your_secure_admin_token_here
 
 The app supports dynamic database backend switching:
 
-1. **Update Environment**: Change `DB_BACKEND` in `.env.local`
+1. **Update Environment**: Change `DB_BACKEND` in `.env`
 2. **Update Schema**: Run `npm run prisma:prepare` to update `prisma/schema.prisma`
 3. **Generate Client**: Run `npm run prisma:generate` to regenerate Prisma client
 4. **Restart App**: Development server will pick up new configuration
