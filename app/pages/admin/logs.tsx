@@ -91,7 +91,7 @@ export default function AdminLogs() {
     if (selectedFile) {
       loadLogEntries(selectedFile, lines);
     }
-  }, [selectedFile, lines]);
+  }, [selectedFile, lines, loadLogEntries]);
 
   const formatFileSize = (bytes: number) => {
     if (bytes === 0) return '0 Bytes';

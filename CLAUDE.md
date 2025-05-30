@@ -57,7 +57,7 @@ TEST_SQLITE_PATH=../db/ivod_test.db python integration_test.py
 ```bash
 # Setup and development
 npm install
-cp .env.example .env.local  # Configure database and Elasticsearch
+cp .env.example .env  # Configure database and Elasticsearch
 npm run prisma:prepare     # Update schema based on .env DB_BACKEND
 npm run prisma:generate     # Generate Prisma client
 npm run dev                 # Development server (localhost:3000)

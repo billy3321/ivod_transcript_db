@@ -364,6 +364,14 @@ sudo systemctl restart elasticsearch
 
 #### 方案一：使用 PM2（推薦）
 
+PM2 是一個強大的 Node.js 進程管理器，類似於 Ruby 的 unicorn，可以：
+- **多 Worker 管理**：自動開啟多個 worker 進程（cluster mode）來充分利用 CPU 核心
+- **負載均衡**：在多個進程間自動分配請求
+- **自動重啟**：當應用程式崩潰時自動重啟
+- **零停機部署**：支援滾動更新，不會中斷服務
+- **資源監控**：即時監控 CPU、記憶體使用量
+- **日誌管理**：統一管理所有 worker 的日誌
+
 **安裝 PM2：**
 ```bash
 # 全域安裝 PM2
@@ -381,15 +389,15 @@ module.exports = {
     script: 'npm',
     args: 'start',
     cwd: '/home/ubuntu/ivod_transcript_db/app',
-    instances: 'max', // 使用所有 CPU 核心
-    exec_mode: 'cluster', // 叢集模式
+    instances: 'max', // 使用所有 CPU 核心（等同於 unicorn workers）
+    exec_mode: 'cluster', // 叢集模式，類似 unicorn 的多 worker 架構
     watch: false,
     max_memory_restart: '1G',
     env: {
       NODE_ENV: 'production',
       PORT: 3000
     },
-    env_file: '/home/ubuntu/ivod_transcript_db/app/.env.local',
+    env_file: '/home/ubuntu/ivod_transcript_db/app/.env',
     error_file: '/var/log/pm2/ivod-app-error.log',
     out_file: '/var/log/pm2/ivod-app-out.log',
     log_file: '/var/log/pm2/ivod-app.log',
@@ -430,6 +438,111 @@ pm2 stop ivod-app    # 停止應用程式
 pm2 delete ivod-app  # 刪除應用程式
 ```
 
+**PM2 與 systemctl 整合**
+
+PM2 提供了與 systemd 整合的功能，可以在系統開機時自動啟動並管理 PM2 進程：
+
+**設定 systemctl 自動啟動：**
+```bash
+# 1. 生成 systemd 啟動腳本
+pm2 startup -u $USER
+
+# 這會顯示類似以下的指令，複製並執行：
+# sudo env PATH=$PATH:/usr/bin /usr/lib/node_modules/pm2/bin/pm2 startup systemd -u ubuntu --hp /home/ubuntu
+
+# 2. 執行顯示的指令（以實際顯示的為準）
+sudo env PATH=$PATH:/usr/bin /usr/lib/node_modules/pm2/bin/pm2 startup systemd -u ubuntu --hp /home/ubuntu
+
+# 3. 保存當前的 PM2 進程列表
+pm2 save
+
+# 4. 驗證 systemd 服務已創建
+sudo systemctl status pm2-ubuntu
+```
+
+**手動創建 systemd 服務檔案（替代方案）：**
+如果自動生成有問題，可以手動創建：
+
+```bash
+# 創建 systemd 服務檔案
+sudo tee /etc/systemd/system/pm2-ivod.service > /dev/null << 'EOF'
+[Unit]
+Description=PM2 process manager for IVOD App
+Documentation=https://pm2.keymetrics.io/
+After=network.target
+
+[Service]
+Type=forking
+User=ubuntu
+LimitNOFILE=infinity
+LimitNPROC=infinity
+LimitCORE=infinity
+Environment=PATH=/home/ubuntu/.nvm/versions/node/v18.19.0/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+Environment=PM2_HOME=/home/ubuntu/.pm2
+PIDFile=/home/ubuntu/.pm2/pm2.pid
+Restart=on-failure
+
+ExecStart=/usr/bin/pm2 resurrect
+ExecReload=/usr/bin/pm2 reload all
+ExecStop=/usr/bin/pm2 kill
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# 啟用並啟動服務
+sudo systemctl daemon-reload
+sudo systemctl enable pm2-ivod
+sudo systemctl start pm2-ivod
+
+# 檢查服務狀態
+sudo systemctl status pm2-ivod
+```
+
+**測試開機自動啟動：**
+```bash
+# 重啟系統測試
+sudo reboot
+
+# 系統重啟後檢查
+pm2 status
+sudo systemctl status pm2-ubuntu  # 或 pm2-ivod
+```
+
+**PM2 監控和管理：**
+```bash
+# 即時監控儀表板
+pm2 monit
+
+# 檢視詳細資訊
+pm2 show ivod-app
+
+# 檢視所有 worker 的狀態
+pm2 list
+
+# 手動調整 worker 數量
+pm2 scale ivod-app 4  # 設定為 4 個 worker
+
+# 重新載入配置
+pm2 reload ecosystem.config.js
+
+# 停止所有應用程式
+pm2 stop all
+
+# 重啟所有應用程式
+pm2 restart all
+```
+
+**PM2 與 nginx 負載均衡：**
+PM2 的 cluster mode 會自動在多個 worker 間做負載均衡，nginx 只需要代理到單一埠口：
+
+```nginx
+upstream ivod_backend {
+    server 127.0.0.1:3000;  # PM2 會自動處理內部負載均衡
+    keepalive 32;
+}
+```
+
 #### 方案二：使用 systemd 搭配多實例
 
 **建立 systemd 服務檔案 `/etc/systemd/system/ivod-app@.service`：**
@@ -446,7 +559,7 @@ WorkingDirectory=/home/ubuntu/ivod_transcript_db/app
 ExecStart=/usr/bin/npm start
 Environment=NODE_ENV=production
 Environment=PORT=300%i
-EnvironmentFile=/home/ubuntu/ivod_transcript_db/app/.env.local
+EnvironmentFile=/home/ubuntu/ivod_transcript_db/app/.env
 Restart=always
 RestartSec=5
 StartLimitInterval=60s
@@ -557,7 +670,7 @@ services:
     environment:
       - NODE_ENV=production
     env_file:
-      - .env.local
+      - .env
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
       interval: 30s
@@ -1080,7 +1193,7 @@ pm2 resurrect
 node --version  # 應該是 v18+
 
 # 檢查環境變數
-cat /home/ubuntu/ivod_transcript_db/app/.env.local
+cat /home/ubuntu/ivod_transcript_db/app/.env
 
 # 檢查應用程式建置
 cd /home/ubuntu/ivod_transcript_db/app
@@ -1243,8 +1356,8 @@ sudo mysql_secure_installation
 
 ```bash
 # 確保環境變數檔案權限正確
-sudo chmod 600 /home/ubuntu/ivod_transcript_db/app/.env.local
-sudo chown www-data:www-data /home/ubuntu/ivod_transcript_db/app/.env.local
+sudo chmod 600 /home/ubuntu/ivod_transcript_db/app/.env
+sudo chown www-data:www-data /home/ubuntu/ivod_transcript_db/app/.env
 ```
 
 這份完整的文件涵蓋了從開發到正式環境部署的所有面向，包括詳細的 Ubuntu Linux 部署指南、故障排除和安全性考慮。

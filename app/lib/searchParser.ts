@@ -224,9 +224,11 @@ export function parseAdvancedSearchQuery(query: string): AdvancedSearchQuery {
     }
 
     logger.debug('Advanced search query parsed successfully', {
-      originalQuery: query,
-      parsedResult: result,
-      hasAdvancedSyntax: result.hasAdvancedSyntax
+      metadata: {
+        originalQuery: query,
+        parsedResult: result,
+        hasAdvancedSyntax: result.hasAdvancedSyntax
+      }
     });
 
   } catch (error) {

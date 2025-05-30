@@ -86,9 +86,9 @@ app/
 ```
 cd app
 npm install
-cp .env.example .env.local
+cp .env.example .env
 # 若用 SQLite：mkdir -p ../db
-# 編輯 .env.local 設定 DATABASE_URL、DB_PROVIDER、ES 參數
+# 編輯 .env 設定 DATABASE_URL、DB_PROVIDER、ES 參數
 npx prisma generate
 npx prisma migrate dev --name init
 npm run dev  # http://localhost:3000

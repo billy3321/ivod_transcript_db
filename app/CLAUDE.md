@@ -273,7 +273,7 @@ const query = searchParams.get('q') || '';
 ## Troubleshooting
 
 ### Common Issues
-1. **Database Connection**: Check `.env.local` configuration and service status
+1. **Database Connection**: Check `.env` configuration and service status
 2. **Prisma Client**: Regenerate after schema changes or backend switches
 3. **Elasticsearch**: App will fallback to database search if ES unavailable
 4. **Build Errors**: Ensure all dependencies installed and TypeScript types correct
@@ -307,7 +307,7 @@ npm run analyze
 - CSRF protection via SameSite cookies
 
 ### Environment Security
-- Sensitive config in `.env.local` (not committed)
+- Sensitive config in `.env` (not committed)
 - Production secrets via secure environment injection
 - Database credentials properly isolated
 - HTTPS enforcement in production

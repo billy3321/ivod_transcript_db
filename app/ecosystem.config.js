@@ -10,12 +10,15 @@ module.exports = {
     max_memory_restart: '1G',
     env: {
       NODE_ENV: 'production',
-      PORT: 3000
+      PORT: 3000,
+      PM2_HOME: '/home/ubuntu/ivod_transcript_db/app/.pm2'
     },
     env_file: '/home/ubuntu/ivod_transcript_db/app/.env',
-    error_file: '/var/log/pm2/ivod-app-error.log',
-    out_file: '/var/log/pm2/ivod-app-out.log',
-    log_file: '/var/log/pm2/ivod-app.log',
+    // PM2 進程和日誌檔案設定
+    pid_file: '/home/ubuntu/ivod_transcript_db/app/.pm2/pm2.pid',
+    error_file: '/home/ubuntu/ivod_transcript_db/app/.pm2/ivod-app-error.log',
+    out_file: '/home/ubuntu/ivod_transcript_db/app/.pm2/ivod-app-out.log',
+    log_file: '/home/ubuntu/ivod_transcript_db/app/.pm2/ivod-app.log',
     time: true,
     // 自動重啟設定
     autorestart: true,
@@ -31,8 +34,6 @@ module.exports = {
     merge_logs: true,
     // 進程監控
     monitoring: true,
-    // 記憶體監控
-    max_memory_restart: '1G',
     // CPU 監控
     listen_timeout: 3000,
     // 忽略的監控項目
