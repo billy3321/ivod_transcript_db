@@ -5,7 +5,7 @@
 這是一個基於 Next.js 開發的網站應用程式，提供 IVOD 逐字稿的瀏覽和搜尋功能：
 
 - **分頁列表**：顯示 IVOD 記錄的日期、會議名稱、委員會、發言人和時長
-- **搜尋表單**：可依會議名稱、委員會、發言人和全文逐字稿進行篩選（使用 Elasticsearch 驅動）
+- **進階搜尋表單**：支援引號搜尋、AND/OR布林運算、括弧分組、欄位搜尋和排除語法的強大搜尋功能（使用 Elasticsearch 驅動）
 - **詳細頁面**：每筆 IVOD 記錄的詳細頁面，包含逐字稿顯示和長文本的展開控制
 
 ## 2. 技術堆疊
@@ -15,6 +15,7 @@
 - [Prisma](https://www.prisma.io/) ORM 用於關聯式資料庫（PostgreSQL / MySQL / SQLite）
 - [Elasticsearch](https://www.elastic.co/) 用於全文逐字稿搜尋
 - [bodybuilder](https://github.com/moscajs/bodybuilder) 用於建構 Elasticsearch 查詢 DSL
+- [search-query-parser](https://github.com/nepsilon/search-query-parser) 用於解析進階搜尋語法
 - [Tailwind CSS](https://tailwindcss.com/) 用於樣式設計
 - **結構化日誌系統**：完整的錯誤記錄、API 監控和管理介面
 
@@ -38,6 +39,7 @@ app/
 ├── lib/
 │   ├── prisma.ts              # 資料庫客戶端設定
 │   ├── elastic.ts             # Elasticsearch 客戶端設定
+│   ├── searchParser.ts        # 進階搜尋語法解析器
 │   ├── logger.ts              # 結構化日誌系統
 │   ├── useErrorHandler.ts     # React 錯誤處理 hook
 │   └── utils.ts               # 工具函數

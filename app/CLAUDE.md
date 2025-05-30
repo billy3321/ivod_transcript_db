@@ -15,13 +15,18 @@ This is a Next.js TypeScript application that provides a web interface for searc
 - **Components**: `components/` - Modular React components with error handling
 - **Database**: `lib/prisma.ts` - Database client with multi-backend support
 - **Search**: `lib/elastic.ts` - Elasticsearch integration with DB fallback
+- **Search Parser**: `lib/searchParser.ts` - Advanced query parsing with boolean logic
 - **Logging**: `lib/logger.ts` - Structured logging system with file rotation
 - **Error Handling**: `lib/useErrorHandler.ts` - React hook for error management
 
 ### Key Features
-1. **Dual Search Modes**: 
-   - "All fields" search across metadata
-   - "Transcript only" full-text search
+1. **Advanced Search Capabilities**: 
+   - Quoted phrase search ("exact phrase")
+   - Boolean operators (AND/OR)
+   - Parentheses grouping for complex queries
+   - Field-specific searches (title:, speaker:, meeting:, committee:)
+   - Exclusion syntax (-term, -"phrase")
+   - Dual search modes: "All fields" and "Transcript only"
 2. **Advanced Filtering**: By meeting name, speaker, committee, date range
 3. **Multi-Database Support**: SQLite/PostgreSQL/MySQL via dynamic Prisma schema
 4. **Responsive Design**: Mobile-first with Tailwind CSS
@@ -95,7 +100,7 @@ The `scripts/updatePrismaSchema.js` automatically handles provider-specific fiel
 ## API Routes
 
 ### Search & Data Access
-- `GET /api/search` - Full-text transcript search with Elasticsearch/DB fallback
+- `GET /api/search` - Advanced search with quotes, boolean operators, field searches, and exclusions (Elasticsearch/DB fallback)
 - `GET /api/ivods` - List/filter IVODs with pagination and sorting
 - `GET /api/ivods/[id]` - Get specific IVOD details and transcript
 - `GET /api/health` - Application health check
@@ -123,7 +128,7 @@ All API routes follow consistent patterns:
 - `Sidebar.tsx` - Mobile navigation drawer
 
 ### Feature Components
-- `SearchForm.tsx` - Advanced search interface with URL state sync
+- `SearchForm.tsx` - Advanced search interface with syntax help and URL state sync
 - `List.tsx` - IVOD results display with responsive cards
 - `Pagination.tsx` - Page navigation with proper accessibility
 - `TranscriptViewer.tsx` - Expandable transcript display
@@ -135,14 +140,25 @@ All API routes follow consistent patterns:
 
 ## Search Implementation
 
+### Advanced Search Parser
+The app includes a sophisticated search parser (`lib/searchParser.ts`) that supports:
+- **Quoted Phrases**: `"exact phrase"` for precise matching
+- **Boolean Logic**: `term1 AND term2`, `term1 OR term2` with proper precedence
+- **Grouping**: `(term1 OR term2) AND term3` for complex queries
+- **Field Searches**: `title:"meeting name"`, `speaker:"legislator name"`
+- **Exclusions**: `-term` or `-"excluded phrase"` to filter out content
+- **Mixed Queries**: Complex combinations like `(speaker:"王委員" OR speaker:"李委員") AND "預算" -"國防"`
+
 ### Elasticsearch Integration
 The app uses a dual search strategy:
-1. **Primary**: Elasticsearch full-text search
+1. **Primary**: Elasticsearch full-text search with advanced query building
 2. **Fallback**: Database LIKE queries when ES unavailable
 
-Search logic in `lib/elastic.ts` and `pages/api/search.ts` handles:
+Search logic in `lib/searchParser.ts`, `lib/elastic.ts` and `pages/api/search.ts` handles:
+- Advanced query parsing and AST generation
+- Elasticsearch query building with boolean logic
+- Database fallback with equivalent SQL queries
 - Connection failure graceful degradation
-- Query building with bodybuilder
 - Result formatting consistency
 - Error logging and monitoring
 
