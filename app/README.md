@@ -438,6 +438,310 @@ pm2 stop ivod-app    # 停止應用程式
 pm2 delete ivod-app  # 刪除應用程式
 ```
 
+#### PM2 + Nginx 配置（推薦方案）
+
+以下提供針對 PM2 部署的 HTTP Nginx 配置，包含效能優化、安全防護、壓縮、快取等生產環境所需功能。
+
+**建立 Nginx 配置檔案 `/etc/nginx/sites-available/ivod-app`：**
+
+```nginx
+# 全域設定（在 /etc/nginx/nginx.conf 的 http 區塊中確保包含）
+# gzip on;
+# gzip_vary on;
+# gzip_min_length 1024;
+# gzip_comp_level 6;
+# gzip_types text/plain text/css application/json application/javascript text/xml application/xml text/javascript;
+
+# 限制請求速率（防止 DDoS）
+limit_req_zone $binary_remote_addr zone=api:10m rate=10r/s;
+limit_req_zone $binary_remote_addr zone=general:10m rate=30r/s;
+
+# 快取配置
+proxy_cache_path /var/cache/nginx/ivod levels=1:2 keys_zone=ivod_cache:100m max_size=1g inactive=60m use_temp_path=off;
+
+# 上游伺服器定義（PM2 會自動負載均衡多個 worker）
+upstream ivod_backend {
+    server 127.0.0.1:3000 weight=100 max_fails=3 fail_timeout=30s;
+    
+    # 如果使用多個 PM2 實例在不同埠口，可以加入：
+    # server 127.0.0.1:3001 weight=100 max_fails=3 fail_timeout=30s backup;
+    
+    # 連線池設定
+    keepalive 32;
+    keepalive_requests 100;
+    keepalive_timeout 60s;
+}
+
+# 主要 HTTP 伺服器
+server {
+    listen 80;
+    server_name your.domain.com www.your.domain.com;
+    
+    # 檔案上傳限制
+    client_max_body_size 10M;
+    
+    # 連線超時設定
+    client_body_timeout 12;
+    client_header_timeout 12;
+    send_timeout 10;
+    
+    # 緩衝設定
+    client_body_buffer_size 10K;
+    client_header_buffer_size 1k;
+    large_client_header_buffers 2 1k;
+    
+    # 記錄檔格式
+    access_log /var/log/nginx/ivod_access.log combined buffer=16k flush=2s;
+    error_log /var/log/nginx/ivod_error.log warn;
+    
+    # Gzip 壓縮
+    gzip on;
+    gzip_vary on;
+    gzip_min_length 1024;
+    gzip_comp_level 6;
+    gzip_types
+        text/plain
+        text/css
+        text/xml
+        text/javascript
+        application/json
+        application/javascript
+        application/xml+rss
+        application/atom+xml
+        image/svg+xml;
+    
+    # 安全標頭
+    add_header X-Frame-Options DENY always;
+    add_header X-Content-Type-Options nosniff always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    
+    # 健康檢查端點（不快取，不記錄）
+    location = /api/health {
+        proxy_pass http://ivod_backend;
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+        proxy_connect_timeout 2s;
+        proxy_read_timeout 2s;
+        access_log off;
+        
+        # 不快取健康檢查
+        add_header Cache-Control "no-cache, no-store, must-revalidate";
+        add_header Pragma "no-cache";
+        add_header Expires "0";
+    }
+    
+    # Next.js 靜態資源（最長快取）
+    location /_next/static/ {
+        alias /home/ubuntu/ivod_transcript_db/app/.next/static/;
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+        add_header Vary "Accept-Encoding";
+        
+        # Gzip 預壓縮檔案
+        gzip_static on;
+        
+        # 檔案不存在時不記錄錯誤
+        log_not_found off;
+    }
+    
+    # 公開靜態資源
+    location /static/ {
+        alias /home/ubuntu/ivod_transcript_db/app/public/;
+        expires 30d;
+        add_header Cache-Control "public";
+        add_header Vary "Accept-Encoding";
+        gzip_static on;
+        log_not_found off;
+    }
+    
+    # Favicon 和基本檔案
+    location ~* \.(ico|png|jpg|jpeg|gif|svg|woff|woff2|ttf|eot)$ {
+        root /home/ubuntu/ivod_transcript_db/app/public;
+        expires 30d;
+        add_header Cache-Control "public";
+        log_not_found off;
+    }
+    
+    # API 路由（限制請求頻率）
+    location /api/ {
+        # 限制 API 請求頻率
+        limit_req zone=api burst=20 nodelay;
+        
+        proxy_pass http://ivod_backend;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Request-ID $request_id;
+        proxy_cache_bypass $http_upgrade;
+        
+        # 連線池設定
+        proxy_set_header Connection "";
+        
+        # 超時設定（API 可能需要較長時間）
+        proxy_connect_timeout 5s;
+        proxy_send_timeout 60s;
+        proxy_read_timeout 60s;
+        
+        # 緩衝設定
+        proxy_buffering on;
+        proxy_buffer_size 4k;
+        proxy_buffers 8 4k;
+        proxy_busy_buffers_size 8k;
+        
+        # 錯誤處理
+        proxy_next_upstream error timeout invalid_header http_500 http_502 http_503;
+        proxy_next_upstream_tries 1;
+        proxy_next_upstream_timeout 5s;
+        
+        # API 回應不快取
+        add_header Cache-Control "no-cache, no-store, must-revalidate";
+    }
+    
+    # 管理員介面（額外安全保護）
+    location /admin/ {
+        # IP 白名單（根據需要調整）
+        allow 127.0.0.1;
+        # allow your.admin.ip.address;
+        deny all;
+        
+        # 基本認證
+        auth_basic "Admin Access";
+        auth_basic_user_file /etc/nginx/.htpasswd;
+        
+        limit_req zone=api burst=5 nodelay;
+        
+        proxy_pass http://ivod_backend;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        
+        proxy_connect_timeout 5s;
+        proxy_send_timeout 30s;
+        proxy_read_timeout 30s;
+    }
+    
+    # 主要應用程式（帶快取）
+    location / {
+        # 一般頁面請求頻率限制
+        limit_req zone=general burst=50 nodelay;
+        
+        proxy_pass http://ivod_backend;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Request-ID $request_id;
+        proxy_cache_bypass $http_upgrade;
+        
+        # 連線池設定
+        proxy_set_header Connection "";
+        
+        # 超時設定
+        proxy_connect_timeout 5s;
+        proxy_send_timeout 30s;
+        proxy_read_timeout 30s;
+        
+        # 快取設定（適用於靜態頁面）
+        proxy_cache ivod_cache;
+        proxy_cache_valid 200 302 5m;
+        proxy_cache_valid 404 1m;
+        proxy_cache_use_stale error timeout updating http_500 http_502 http_503 http_504;
+        proxy_cache_lock on;
+        proxy_cache_revalidate on;
+        
+        # 快取繞過條件
+        proxy_cache_bypass $cookie_nocache $arg_nocache $arg_comment;
+        proxy_no_cache $cookie_nocache $arg_nocache $arg_comment;
+        
+        # 錯誤處理
+        proxy_next_upstream error timeout invalid_header http_500 http_502 http_503;
+        proxy_next_upstream_tries 1;
+        proxy_next_upstream_timeout 5s;
+    }
+    
+    # 禁止存取敏感檔案
+    location ~ /\. {
+        deny all;
+        access_log off;
+        log_not_found off;
+    }
+    
+    location ~ ~$ {
+        deny all;
+        access_log off;
+        log_not_found off;
+    }
+    
+    # robots.txt
+    location = /robots.txt {
+        root /home/ubuntu/ivod_transcript_db/app/public;
+        log_not_found off;
+    }
+    
+    # sitemap.xml
+    location = /sitemap.xml {
+        proxy_pass http://ivod_backend;
+        proxy_cache ivod_cache;
+        proxy_cache_valid 200 1h;
+    }
+}
+```
+
+**設定步驟：**
+
+```bash
+# 1. 建立必要目錄和權限
+sudo mkdir -p /var/cache/nginx/ivod
+sudo chown -R nginx:nginx /var/cache/nginx
+sudo mkdir -p /var/log/nginx
+sudo chown -R nginx:nginx /var/log/nginx
+
+# 2. 設定靜態檔案權限
+sudo chown -R www-data:www-data /home/ubuntu/ivod_transcript_db/app/.next
+sudo chown -R www-data:www-data /home/ubuntu/ivod_transcript_db/app/public
+
+# 3. 建立管理員認證檔案（可選）
+sudo apt-get install -y apache2-utils
+sudo htpasswd -c /etc/nginx/.htpasswd admin
+sudo chmod 644 /etc/nginx/.htpasswd
+sudo chown root:www-data /etc/nginx/.htpasswd
+
+# 4. 啟用站點配置
+sudo nginx -t
+sudo ln -s /etc/nginx/sites-available/ivod-app /etc/nginx/sites-enabled/
+sudo rm -f /etc/nginx/sites-enabled/default  # 移除預設站點
+sudo systemctl reload nginx
+
+# 5. 設定防火牆
+sudo ufw allow 'Nginx HTTP'
+sudo ufw allow ssh
+sudo ufw enable
+```
+
+**效能監控和調整：**
+
+```bash
+# 監控 Nginx 效能
+watch -n 1 'sudo netstat -an | grep :80 | wc -l'
+
+# 監控快取狀態
+sudo du -sh /var/cache/nginx/ivod
+
+# 檢視 Nginx 日誌
+sudo tail -f /var/log/nginx/ivod_access.log
+sudo tail -f /var/log/nginx/ivod_error.log
+```
+
 **PM2 與 systemctl 整合**
 
 PM2 提供了與 systemd 整合的功能，可以在系統開機時自動啟動並管理 PM2 進程：
@@ -736,314 +1040,7 @@ docker service update ivod_app       # 更新服務
 curl http://localhost:3000/api/health
 ```
 
-### 9.9 PM2 + Nginx 完整配置（推薦生產環境方案）
-
-以下提供針對 PM2 部署的完整 Nginx 配置，包含效能優化、安全防護、壓縮、快取等生產環境所需功能。
-
-#### 建立完整的 Nginx 站點配置
-
-建立 nginx 站點檔案 `/etc/nginx/sites-available/ivod-app`：
-
-```nginx
-# 全域設定（在 /etc/nginx/nginx.conf 的 http 區塊中確保包含）
-# gzip on;
-# gzip_vary on;
-# gzip_min_length 1024;
-# gzip_comp_level 6;
-# gzip_types text/plain text/css application/json application/javascript text/xml application/xml text/javascript;
-
-# 限制請求速率（防止 DDoS）
-limit_req_zone $binary_remote_addr zone=api:10m rate=10r/s;
-limit_req_zone $binary_remote_addr zone=general:10m rate=30r/s;
-
-# 快取配置
-proxy_cache_path /var/cache/nginx/ivod levels=1:2 keys_zone=ivod_cache:100m max_size=1g inactive=60m use_temp_path=off;
-
-# 上游伺服器定義（PM2 會自動負載均衡多個 worker）
-upstream ivod_backend {
-    server 127.0.0.1:3000 weight=100 max_fails=3 fail_timeout=30s;
-    
-    # 如果使用多個 PM2 實例在不同埠口，可以加入：
-    # server 127.0.0.1:3001 weight=100 max_fails=3 fail_timeout=30s backup;
-    
-    # 連線池設定
-    keepalive 32;
-    keepalive_requests 100;
-    keepalive_timeout 60s;
-}
-
-# HTTP 到 HTTPS 重定向
-server {
-    listen 80;
-    server_name your.domain.com www.your.domain.com;
-    
-    # Let's Encrypt ACME 挑戰
-    location /.well-known/acme-challenge/ {
-        root /var/www/html;
-    }
-    
-    # 其他所有請求重定向到 HTTPS
-    location / {
-        return 301 https://$server_name$request_uri;
-    }
-}
-
-# 主要 HTTPS 伺服器
-server {
-    listen 443 ssl http2;
-    server_name your.domain.com;
-    
-    # SSL 證書配置（Let's Encrypt）
-    ssl_certificate /etc/letsencrypt/live/your.domain.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/your.domain.com/privkey.pem;
-    ssl_trusted_certificate /etc/letsencrypt/live/your.domain.com/chain.pem;
-    
-    # SSL 安全配置
-    ssl_protocols TLSv1.2 TLSv1.3;
-    ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384;
-    ssl_prefer_server_ciphers off;
-    ssl_session_cache shared:SSL:10m;
-    ssl_session_timeout 1d;
-    ssl_session_tickets off;
-    
-    # OCSP Stapling
-    ssl_stapling on;
-    ssl_stapling_verify on;
-    resolver 8.8.8.8 8.8.4.4 valid=300s;
-    resolver_timeout 5s;
-    
-    # 安全標頭
-    add_header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload" always;
-    add_header X-Frame-Options DENY always;
-    add_header X-Content-Type-Options nosniff always;
-    add_header X-XSS-Protection "1; mode=block" always;
-    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
-    add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self'; frame-ancestors 'none';" always;
-    
-    # 檔案上傳限制
-    client_max_body_size 10M;
-    
-    # 連線超時設定
-    client_body_timeout 12;
-    client_header_timeout 12;
-    send_timeout 10;
-    
-    # 緩衝設定
-    client_body_buffer_size 10K;
-    client_header_buffer_size 1k;
-    large_client_header_buffers 2 1k;
-    
-    # 記錄檔格式
-    access_log /var/log/nginx/ivod_access.log combined buffer=16k flush=2s;
-    error_log /var/log/nginx/ivod_error.log warn;
-    
-    # Gzip 壓縮
-    gzip on;
-    gzip_vary on;
-    gzip_min_length 1024;
-    gzip_comp_level 6;
-    gzip_types
-        text/plain
-        text/css
-        text/xml
-        text/javascript
-        application/json
-        application/javascript
-        application/xml+rss
-        application/atom+xml
-        image/svg+xml;
-    
-    # 健康檢查端點（不快取，不記錄）
-    location = /api/health {
-        proxy_pass http://ivod_backend;
-        proxy_http_version 1.1;
-        proxy_set_header Connection "";
-        proxy_connect_timeout 2s;
-        proxy_read_timeout 2s;
-        access_log off;
-        
-        # 不快取健康檢查
-        add_header Cache-Control "no-cache, no-store, must-revalidate";
-        add_header Pragma "no-cache";
-        add_header Expires "0";
-    }
-    
-    # Next.js 靜態資源（最長快取）
-    location /_next/static/ {
-        alias /home/ubuntu/ivod_transcript_db/app/.next/static/;
-        expires 1y;
-        add_header Cache-Control "public, immutable";
-        add_header Vary "Accept-Encoding";
-        
-        # Gzip 預壓縮檔案
-        gzip_static on;
-        
-        # 檔案不存在時不記錄錯誤
-        log_not_found off;
-    }
-    
-    # 公開靜態資源
-    location /static/ {
-        alias /home/ubuntu/ivod_transcript_db/app/public/;
-        expires 30d;
-        add_header Cache-Control "public";
-        add_header Vary "Accept-Encoding";
-        gzip_static on;
-        log_not_found off;
-    }
-    
-    # Favicon 和基本檔案
-    location ~* \.(ico|png|jpg|jpeg|gif|svg|woff|woff2|ttf|eot)$ {
-        root /home/ubuntu/ivod_transcript_db/app/public;
-        expires 30d;
-        add_header Cache-Control "public";
-        log_not_found off;
-    }
-    
-    # API 路由（限制請求頻率）
-    location /api/ {
-        # 限制 API 請求頻率
-        limit_req zone=api burst=20 nodelay;
-        
-        proxy_pass http://ivod_backend;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_set_header X-Request-ID $request_id;
-        proxy_cache_bypass $http_upgrade;
-        
-        # 連線池設定
-        proxy_set_header Connection "";
-        
-        # 超時設定（API 可能需要較長時間）
-        proxy_connect_timeout 5s;
-        proxy_send_timeout 60s;
-        proxy_read_timeout 60s;
-        
-        # 緩衝設定
-        proxy_buffering on;
-        proxy_buffer_size 4k;
-        proxy_buffers 8 4k;
-        proxy_busy_buffers_size 8k;
-        
-        # 錯誤處理
-        proxy_next_upstream error timeout invalid_header http_500 http_502 http_503;
-        proxy_next_upstream_tries 1;
-        proxy_next_upstream_timeout 5s;
-        
-        # API 回應不快取
-        add_header Cache-Control "no-cache, no-store, must-revalidate";
-    }
-    
-    # 管理員介面（額外安全保護）
-    location /admin/ {
-        # IP 白名單（根據需要調整）
-        allow 127.0.0.1;
-        # allow your.admin.ip.address;
-        deny all;
-        
-        # 基本認證
-        auth_basic "Admin Access";
-        auth_basic_user_file /etc/nginx/.htpasswd;
-        
-        limit_req zone=api burst=5 nodelay;
-        
-        proxy_pass http://ivod_backend;
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        
-        proxy_connect_timeout 5s;
-        proxy_send_timeout 30s;
-        proxy_read_timeout 30s;
-    }
-    
-    # 主要應用程式（帶快取）
-    location / {
-        # 一般頁面請求頻率限制
-        limit_req zone=general burst=50 nodelay;
-        
-        proxy_pass http://ivod_backend;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_set_header X-Request-ID $request_id;
-        proxy_cache_bypass $http_upgrade;
-        
-        # 連線池設定
-        proxy_set_header Connection "";
-        
-        # 超時設定
-        proxy_connect_timeout 5s;
-        proxy_send_timeout 30s;
-        proxy_read_timeout 30s;
-        
-        # 快取設定（適用於靜態頁面）
-        proxy_cache ivod_cache;
-        proxy_cache_valid 200 302 5m;
-        proxy_cache_valid 404 1m;
-        proxy_cache_use_stale error timeout updating http_500 http_502 http_503 http_504;
-        proxy_cache_lock on;
-        proxy_cache_revalidate on;
-        
-        # 快取繞過條件
-        proxy_cache_bypass $cookie_nocache $arg_nocache $arg_comment;
-        proxy_no_cache $cookie_nocache $arg_nocache $arg_comment;
-        
-        # 錯誤處理
-        proxy_next_upstream error timeout invalid_header http_500 http_502 http_503;
-        proxy_next_upstream_tries 1;
-        proxy_next_upstream_timeout 5s;
-    }
-    
-    # 禁止存取敏感檔案
-    location ~ /\. {
-        deny all;
-        access_log off;
-        log_not_found off;
-    }
-    
-    location ~ ~$ {
-        deny all;
-        access_log off;
-        log_not_found off;
-    }
-    
-    # robots.txt
-    location = /robots.txt {
-        root /home/ubuntu/ivod_transcript_db/app/public;
-        log_not_found off;
-    }
-    
-    # sitemap.xml
-    location = /sitemap.xml {
-        proxy_pass http://ivod_backend;
-        proxy_cache ivod_cache;
-        proxy_cache_valid 200 1h;
-    }
-}
-
-# www 重定向到非 www
-server {
-    listen 443 ssl http2;
-    server_name www.your.domain.com;
-    
-    ssl_certificate /etc/letsencrypt/live/your.domain.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/your.domain.com/privkey.pem;
-    
-    return 301 https://your.domain.com$request_uri;
-}
-```
+### 9.9 設定 Nginx
 
 #### 設定步驟
 
