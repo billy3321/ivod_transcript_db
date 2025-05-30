@@ -48,6 +48,12 @@ cp .env.example .env   # 如尚未有 .env
 
 # 重新嘗試失敗紀錄 (每日/每小時皆可)
 ./ivod_retry.py
+
+# 補抓錯誤記錄 (從錯誤記錄檔案批量修復)
+./ivod_fix.py
+
+# 補抓單一IVOD_ID
+./ivod_fix.py --ivod-id 123456
 ```
 
 ## 4. 部署於 Ubuntu Linux
@@ -81,23 +87,87 @@ mkdir logs
 
 # 每月 1 日 04:00 全量拉取 (視需要)
 0 4 1 * * cd /home/ivoduser/ivod_transcript_db && /home/ivoduser/ivod_transcript_db/venv/bin/python ivod_full.py >> logs/full.log 2>&1
+
+# 每天 04:00 執行錯誤記錄補抓
+0 4 * * * cd /home/ivoduser/ivod_transcript_db && /home/ivoduser/ivod_transcript_db/venv/bin/python ivod_fix.py >> logs/fix.log 2>&1
 ```
 
 > 若偏好 Systemd Timer，可另行設定。
 
-## 5. 常見問題
+## 5. 錯誤記錄與補抓機制
 
-- 若抓取到空結果，task 會將 status 標為 `failed`，可透過 `ivod_retry.py` 補抓  
+本系統提供完整的錯誤記錄與補抓功能，確保不遺漏任何IVOD資料。
+
+### 5.1 錯誤記錄
+
+所有在抓取過程中發生錯誤的IVOD_ID都會自動記錄到錯誤日誌檔案：
+- **預設路徑**：`logs/failed_ivods.txt`
+- **環境變數**：可透過 `ERROR_LOG_PATH` 自訂路徑
+- **記錄格式**：`IVOD_ID,錯誤類型,時間戳記`
+
+錯誤類型包括：
+- `processing`：全量抓取時的處理錯誤
+- `incremental`：增量更新時的處理錯誤  
+- `retry`：重試時的錯誤
+- `fix_retry`：補抓重試時的錯誤
+- `manual_fix`：手動補抓時的錯誤
+
+### 5.2 補抓腳本 (`ivod_fix.py`)
+
+提供兩種補抓模式：
+
+#### 批量補抓模式
+```bash
+# 從預設錯誤記錄檔案補抓
+./ivod_fix.py
+
+# 從指定錯誤記錄檔案補抓
+./ivod_fix.py --file logs/custom_failed.txt
+
+# 使用自訂錯誤記錄檔案路徑
+./ivod_fix.py --error-log logs/my_errors.txt
+```
+
+#### 單一補抓模式
+```bash
+# 補抓指定的IVOD_ID
+./ivod_fix.py --ivod-id 123456
+
+# 跳過SSL驗證
+./ivod_fix.py --ivod-id 123456 --skip-ssl
+```
+
+#### 補抓流程
+1. **批量模式**：讀取錯誤記錄檔案中的所有IVOD_ID
+2. **逐一重新抓取**：對每個IVOD_ID執行完整的抓取流程
+3. **成功處理**：從錯誤記錄檔案中移除成功處理的IVOD_ID
+4. **失敗處理**：重新記錄到錯誤檔案，標記為 `fix_retry`
+
+### 5.3 環境變數設定
+
+在 `.env` 檔案中可設定：
+```ini
+# 錯誤記錄檔案路徑
+ERROR_LOG_PATH=logs/failed_ivods.txt
+
+# 日誌目錄
+LOG_PATH=logs/
+```
+
+## 6. 常見問題
+
+- 若抓取到空結果，task 會將 status 標為 `failed`，同時記錄到錯誤檔案，可透過 `ivod_retry.py` 或 `ivod_fix.py` 補抓  
 - 如需調整「全量起始日」，請修改 `ivod_tasks.py` `run_full()` 中的 `start` 參數  
 - 如欲動態設定 `skip_ssl`，可自行在 wrapper 或呼叫 `ivod_tasks.run_*()` 時指定參數
+- 錯誤記錄檔案會自動去重複，避免重複記錄同一個IVOD_ID
 
 ---
 
 *完成上述步驟，即可在 Ubuntu 環境下每日自動更新立法院逐字稿，並自動重試失敗紀錄，避免遺漏與 SSL 驗證錯誤*。
 
-## 6. Elasticsearch 設定與索引
+## 7. Elasticsearch 設定與索引
 
-### 6.1 安裝中文分析插件
+### 7.1 安裝中文分析插件
 
 建議安裝 IK Analyzer 插件以改善繁體中文分詞：  
 ```bash
@@ -109,7 +179,7 @@ bin/elasticsearch-plugin install analysis-ik
 bin/elasticsearch-plugin install analysis-smartcn
 ```
 
-### 6.2 .env 變數設定
+### 7.2 .env 變數設定
 
 請在 `.env` 中設定：  
 ```ini
@@ -121,13 +191,13 @@ ES_SCHEME=http
 ES_INDEX=ivod_transcripts
 ```
 
-### 6.3 執行索引更新
+### 7.3 執行索引更新
 
 ```bash
 ./ivod_es.py
 ```
 
-## 7. Testing
+## 8. Testing
 
 本專案使用 pytest 作為測試框架，並將開發相依 (dev dependencies) 集中於 `requirements-dev.txt`。
 
@@ -135,7 +205,7 @@ ES_INDEX=ivod_transcripts
 pip install -r requirements-dev.txt
 ```
 
-### 7.1 單元測試 (Unit Tests)
+### 8.1 單元測試 (Unit Tests)
 - 使用 pytest 測試核心函式，如 `make_browser`、`fetch_ivod_list`、`process_ivod`。
 - 測試檔案可依模組結構，放於 `tests/core/`、`tests/crawler/`、`tests/db/`、`tests/tasks/` 等子目錄中：
   - `tests/core/`：`test_core.py`
@@ -144,11 +214,11 @@ pip install -r requirements-dev.txt
   - `tests/tasks/`：`test_tasks.py`、`test_run_es.py`
 - 可透過 requests-mock 模擬 HTTP 回應，並利用 sqlite in-memory (`DB_BACKEND=sqlite`, `DB_URL=:memory:`) 測試資料庫操作。
 
-### 7.2 整合測試 (Integration Tests)
+### 8.2 整合測試 (Integration Tests)
 - 建議於 `tests/crawler/` 子目錄中加入整合測試，標記 `@pytest.mark.integration`，如 `test_fetch_available_dates.py`、`test_fetch_ly_speech.py`。
 - 可使用 Docker Compose 啟動測試用的資料庫與 Elasticsearch service，並於測試前自動初始化資料庫 schema (呼叫 `ivod_core.Base.metadata.create_all`)。
 
-### 7.3 Integration Test Script
+### 8.3 Integration Test Script
 
 Run the following script to reset the test database and fetch IVOD transcripts for integration testing.
 By default it uses the SQLite path from your `.env` (e.g. `db/ivod_local.db`),
@@ -160,7 +230,7 @@ cd crawler
 TEST_SQLITE_PATH=../db/ivod_test.db python integration_test.py
 ```
 
-### 7.4 執行所有測試
+### 8.4 執行所有測試
 
 ```bash
 pytest --cov=ivod_core --cov=ivod_tasks --cov-report=term-missing

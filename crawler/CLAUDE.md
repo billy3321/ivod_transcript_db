@@ -18,6 +18,7 @@ This is a Python-based web scraper that extracts transcripts from Taiwan's Legis
 - **`ivod_full.py`** - Full data capture from 2024-02-01 to present
 - **`ivod_incremental.py`** - Incremental updates for past 2 weeks
 - **`ivod_retry.py`** - Retry failed AI/LY transcript extractions (max 5 retries)
+- **`ivod_fix.py`** - Fix script for error recovery with batch and single-ID modes
 - **`ivod_es.py`** - Elasticsearch indexing with Chinese analysis support
 
 ### Testing Infrastructure
@@ -57,6 +58,12 @@ mkdir -p ../db  # For shared SQLite database
 
 # Retry failed records (daily/hourly execution)
 ./ivod_retry.py
+
+# Fix errors from error log file (batch mode)
+./ivod_fix.py
+
+# Fix specific IVOD_ID (single mode)
+./ivod_fix.py --ivod-id 123456
 
 # Update Elasticsearch index
 ./ivod_es.py
@@ -102,6 +109,9 @@ ES_INDEX=ivod_transcripts
 
 # Testing
 TEST_SQLITE_PATH=../db/ivod_test.db
+
+# Error logging
+ERROR_LOG_PATH=logs/failed_ivods.txt
 ```
 
 ## Key Implementation Details
@@ -124,10 +134,11 @@ TEST_SQLITE_PATH=../db/ivod_test.db
    - Prevents infinite retry loops with counter tracking
 
 ### Error Handling Patterns
-- **HTTP Failures**: Caught and marked with status="failed"
-- **Empty Content**: Results in failed status for retry
+- **HTTP Failures**: Caught and marked with status="failed", logged to error file
+- **Empty Content**: Results in failed status for retry, logged to error file
 - **SSL Issues**: Bypassable with `skip_ssl=True`
 - **Database Errors**: SQLAlchemy connection pooling and retry logic
+- **Error Logging**: All failures automatically logged with IVOD_ID, error type, and timestamp
 
 ### Elasticsearch Integration
 - **Chinese Analysis**: Support for IK Analyzer or Smart Chinese

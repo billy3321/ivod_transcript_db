@@ -20,6 +20,16 @@ from .core import date_range, make_browser, fetch_ivod_list, process_ivod, Sessi
 
 logger = logging.getLogger(__name__)
 
+def log_failed_ivod(ivod_id, error_type="general"):
+    """記錄失敗的IVOD_ID到錯誤日誌檔案"""
+    error_log_path = os.getenv("ERROR_LOG_PATH", "logs/failed_ivods.txt")
+    error_dir = Path(error_log_path).parent
+    error_dir.mkdir(exist_ok=True)
+    
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    with open(error_log_path, "a", encoding="utf-8") as f:
+        f.write(f"{ivod_id},{error_type},{timestamp}\n")
+
 def setup_logging():
     """設置日誌配置 - 成功消息只記錄到文件，錯誤消息同時顯示在控制台和記錄到文件"""
     log_path = os.getenv("LOG_PATH", "logs/")
@@ -82,6 +92,7 @@ def run_full(skip_ssl: bool = True):
                 logger.info(f"影片 {ivod_id} 處理完成")
             except Exception as e:
                 logger.error(f"處理影片 {ivod_id} 時發生錯誤: {e}", exc_info=True)
+                log_failed_ivod(ivod_id, "processing")
                 continue
 
         db.commit()
@@ -128,6 +139,7 @@ def run_incremental(skip_ssl: bool = True):
                 logger.info(f"更新影片 {ivod_id} LY逐字稿")
         except Exception as e:
             logger.error(f"增量更新影片 {ivod_id} 時發生錯誤: {e}", exc_info=True)
+            log_failed_ivod(ivod_id, "incremental")
             continue
 
     db.commit()
@@ -161,6 +173,7 @@ def run_retry(skip_ssl: bool = True):
             logger.info(f"重試影片 {obj.ivod_id} 完成")
         except Exception as e:
             logger.error(f"重試影片 {obj.ivod_id} 時發生錯誤: {e}", exc_info=True)
+            log_failed_ivod(obj.ivod_id, "retry")
             continue
 
     db.close()
