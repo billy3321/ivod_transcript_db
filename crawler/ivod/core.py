@@ -21,7 +21,7 @@ from .db import DB_BACKEND, Session, IVODTranscript
 def process_ivod(br, ivod_id):
     """Fetch and assemble a single IVOD record into a dict."""
     js = fetch_ivod_info(br, ivod_id)
-    md = js.get("會議資料", {})
+    md = js.get("會議資料", {}) or {}
     
     # Validate required fields
     date_str = js.get("日期")
