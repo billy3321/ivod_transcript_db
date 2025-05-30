@@ -244,7 +244,7 @@ class Logger {
     this.error(`API Error: ${error.message}`, {
       method: req.method,
       url: req.url,
-      userAgent: req.headers['user-agent'],
+      userAgent: req.headers?.['user-agent'] || 'unknown',
       ip: this.getClientIP(req),
       error: error.message,
       stack: error.stack,
@@ -256,7 +256,7 @@ class Logger {
     this.info(`API Request`, {
       method: req.method,
       url: req.url,
-      userAgent: req.headers['user-agent'],
+      userAgent: req.headers?.['user-agent'] || 'unknown',
       ip: this.getClientIP(req),
       metadata: context,
     });
@@ -286,9 +286,9 @@ class Logger {
 
   private getClientIP(req: NextApiRequest): string | undefined {
     return (
-      req.headers['x-forwarded-for'] as string ||
-      req.headers['x-real-ip'] as string ||
-      req.socket.remoteAddress
+      req.headers?.['x-forwarded-for'] as string ||
+      req.headers?.['x-real-ip'] as string ||
+      req.socket?.remoteAddress
     );
   }
 }

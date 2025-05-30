@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { useRouter } from 'next/router';
 import Home from '@/pages/index';
 
@@ -10,9 +10,10 @@ jest.mock('next/router', () => ({
 
 // Mock Next.js Link and Head
 jest.mock('next/link', () => {
-  return function MockLink({ children, href }: { children: React.ReactNode; href: string }) {
-    return <a href={href}>{children}</a>;
-  };
+  return React.forwardRef(function MockLink(props: any, ref: any) {
+    const { children, href, ...otherProps } = props;
+    return <a href={href} ref={ref} {...otherProps}>{children}</a>;
+  });
 });
 
 jest.mock('next/head', () => {
@@ -57,7 +58,9 @@ describe('Home Page', () => {
       json: () => Promise.resolve({ data: [], total: 0 }),
     });
 
-    render(<Home />);
+    await act(async () => {
+      render(<Home />);
+    });
 
     await waitFor(() => {
       expect(screen.getByText('IVOD 逐字稿檢索系統')).toBeInTheDocument();
@@ -74,7 +77,9 @@ describe('Home Page', () => {
       json: () => Promise.resolve({ data: [], total: 0 }),
     });
 
-    render(<Home />);
+    await act(async () => {
+      render(<Home />);
+    });
 
     await waitFor(() => {
       expect(screen.getByPlaceholderText('搜尋會議名稱、立委姓名、逐字稿內容...')).toBeInTheDocument();
@@ -83,8 +88,10 @@ describe('Home Page', () => {
     const searchInput = screen.getByPlaceholderText('搜尋會議名稱、立委姓名、逐字稿內容...');
     const searchButton = screen.getByText('搜尋');
     
-    fireEvent.change(searchInput, { target: { value: '測試搜尋' } });
-    fireEvent.click(searchButton);
+    await act(async () => {
+      fireEvent.change(searchInput, { target: { value: '測試搜尋' } });
+      fireEvent.click(searchButton);
+    });
 
     await waitFor(() => {
       expect(mockPush).toHaveBeenCalledWith(

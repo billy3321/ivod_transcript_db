@@ -4,9 +4,10 @@ import List from '@/components/List';
 
 // Mock Next.js Link component
 jest.mock('next/link', () => {
-  return function MockLink({ children, href }: { children: React.ReactNode; href: string }) {
-    return <a href={href}>{children}</a>;
-  };
+  return React.forwardRef(function MockLink(props: any, ref: any) {
+    const { children, href, ...otherProps } = props;
+    return <a href={href} ref={ref} {...otherProps}>{children}</a>;
+  });
 });
 
 describe('List', () => {

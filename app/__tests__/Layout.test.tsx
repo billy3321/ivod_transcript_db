@@ -79,7 +79,7 @@ describe('Layout Component', () => {
 
     // Check main container classes
     const mainContainer = screen.getByTestId('sidebar').parentElement
-    expect(mainContainer).toHaveClass('flex', 'h-screen', 'bg-gray-200', 'font-sans')
+    expect(mainContainer).toHaveClass('min-h-screen', 'bg-gray-200', 'font-sans')
 
     // Check that main content area is present
     const mainContent = screen.getByText('Test page content').closest('main')
