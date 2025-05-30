@@ -12,6 +12,11 @@ if not hasattr(_http_client.HTTPResponse, '_set_fp'):
 import http.cookiejar as cookiejar
 from bs4 import BeautifulSoup
 import time, random
+import urllib3
+from urllib3.exceptions import InsecureRequestWarning
+
+# 關閉 InsecureRequestWarning
+urllib3.disable_warnings(InsecureRequestWarning)
 
 HEADERS = [
     ("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
