@@ -531,35 +531,62 @@ server {
         add_header Expires "0";
     }
     
-    # Next.js 靜態資源（最長快取）
+    # 根目錄設定
+    root /home/ubuntu/ivod_transcript_db/app;
+    
+    # Next.js 靜態資源（CSS、JS 等）
     location /_next/static/ {
         alias /home/ubuntu/ivod_transcript_db/app/.next/static/;
         expires 1y;
         add_header Cache-Control "public, immutable";
         add_header Vary "Accept-Encoding";
         
-        # Gzip 預壓縮檔案
-        gzip_static on;
+        # 確保 CSS 和 JS 檔案的 MIME 類型正確
+        location ~* \.css$ {
+            add_header Content-Type text/css;
+        }
+        location ~* \.js$ {
+            add_header Content-Type application/javascript;
+        }
         
-        # 檔案不存在時不記錄錯誤
+        # Gzip 壓縮
+        gzip_static on;
         log_not_found off;
     }
     
-    # 公開靜態資源
+    # Next.js 構建產生的其他靜態檔案
+    location /_next/ {
+        proxy_pass http://ivod_backend;
+        proxy_cache_valid 200 1h;
+        expires 1h;
+        add_header Cache-Control "public";
+    }
+    
+    # Favicon 和 public 目錄檔案
+    location ~* ^/(favicon\.ico|favicon\.svg|apple-touch-icon\.png|favicon-16x16\.png|favicon-32x32\.png|robots\.txt|site\.webmanifest)$ {
+        root /home/ubuntu/ivod_transcript_db/app/public;
+        expires 30d;
+        add_header Cache-Control "public";
+        log_not_found off;
+        
+        # 確保 favicon 類型正確
+        location ~* \.ico$ {
+            add_header Content-Type image/x-icon;
+        }
+        location ~* \.svg$ {
+            add_header Content-Type image/svg+xml;
+        }
+        location ~* \.png$ {
+            add_header Content-Type image/png;
+        }
+    }
+    
+    # 其他靜態檔案
     location /static/ {
         alias /home/ubuntu/ivod_transcript_db/app/public/;
         expires 30d;
         add_header Cache-Control "public";
-        add_header Vary "Accept-Encoding";
         gzip_static on;
-        log_not_found off;
-    }
-    
-    # Favicon 和基本檔案
-    location ~* \.(ico|png|jpg|jpeg|gif|svg|woff|woff2|ttf|eot)$ {
-        root /home/ubuntu/ivod_transcript_db/app/public;
-        expires 30d;
-        add_header Cache-Control "public";
         log_not_found off;
     }
     
@@ -627,46 +654,26 @@ server {
         proxy_read_timeout 30s;
     }
     
-    # 主要應用程式（帶快取）
+    # 主要應用程式（所有其他請求）
     location / {
         # 一般頁面請求頻率限制
         limit_req zone=general burst=50 nodelay;
         
         proxy_pass http://ivod_backend;
         proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_set_header X-Request-ID $request_id;
-        proxy_cache_bypass $http_upgrade;
         
-        # 連線池設定
-        proxy_set_header Connection "";
+        # 支援 WebSocket（如果需要）
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
         
         # 超時設定
         proxy_connect_timeout 5s;
         proxy_send_timeout 30s;
         proxy_read_timeout 30s;
-        
-        # 快取設定（適用於靜態頁面）
-        proxy_cache ivod_cache;
-        proxy_cache_valid 200 302 5m;
-        proxy_cache_valid 404 1m;
-        proxy_cache_use_stale error timeout updating http_500 http_502 http_503 http_504;
-        proxy_cache_lock on;
-        proxy_cache_revalidate on;
-        
-        # 快取繞過條件
-        proxy_cache_bypass $cookie_nocache $arg_nocache $arg_comment;
-        proxy_no_cache $cookie_nocache $arg_nocache $arg_comment;
-        
-        # 錯誤處理
-        proxy_next_upstream error timeout invalid_header http_500 http_502 http_503;
-        proxy_next_upstream_tries 1;
-        proxy_next_upstream_timeout 5s;
     }
     
     # 禁止存取敏感檔案
@@ -706,9 +713,11 @@ sudo chown -R nginx:nginx /var/cache/nginx
 sudo mkdir -p /var/log/nginx
 sudo chown -R nginx:nginx /var/log/nginx
 
-# 2. 設定靜態檔案權限
+# 2. 設定靜態檔案權限（重要！）
 sudo chown -R www-data:www-data /home/ubuntu/ivod_transcript_db/app/.next
 sudo chown -R www-data:www-data /home/ubuntu/ivod_transcript_db/app/public
+sudo chmod -R 755 /home/ubuntu/ivod_transcript_db/app/.next
+sudo chmod -R 755 /home/ubuntu/ivod_transcript_db/app/public
 
 # 3. 建立管理員認證檔案（可選）
 sudo apt-get install -y apache2-utils
@@ -726,6 +735,40 @@ sudo systemctl reload nginx
 sudo ufw allow 'Nginx HTTP'
 sudo ufw allow ssh
 sudo ufw enable
+
+# 6. 測試靜態檔案存取（重要！）
+curl -I http://your.domain.com/favicon.ico
+curl -I http://your.domain.com/_next/static/css/[hash].css  # 使用實際的 CSS 檔名
+```
+
+**靜態檔案問題排除：**
+
+如果 CSS/JS/favicon 無法載入，請按以下步驟排除：
+
+```bash
+# 1. 檢查静態檔案是否存在
+ls -la /home/ubuntu/ivod_transcript_db/app/.next/static/css/
+ls -la /home/ubuntu/ivod_transcript_db/app/public/favicon.ico
+
+# 2. 檢查檔案權限
+ls -la /home/ubuntu/ivod_transcript_db/app/.next/
+ls -la /home/ubuntu/ivod_transcript_db/app/public/
+
+# 3. 測試直接存取靜態檔案
+curl -I http://localhost/_next/static/css/[actual-hash].css
+curl -I http://localhost/favicon.ico
+
+# 4. 檢查 Nginx 錯誤日誌
+sudo tail -f /var/log/nginx/error.log
+
+# 5. 檢查 Nginx 存取日誌
+sudo tail -f /var/log/nginx/access.log
+
+# 6. 如果仍有問題，重新建置和設定權限
+npm run build
+sudo chown -R www-data:www-data /home/ubuntu/ivod_transcript_db/app/.next
+sudo chmod -R 755 /home/ubuntu/ivod_transcript_db/app/.next
+sudo systemctl reload nginx
 ```
 
 **效能監控和調整：**
