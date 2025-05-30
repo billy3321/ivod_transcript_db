@@ -21,20 +21,33 @@ from .core import date_range, make_browser, fetch_ivod_list, process_ivod, Sessi
 logger = logging.getLogger(__name__)
 
 def setup_logging():
-    """設置日誌配置"""
+    """設置日誌配置 - 成功消息只記錄到文件，錯誤消息同時顯示在控制台和記錄到文件"""
     log_path = os.getenv("LOG_PATH", "logs/")
     log_dir = Path(log_path)
     log_dir.mkdir(exist_ok=True)
     
     log_file = log_dir / f"crawler_{datetime.now().strftime('%Y%m%d')}.log"
     
+    # 清除現有的handlers以避免重複設置
+    for handler in logging.root.handlers[:]:
+        logging.root.removeHandler(handler)
+    
+    # 創建文件handler，記錄所有級別的日誌
+    file_handler = logging.FileHandler(log_file, encoding='utf-8')
+    file_handler.setLevel(logging.INFO)
+    file_formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s")
+    file_handler.setFormatter(file_formatter)
+    
+    # 創建控制台handler，只顯示ERROR和WARNING級別
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(logging.WARNING)
+    console_formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s")
+    console_handler.setFormatter(console_formatter)
+    
+    # 配置root logger
     logging.basicConfig(
         level=logging.INFO,
-        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-        handlers=[
-            logging.FileHandler(log_file, encoding='utf-8'),
-            logging.StreamHandler()
-        ]
+        handlers=[file_handler, console_handler]
     )
 
 
