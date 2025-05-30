@@ -1,16 +1,36 @@
 if (process.env.NODE_ENV === 'development') {
+  require('dotenv').config();
+  const { resolve } = require('path');
+  
   const backend = process.env.DB_BACKEND;
+  let databaseUrl = process.env.DATABASE_URL;
+  
+  
+  // Generate DATABASE_URL if not set
+  if (backend && !databaseUrl) {
+    if (backend === 'sqlite') {
+      const sqlitePath = process.env.SQLITE_PATH || '../db/ivod_test.db';
+      databaseUrl = `file://${resolve(sqlitePath)}`;
+    } else if (backend === 'postgresql') {
+      const { PG_USER, PG_PASS, PG_HOST, PG_PORT, PG_DB } = process.env;
+      databaseUrl = `postgresql://${PG_USER}:${PG_PASS}@${PG_HOST}:${PG_PORT}/${PG_DB}`;
+    } else if (backend === 'mysql') {
+      const { MYSQL_USER, MYSQL_PASS, MYSQL_HOST, MYSQL_PORT, MYSQL_DB } = process.env;
+      databaseUrl = `mysql://${MYSQL_USER}:${MYSQL_PASS}@${MYSQL_HOST}:${MYSQL_PORT}/${MYSQL_DB}`;
+    }
+  }
+  
   if (backend === 'sqlite') {
     console.log(
-      `使用資料庫: SQLite，檔案路徑: ${process.env.SQLITE_PATH || process.env.DATABASE_URL}`
+      `使用資料庫: SQLite，檔案路徑: ${process.env.SQLITE_PATH || '../db/ivod_test.db'}`
     );
   } else if (backend) {
     console.log(
-      `使用資料庫: ${backend}，連線 URL: ${process.env.DATABASE_URL}`
+      `使用資料庫: ${backend}，連線 URL: ${databaseUrl}`
     );
-  } else if (process.env.DATABASE_URL) {
+  } else if (databaseUrl) {
     console.log(
-      `使用資料庫連線字串: ${process.env.DATABASE_URL}`
+      `使用資料庫連線字串: ${databaseUrl}`
     );
   }
 }

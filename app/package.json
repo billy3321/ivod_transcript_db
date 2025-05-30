@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "dev:no-hmr": "node start-no-hmr.js",
-    "build": "next build",
+    "build": "npm run clean && next build",
     "start": "next start",
     "lint": "next lint",
     "test": "jest --passWithNoTests --watch",
