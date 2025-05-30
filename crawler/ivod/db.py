@@ -1,6 +1,10 @@
 
 # 1. Configure DB URL from environment
 import os
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 DB_BACKEND = os.getenv("DB_BACKEND", "sqlite").lower()
 if DB_BACKEND == "sqlite":
