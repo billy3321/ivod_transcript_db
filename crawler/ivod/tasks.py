@@ -17,8 +17,47 @@ except ImportError:
     Elasticsearch = None
 
 from .core import date_range, make_browser, fetch_ivod_list, process_ivod, Session, IVODTranscript
+from .db import DB_BACKEND, engine, Base
 
 logger = logging.getLogger(__name__)
+
+def check_and_create_database_tables():
+    """
+    檢查資料庫連線狀況並確保表格存在
+    """
+    from sqlalchemy import inspect, text
+    
+    try:
+        # 檢查資料庫連線
+        with engine.connect() as conn:
+            result = conn.execute(text("SELECT 1"))
+            logger.info(f"✅ 資料庫連線成功 (Backend: {DB_BACKEND})")
+        
+        # 檢查表格是否存在
+        inspector = inspect(engine)
+        tables = inspector.get_table_names()
+        
+        if 'ivod_transcripts' not in tables:
+            logger.info("⚠️  ivod_transcripts 表格不存在，正在創建...")
+            Base.metadata.create_all(engine)
+            logger.info("✅ 表格創建成功")
+        else:
+            logger.info("✅ ivod_transcripts 表格已存在")
+            
+            # 檢查表格結構
+            columns = inspector.get_columns('ivod_transcripts')
+            logger.info(f"✅ 表格包含 {len(columns)} 個欄位")
+            
+            # 檢查現有記錄數
+            with Session() as session:
+                count = session.query(IVODTranscript).count()
+                logger.info(f"✅ 現有記錄數: {count}")
+        
+        return True
+        
+    except Exception as e:
+        logger.error(f"❌ 資料庫檢查失敗: {e}")
+        return False
 
 def log_failed_ivod(ivod_id, error_type="general"):
     """記錄失敗的IVOD_ID到錯誤日誌檔案"""
@@ -66,6 +105,13 @@ def run_full(skip_ssl: bool = True):
     全量拉取：從固定起始日跑到今天，逐筆 upsert 到資料庫。
     """
     setup_logging()
+    
+    # 檢查並確保資料庫表格存在
+    logger.info("🔍 檢查資料庫狀況...")
+    if not check_and_create_database_tables():
+        logger.error("❌ 資料庫檢查失敗，停止執行")
+        return False
+    
     br = make_browser(skip_ssl=skip_ssl)
     db = Session()
 
@@ -105,6 +151,13 @@ def run_incremental(skip_ssl: bool = True):
     增量更新：只檢查過去兩週的新 ID，並針對缺漏的 AI 或 LY 逐字稿進行補抓。
     """
     setup_logging()
+    
+    # 檢查並確保資料庫表格存在
+    logger.info("🔍 檢查資料庫狀況...")
+    if not check_and_create_database_tables():
+        logger.error("❌ 資料庫檢查失敗，停止執行")
+        return False
+    
     br = make_browser(skip_ssl=skip_ssl)
     db = Session()
 
@@ -152,6 +205,13 @@ def run_retry(skip_ssl: bool = True):
     重新嘗試失敗的任務：AI 或 LY 逐字稿之前發生錯誤，且重試次數尚未超過上限。
     """
     setup_logging()
+    
+    # 檢查並確保資料庫表格存在
+    logger.info("🔍 檢查資料庫狀況...")
+    if not check_and_create_database_tables():
+        logger.error("❌ 資料庫檢查失敗，停止執行")
+        return False
+    
     br = make_browser(skip_ssl=skip_ssl)
     db = Session()
 

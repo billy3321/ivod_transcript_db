@@ -81,5 +81,5 @@ class IVODTranscript(Base):
         # SQLite does not support ARRAY
         committee_names = Column(Text)
 
-# Ensure tables are created
-Base.metadata.create_all(engine)
+# Note: Tables will be created by tasks.py check_and_create_database_tables() function
+# when needed, rather than automatically on module import
