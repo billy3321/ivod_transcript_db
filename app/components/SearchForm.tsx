@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useErrorHandler } from '@/lib/useErrorHandler';
 
 interface SearchFormProps {
   filters: Record<string, string>;
@@ -7,15 +8,16 @@ interface SearchFormProps {
 
 export default function SearchForm({ filters, onSearch }: SearchFormProps) {
   const [local, setLocal] = useState<Record<string, string>>(filters);
+  const { wrapEventHandler } = useErrorHandler({ component: 'SearchForm' });
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleChange = wrapEventHandler((e: React.ChangeEvent<HTMLInputElement>) => {
     setLocal({ ...local, [e.target.name]: e.target.value });
-  };
+  }, { action: 'form_field_change' });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = wrapEventHandler((e: React.FormEvent) => {
     e.preventDefault();
     onSearch(local);
-  };
+  }, { action: 'search_submit', filters: local });
 
   return (
     <form onSubmit={handleSubmit} className="space-y-2 mb-4">

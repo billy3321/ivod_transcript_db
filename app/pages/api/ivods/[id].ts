@@ -1,9 +1,18 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
+import { logger } from '@/lib/logger';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { id } = req.query;
+  
+  logger.logApiRequest(req, { ivodId: id });
+  
   if (!id || Array.isArray(id)) {
+    logger.warn('Invalid IVOD ID provided', {
+      method: req.method,
+      url: req.url,
+      providedId: id
+    });
     res.status(400).json({ error: 'Invalid id' });
     return;
   }
@@ -34,12 +43,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         last_updated: true,
       },
     });
+    
     if (!data) {
+      logger.warn('IVOD not found', {
+        ivodId: id,
+        action: 'ivod_detail_not_found'
+      });
       res.status(404).json({ error: 'Not found' });
     } else {
+      logger.info('IVOD detail retrieved successfully', {
+        ivodId: id,
+        hasAiTranscript: !!data.ai_transcript,
+        hasLyTranscript: !!data.ly_transcript
+      });
       res.status(200).json({ data });
     }
   } catch (error: any) {
+    logger.logDatabaseError(error, 'ivod_detail', {
+      ivodId: id
+    });
     res.status(500).json({ error: error.message });
   }
 }

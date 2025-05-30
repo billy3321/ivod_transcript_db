@@ -1,4 +1,5 @@
 import React, { Component, ReactNode } from 'react'
+import { logClientError } from '@/lib/logger'
 
 interface Props {
   children: ReactNode
@@ -29,6 +30,14 @@ class ErrorBoundary extends Component<Props, State> {
     console.error('Error Info:', errorInfo)
     console.error('Component Stack:', errorInfo.componentStack)
     console.groupEnd()
+    
+    // Send error to server for logging
+    logClientError(error, 'ErrorBoundary', {
+      componentStack: errorInfo.componentStack,
+      errorMessage: error.message,
+      errorStack: error.stack,
+      timestamp: new Date().toISOString()
+    })
     
     this.setState({
       error,

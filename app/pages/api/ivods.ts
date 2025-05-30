@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
 import { getDbBackend } from '@/lib/utils';
+import { logger } from '@/lib/logger';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { 
@@ -15,6 +16,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     sort = 'date_desc',
     ids
   } = req.query;
+  
+  // Log the API request with search parameters
+  logger.logApiRequest(req, {
+    searchParams: {
+      q, meeting_name, speaker, committee, date_from, date_to, page, pageSize, sort, ids
+    }
+  });
   
   const pageNum = parseInt(page as string, 10);
   const size = parseInt(pageSize as string, 10);
@@ -135,8 +143,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }),
       prisma.iVODTranscript.count({ where }),
     ]);
+    
+    logger.info('IVOD list query completed successfully', {
+      resultsCount: data.length,
+      totalCount: total,
+      page: pageNum,
+      pageSize: size
+    });
+    
     res.status(200).json({ data, total });
   } catch (error: any) {
+    logger.logDatabaseError(error, 'ivods_list', {
+      where,
+      orderBy,
+      skip,
+      take: size
+    });
     res.status(500).json({ error: error.message });
   }
 }

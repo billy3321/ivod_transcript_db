@@ -19,7 +19,7 @@ export default function DebugNav() {
         <h2 className="text-lg mb-2">Rendered items:</h2>
         {navItems.map((item, index) => (
           <div key={index} className="mb-1">
-            <span className="font-mono">Label: "{item.label}", Href: "{item.href}"</span>
+            <span className="font-mono">Label: &quot;{item.label}&quot;, Href: &quot;{item.href}&quot;</span>
           </div>
         ))}
       </div>

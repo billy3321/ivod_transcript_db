@@ -1,64 +1,118 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import client from '@/lib/elastic';
-import bodybuilder from 'bodybuilder';
 import prisma from '@/lib/prisma';
 import { getDbBackend } from '@/lib/utils';
+import { logger } from '@/lib/logger';
+import { parseAdvancedSearchQuery, buildElasticsearchQuery, buildDatabaseQuery } from '@/lib/searchParser';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { q = '' } = req.query;
+  
   if (Array.isArray(q)) {
+    logger.warn('Invalid query parameter received', {
+      method: req.method,
+      url: req.url,
+      query: q
+    });
     res.status(400).json({ error: 'Invalid query' });
     return;
   }
+
+  // Parse the advanced search query
+  const parsedQuery = parseAdvancedSearchQuery(q as string);
   
-  // For transcript searches, use Elasticsearch if available, otherwise fallback to DB
-  // For general searches (all fields), primarily use database search
+  // Log the search request with parsed information
+  logger.logApiRequest(req, { 
+    query: q,
+    searchType: 'transcript',
+    hasAdvancedSyntax: parsedQuery.hasAdvancedSyntax,
+    parseSuccess: parsedQuery.parseSuccess
+  });
+  
   let hits: Array<{ id: number; transcript: string | null }> = [];
   let usedES = true;
   
   try {
-    // Try Elasticsearch for transcript-specific search
-    const body = bodybuilder()
-      .query('multi_match', { query: q, fields: ['ai_transcript', 'ly_transcript'] })
-      .build();
+    // Try Elasticsearch with advanced query building
+    const esQuery = buildElasticsearchQuery(parsedQuery);
     const result = await client.search({
       index: process.env.NEXT_PUBLIC_ES_INDEX,
-      body,
+      body: {
+        query: esQuery,
+        _source: ['ivod_id', 'ai_transcript', 'ly_transcript'],
+        size: 100
+      },
     });
+    
     hits = result.hits.hits.map(hit => ({
       id: (hit._source as any).ivod_id,
       transcript: (hit._source as any).ai_transcript || (hit._source as any).ly_transcript,
     }));
+    
+    logger.info('Elasticsearch search completed', {
+      query: q,
+      resultsCount: hits.length,
+      hasAdvancedSyntax: parsedQuery.hasAdvancedSyntax
+    });
   } catch (error: any) {
-    // Elasticsearch failed or not reachable; fallback to DB search for transcripts only
+    // Elasticsearch failed or not reachable; fallback to DB search
+    logger.warn('Elasticsearch search failed, falling back to database', {
+      query: q,
+      error: error.message,
+      action: 'elasticsearch_fallback',
+      hasAdvancedSyntax: parsedQuery.hasAdvancedSyntax
+    });
     usedES = false;
     const dbBackend = getDbBackend();
     
-    // Build search conditions for transcripts based on database backend
-    const searchConditions = dbBackend === 'sqlite' 
-      ? [
-          { ai_transcript: { contains: q } },
-          { ly_transcript: { contains: q } },
-        ]
-      : [
-          { ai_transcript: { contains: q, mode: 'insensitive' as const } },
-          { ly_transcript: { contains: q, mode: 'insensitive' as const } },
-        ];
-    
-    const records = await prisma.iVODTranscript.findMany({
-      where: {
-        OR: searchConditions,
-      },
-      select: {
-        ivod_id: true,
-        ai_transcript: true,
-        ly_transcript: true,
-      },
-    });
-    hits = records.map(rec => ({
-      id: rec.ivod_id,
-      transcript: rec.ai_transcript || rec.ly_transcript,
-    }));
+    try {
+      // Build database query conditions using the advanced parser
+      const whereConditions = buildDatabaseQuery(parsedQuery, dbBackend);
+      
+      const records = await prisma.iVODTranscript.findMany({
+        where: whereConditions,
+        select: {
+          ivod_id: true,
+          ai_transcript: true,
+          ly_transcript: true,
+        },
+        take: 100 // Limit results similar to Elasticsearch
+      });
+      
+      hits = records.map(rec => ({
+        id: rec.ivod_id,
+        transcript: rec.ai_transcript || rec.ly_transcript,
+      }));
+      
+      logger.info('Database fallback search completed', {
+        query: q,
+        resultsCount: hits.length,
+        dbBackend,
+        hasAdvancedSyntax: parsedQuery.hasAdvancedSyntax
+      });
+    } catch (dbError: any) {
+      logger.logDatabaseError(dbError, 'search', {
+        query: q,
+        parsedQuery: parsedQuery
+      });
+      res.status(500).json({ error: 'Search failed' });
+      return;
+    }
   }
-  res.status(200).json({ data: hits, fallback: !usedES });
+  
+  logger.info('Search completed successfully', {
+    query: q,
+    resultsCount: hits.length,
+    usedElasticsearch: usedES,
+    hasAdvancedSyntax: parsedQuery.hasAdvancedSyntax
+  });
+  
+  res.status(200).json({ 
+    data: hits, 
+    fallback: !usedES,
+    parsed: {
+      hasAdvancedSyntax: parsedQuery.hasAdvancedSyntax,
+      parseSuccess: parsedQuery.parseSuccess
+    }
+  });
 }

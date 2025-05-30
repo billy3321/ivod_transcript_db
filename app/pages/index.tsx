@@ -327,6 +327,23 @@ export default function Home() {
               </div>
             </div>
 
+            {/* Advanced Search Syntax Help */}
+            <div className="mt-3 text-xs text-gray-600">
+              <details className="group">
+                <summary className="cursor-pointer text-blue-600 hover:text-blue-800 select-none">
+                  進階搜尋語法
+                </summary>
+                <div className="mt-2 p-3 bg-gray-50 rounded-md text-xs space-y-1">
+                  <div><strong>引號搜尋：</strong> <code>&quot;完整詞組&quot;</code> - 搜尋完整詞組</div>
+                  <div><strong>布林運算：</strong> <code>預算 AND 教育</code>, <code>王委員 OR 李委員</code> - AND/OR 邏輯</div>
+                  <div><strong>群組搜尋：</strong> <code>(預算 OR 教育) AND 委員會</code> - 括弧分組</div>
+                  <div><strong>欄位搜尋：</strong> <code>title:&quot;會議名稱&quot;</code>, <code>speaker:&quot;立委名稱&quot;</code>, <code>meeting:&quot;會議&quot;</code></div>
+                  <div><strong>排除搜尋：</strong> <code>-詞彙</code> 或 <code>-&quot;詞組&quot;</code> - 排除特定內容</div>
+                  <div><strong>複合範例：</strong> <code>(speaker:&quot;王委員&quot; OR speaker:&quot;李委員&quot;) AND &quot;預算&quot; -&quot;國防&quot;</code></div>
+                </div>
+              </details>
+            </div>
+
             {/* Search Controls */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <button

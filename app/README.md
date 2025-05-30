@@ -16,7 +16,7 @@
 - [Elasticsearch](https://www.elastic.co/) 用於全文逐字稿搜尋
 - [bodybuilder](https://github.com/moscajs/bodybuilder) 用於建構 Elasticsearch 查詢 DSL
 - [Tailwind CSS](https://tailwindcss.com/) 用於樣式設計
-- [React Query](https://react-query.tanstack.com/)（可選）用於資料獲取和快取
+- **結構化日誌系統**：完整的錯誤記錄、API 監控和管理介面
 
 ## 3. 架構
 
@@ -30,11 +30,16 @@ app/
 │   └── api/
 │       ├── ivods.ts           # GET: 列出和篩選 IVOD，支援分頁
 │       ├── ivods/[id].ts      # GET: 根據 ID 獲取 IVOD 元資料和逐字稿
-│       └── search.ts          # GET: 全文逐字稿搜尋（ES 不可用時會 fallback 到 DB）
+│       ├── search.ts          # GET: 全文逐字稿搜尋（ES 不可用時會 fallback 到 DB）
+│       ├── logs.ts            # POST: 客戶端錯誤日誌記錄
+│       └── admin/
+│           └── logs.ts        # GET/DELETE: 管理員日誌檢視和管理
 ├── components/                # React UI 組件（List, SearchForm, Pagination, TranscriptViewer 等）
 ├── lib/
 │   ├── prisma.ts              # 資料庫客戶端設定
 │   ├── elastic.ts             # Elasticsearch 客戶端設定
+│   ├── logger.ts              # 結構化日誌系統
+│   ├── useErrorHandler.ts     # React 錯誤處理 hook
 │   └── utils.ts               # 工具函數
 └── public/
     └── ...                    # 靜態資源
@@ -113,6 +118,11 @@ ES_INDEX=ivod_transcripts
 
 # （可選）將索引暴露給瀏覽器端
 NEXT_PUBLIC_ES_INDEX=ivod_transcripts
+
+# 日誌系統配置
+LOG_LEVEL=info                    # 日誌級別：error, warn, info, debug
+LOG_PATH=logs                     # 日誌檔案目錄
+ADMIN_TOKEN=your_secure_admin_token_here  # 管理員日誌介面存取金鑰
 ```
 
 ## 6. 本地開發
@@ -130,6 +140,39 @@ npm run dev
 ```
 
 在瀏覽器開啟 http://localhost:3000 查看應用程式。
+
+### 6.1 日誌監控
+
+系統提供完整的日誌功能：
+
+- **自動錯誤記錄**：API 錯誤、資料庫問題、搜尋失敗等會自動記錄
+- **客戶端錯誤追蹤**：前端組件錯誤、JavaScript 錯誤會送到伺服器記錄
+- **管理員介面**：訪問 http://localhost:3000/admin/logs 查看和管理日誌
+- **結構化日誌**：包含時間戳、錯誤級別、上下文資訊等
+
+**使用 useErrorHandler Hook：**
+```tsx
+import { useErrorHandler } from '@/lib/useErrorHandler';
+
+function MyComponent() {
+  const { handleError, handleAsyncError, wrapEventHandler } = useErrorHandler({
+    component: 'MyComponent'
+  });
+
+  const handleClick = wrapEventHandler(() => {
+    // 如果出錯會自動記錄
+    doSomething();
+  });
+
+  const fetchData = async () => {
+    const result = await handleAsyncError(async () => {
+      return await fetch('/api/data');
+    });
+  };
+
+  return <button onClick={handleClick}>按鈕</button>;
+}
+```
 
 ## 7. 建置和正式環境部署
 

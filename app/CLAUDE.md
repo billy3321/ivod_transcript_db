@@ -12,9 +12,11 @@ This is a Next.js TypeScript application that provides a web interface for searc
 - **Entry Points**: `pages/_app.tsx` (app wrapper), `pages/_document.tsx` (HTML document)
 - **Main Pages**: `pages/index.tsx` (search interface), `pages/ivod/[id].tsx` (detail view)
 - **API Layer**: `pages/api/` - RESTful endpoints for data access
-- **Components**: `components/` - Modular React components
+- **Components**: `components/` - Modular React components with error handling
 - **Database**: `lib/prisma.ts` - Database client with multi-backend support
 - **Search**: `lib/elastic.ts` - Elasticsearch integration with DB fallback
+- **Logging**: `lib/logger.ts` - Structured logging system with file rotation
+- **Error Handling**: `lib/useErrorHandler.ts` - React hook for error management
 
 ### Key Features
 1. **Dual Search Modes**: 
@@ -24,6 +26,8 @@ This is a Next.js TypeScript application that provides a web interface for searc
 3. **Multi-Database Support**: SQLite/PostgreSQL/MySQL via dynamic Prisma schema
 4. **Responsive Design**: Mobile-first with Tailwind CSS
 5. **SEO Optimization**: Meta tags, structured data, sitemap generation
+6. **Comprehensive Logging**: Structured error logging with admin interface
+7. **Error Boundary**: React error boundaries with automatic error reporting
 
 ## Development Commands
 
@@ -70,6 +74,11 @@ NEXT_PUBLIC_ES_INDEX=ivod_transcripts
 
 # Testing
 TEST_SQLITE_PATH=../db/ivod_test.db
+
+# Logging configuration
+LOG_LEVEL=info
+LOG_PATH=logs
+ADMIN_TOKEN=your_secure_admin_token_here
 ```
 
 ## Database Backend Switching
@@ -91,6 +100,12 @@ The `scripts/updatePrismaSchema.js` automatically handles provider-specific fiel
 - `GET /api/ivods/[id]` - Get specific IVOD details and transcript
 - `GET /api/health` - Application health check
 - `GET /api/database-status` - Database connectivity status
+
+### Logging & Administration
+- `POST /api/logs` - Client-side error logging endpoint
+- `GET /api/admin/logs` - List log files (requires admin token)
+- `GET /api/admin/logs?file=filename` - View specific log file content
+- `DELETE /api/admin/logs` - Delete log files (requires admin token)
 
 ### Request/Response Patterns
 All API routes follow consistent patterns:
@@ -280,5 +295,64 @@ npm run analyze
 - Production secrets via secure environment injection
 - Database credentials properly isolated
 - HTTPS enforcement in production
+- Admin token protection for log management interface
+
+## Logging System
+
+### Overview
+The application includes a comprehensive logging system for error tracking, debugging, and monitoring:
+
+### Key Components
+- **Logger Class** (`lib/logger.ts`): Structured logging with file rotation
+- **Error Handler Hook** (`lib/useErrorHandler.ts`): React hook for error management
+- **Error Boundary** (`components/ErrorBoundary.tsx`): Catches unhandled React errors
+- **Admin Interface** (`pages/admin/logs.tsx`): Web-based log management
+
+### Usage Patterns
+
+#### Server-side Logging
+```typescript
+import { logger } from '@/lib/logger';
+
+// API route logging
+logger.logApiRequest(req, { searchQuery: query });
+logger.logApiError(error, req, { endpoint: 'search' });
+logger.logDatabaseError(error, 'findMany', { table: 'ivods' });
+```
+
+#### Client-side Error Handling
+```typescript
+import { useErrorHandler } from '@/lib/useErrorHandler';
+
+function MyComponent() {
+  const { handleError, handleAsyncError, wrapEventHandler } = useErrorHandler({
+    component: 'MyComponent'
+  });
+
+  const handleClick = wrapEventHandler(() => {
+    // Automatically logs errors
+    performAction();
+  });
+
+  const fetchData = async () => {
+    const result = await handleAsyncError(async () => {
+      return fetch('/api/data');
+    });
+  };
+}
+```
+
+### Log Management
+- **Development**: Logs to console and file
+- **Production**: File-based logging with rotation
+- **Admin Access**: `/admin/logs` with token authentication
+- **File Rotation**: Automatic rotation when files exceed 10MB
+- **Cleanup**: Keeps only 5 most recent log files
+
+### Log Levels
+- `error`: Critical errors requiring attention
+- `warn`: Warning conditions
+- `info`: General information messages
+- `debug`: Detailed debugging information
 
 This guidance should help Claude Code efficiently navigate and modify the web application component while maintaining code quality and following established patterns.
