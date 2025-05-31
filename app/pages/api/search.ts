@@ -34,41 +34,58 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   let hits: Array<{ id: number; transcript: string | null }> = [];
   let usedES = true;
   
-  try {
-    // Try Elasticsearch with advanced query building
-    const esQuery = buildElasticsearchQuery(parsedQuery);
-    const result = await client.search({
-      index: process.env.NEXT_PUBLIC_ES_INDEX,
-      body: {
-        query: esQuery,
-        _source: ['ivod_id', 'ai_transcript', 'ly_transcript'],
-        size: 100
-      },
-    });
-    
-    hits = result.hits.hits.map(hit => ({
-      id: (hit._source as any).ivod_id,
-      transcript: (hit._source as any).ai_transcript || (hit._source as any).ly_transcript,
-    }));
-    
-    logger.info('Elasticsearch search completed', {
+  // Check if Elasticsearch is enabled
+  const esEnabled = process.env.ENABLE_ELASTICSEARCH !== 'false';
+  
+  if (!esEnabled) {
+    logger.info('Elasticsearch disabled, using database search', {
       metadata: {
         query: q,
-        resultsCount: hits.length,
-        hasAdvancedSyntax: parsedQuery.hasAdvancedSyntax
-      }
-    });
-  } catch (error: any) {
-    // Elasticsearch failed or not reachable; fallback to DB search
-    logger.warn('Elasticsearch search failed, falling back to database', {
-      error: error.message,
-      action: 'elasticsearch_fallback',
-      metadata: {
-        query: q,
-        hasAdvancedSyntax: parsedQuery.hasAdvancedSyntax
+        reason: 'ENABLE_ELASTICSEARCH=false'
       }
     });
     usedES = false;
+  } else {
+    try {
+      // Try Elasticsearch with advanced query building
+      const esQuery = buildElasticsearchQuery(parsedQuery);
+      const result = await client.search({
+        index: process.env.NEXT_PUBLIC_ES_INDEX,
+        body: {
+          query: esQuery,
+          _source: ['ivod_id', 'ai_transcript', 'ly_transcript'],
+          size: 100
+        },
+      });
+      
+      hits = result.hits.hits.map(hit => ({
+        id: (hit._source as any).ivod_id,
+        transcript: (hit._source as any).ai_transcript || (hit._source as any).ly_transcript,
+      }));
+      
+      logger.info('Elasticsearch search completed', {
+        metadata: {
+          query: q,
+          resultsCount: hits.length,
+          hasAdvancedSyntax: parsedQuery.hasAdvancedSyntax
+        }
+      });
+    } catch (error: any) {
+      // Elasticsearch failed or not reachable; fallback to DB search
+      logger.warn('Elasticsearch search failed, falling back to database', {
+        error: error.message,
+        action: 'elasticsearch_fallback',
+        metadata: {
+          query: q,
+          hasAdvancedSyntax: parsedQuery.hasAdvancedSyntax
+        }
+      });
+      usedES = false;
+    }
+  }
+  
+  // Use database search if ES is disabled or failed
+  if (!usedES) {
     const dbBackend = getDbBackend();
     
     try {

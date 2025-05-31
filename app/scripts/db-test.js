@@ -2,25 +2,14 @@
 
 const { PrismaClient } = require('@prisma/client');
 const dotenv = require('dotenv');
-const { resolve } = require('path');
+const { setupDatabaseUrl, getDatabaseInfo, validateDatabaseConfig } = require('../lib/database-url');
 
 // Load environment variables
 dotenv.config();
 
-// Set up DATABASE_URL similar to lib/prisma.ts
-const backend = process.env.DB_BACKEND;
-if (backend) {
-  if (backend === 'sqlite') {
-    const sqlitePath = process.env.SQLITE_PATH || '../db/ivod_test.db';
-    process.env.DATABASE_URL = `file://${resolve(sqlitePath)}`;
-  } else if (backend === 'postgresql') {
-    const { PG_USER, PG_PASS, PG_HOST, PG_PORT, PG_DB } = process.env;
-    process.env.DATABASE_URL = `${backend}://${PG_USER}:${PG_PASS}@${PG_HOST}:${PG_PORT}/${PG_DB}`;
-  } else if (backend === 'mysql') {
-    const { MYSQL_USER, MYSQL_PASS, MYSQL_HOST, MYSQL_PORT, MYSQL_DB } = process.env;
-    process.env.DATABASE_URL = `mysql://${MYSQL_USER}:${MYSQL_PASS}@${MYSQL_HOST}:${MYSQL_PORT}/${MYSQL_DB}`;
-  }
-}
+// Setup DATABASE_URL using modular function
+const dbSetup = setupDatabaseUrl();
+const backend = dbSetup.backend;
 
 async function testDatabaseConnection() {
   

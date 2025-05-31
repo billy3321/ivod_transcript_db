@@ -478,6 +478,25 @@ export function buildDatabaseQuery(parsedQuery: AdvancedSearchQuery, dbBackend: 
 
   // Helper function to create contains condition
   const createContainsCondition = (field: string, value: string) => {
+    // Special handling for committee_names field based on database backend
+    if (field === 'committee_names') {
+      if (dbBackend === 'postgresql') {
+        // PostgreSQL array field - use 'has' for array contains operation
+        return { [field]: { has: value } };
+      } else if (dbBackend === 'mysql') {
+        // MySQL JSON field - use string_contains for JSON search
+        return { [field]: { string_contains: value } };
+      } else {
+        // SQLite string field - use regular contains
+        return { [field]: { contains: value } };
+      }
+    }
+    
+    // For MySQL, case insensitive mode is not supported on string fields
+    if (dbBackend === 'mysql') {
+      return { [field]: { contains: value } };
+    }
+    
     return isInsensitiveSupported
       ? { [field]: { contains: value, mode: 'insensitive' as const } }
       : { [field]: { contains: value } };
@@ -950,6 +969,25 @@ function buildBooleanDatabaseQuery(booleanGroups: BooleanGroup[], dbBackend: str
   const isInsensitiveSupported = dbBackend !== 'sqlite';
   
   const createContainsCondition = (field: string, value: string) => {
+    // Special handling for committee_names field based on database backend
+    if (field === 'committee_names') {
+      if (dbBackend === 'postgresql') {
+        // PostgreSQL array field - use 'has' for array contains operation
+        return { [field]: { has: value } };
+      } else if (dbBackend === 'mysql') {
+        // MySQL JSON field - use string_contains for JSON search
+        return { [field]: { string_contains: value } };
+      } else {
+        // SQLite string field - use regular contains
+        return { [field]: { contains: value } };
+      }
+    }
+    
+    // For MySQL, case insensitive mode is not supported on string fields
+    if (dbBackend === 'mysql') {
+      return { [field]: { contains: value } };
+    }
+    
     return isInsensitiveSupported
       ? { [field]: { contains: value, mode: 'insensitive' as const } }
       : { [field]: { contains: value } };

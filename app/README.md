@@ -111,6 +111,9 @@ TEST_SQLITE_PATH=../db/ivod_test.db
 # SKIP_SSL=True
 
 # Elasticsearch 設定（可選，設定 ES 連線與索引名稱）
+# 啟用/停用 Elasticsearch（預設：true）
+ENABLE_ELASTICSEARCH=true
+
 ES_HOST=localhost
 ES_PORT=9200
 ES_SCHEME=http
@@ -142,6 +145,9 @@ npm run dev
 
 # 測試資料庫連線
 npm run db:test
+
+# 測試 Elasticsearch 連線
+npm run es:test
 ```
 
 在瀏覽器開啟 http://localhost:3000 查看應用程式。
@@ -177,6 +183,76 @@ function MyComponent() {
 
   return <button onClick={handleClick}>按鈕</button>;
 }
+```
+
+### 6.2 Elasticsearch 設定與測試
+
+系統提供完整的 Elasticsearch 整合和控制機制：
+
+#### Elasticsearch 功能控制
+
+- **啟用/停用**：透過 `ENABLE_ELASTICSEARCH` 環境變數控制
+- **自動降級**：Elasticsearch 不可用時自動轉為資料庫搜尋
+- **智能偵測**：系統會自動檢測 ES 可用性
+
+#### 測試 Elasticsearch 連線
+
+```bash
+# 完整的 Elasticsearch 測試
+npm run es:test
+```
+
+測試內容包括：
+- **基本連線測試**：檢查 ES 服務是否運行
+- **叢集資訊**：顯示 ES 版本和叢集狀態
+- **索引檢查**：確認索引是否存在及文件數量
+- **搜尋功能測試**：驗證搜尋查詢正常運作
+- **中文分析器測試**：確認中文分詞功能
+
+#### Elasticsearch 設定選項
+
+```bash
+# 停用 Elasticsearch（只使用資料庫搜尋）
+ENABLE_ELASTICSEARCH=false
+
+# 啟用 Elasticsearch（預設）
+ENABLE_ELASTICSEARCH=true
+```
+
+**使用場景：**
+- **開發環境**：ES 服務未安裝時設為 `false`
+- **正式環境**：有 ES 服務時設為 `true`
+- **測試環境**：可依需求彈性切換
+
+#### 搜尋功能行為
+
+| ES 設定 | ES 狀態 | 搜尋行為 |
+|---------|---------|----------|
+| `true` | 正常 | 使用 ES 高效搜尋 |
+| `true` | 異常 | 自動降級至資料庫搜尋 |
+| `false` | 任何 | 直接使用資料庫搜尋 |
+
+#### 設定建議
+
+**本地開發：**
+```bash
+# ES 未安裝時
+ENABLE_ELASTICSEARCH=false
+
+# 有 Docker ES 時
+ENABLE_ELASTICSEARCH=true
+ES_HOST=localhost
+ES_PORT=9200
+```
+
+**正式環境：**
+```bash
+# 推薦設定
+ENABLE_ELASTICSEARCH=true
+ES_HOST=your-es-cluster.com
+ES_PORT=9200
+ES_USER=your_username
+ES_PASS=your_password
 ```
 
 ## 7. 建置和正式環境部署

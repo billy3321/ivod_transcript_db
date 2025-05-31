@@ -39,25 +39,41 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   
   // General search in multiple fields
   if (q && typeof q === 'string') {
-    const searchFields = isInsensitiveSupported 
-      ? [
-          { title: { contains: q, mode: 'insensitive' as const } },
-          { meeting_name: { contains: q, mode: 'insensitive' as const } },
-          { speaker_name: { contains: q, mode: 'insensitive' as const } },
-          { committee_names: { contains: q, mode: 'insensitive' as const } },
-          { meeting_code_str: { contains: q, mode: 'insensitive' as const } },
-          { ai_transcript: { contains: q, mode: 'insensitive' as const } },
-          { ly_transcript: { contains: q, mode: 'insensitive' as const } },
-        ]
-      : [
-          { title: { contains: q } },
-          { meeting_name: { contains: q } },
-          { speaker_name: { contains: q } },
-          { committee_names: { contains: q } },
-          { meeting_code_str: { contains: q } },
-          { ai_transcript: { contains: q } },
-          { ly_transcript: { contains: q } },
-        ];
+    // Helper function to create contains condition with database-specific field handling
+    const createContainsCondition = (field: string, value: string) => {
+      // Special handling for committee_names field based on database backend
+      if (field === 'committee_names') {
+        if (dbBackend === 'postgresql') {
+          // PostgreSQL array field - use 'has' for array contains operation
+          return { [field]: { has: value } };
+        } else if (dbBackend === 'mysql') {
+          // MySQL JSON field - use string_contains for JSON search
+          return { [field]: { string_contains: value } };
+        } else {
+          // SQLite string field - use regular contains
+          return { [field]: { contains: value } };
+        }
+      }
+      
+      // For MySQL, case insensitive mode is not supported on string fields
+      if (dbBackend === 'mysql') {
+        return { [field]: { contains: value } };
+      }
+      
+      return isInsensitiveSupported
+        ? { [field]: { contains: value, mode: 'insensitive' as const } }
+        : { [field]: { contains: value } };
+    };
+
+    const searchFields = [
+      createContainsCondition('title', q),
+      createContainsCondition('meeting_name', q),
+      createContainsCondition('speaker_name', q),
+      createContainsCondition('committee_names', q),
+      createContainsCondition('meeting_code_str', q),
+      createContainsCondition('ai_transcript', q),
+      createContainsCondition('ly_transcript', q),
+    ];
     
     conditions.push({
       OR: searchFields,
@@ -82,10 +98,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   if (committee && typeof committee === 'string') {
-    conditions.push({
-      committee_names: isInsensitiveSupported 
+    // Handle committee_names field based on database backend
+    let committeeCondition;
+    if (dbBackend === 'postgresql') {
+      // PostgreSQL array field - use 'has' for array contains operation
+      committeeCondition = { has: committee };
+    } else if (dbBackend === 'mysql') {
+      // MySQL JSON field - use string_contains for JSON search
+      committeeCondition = { string_contains: committee };
+    } else {
+      // SQLite string field - use regular contains with case sensitivity if supported
+      committeeCondition = isInsensitiveSupported 
         ? { contains: committee, mode: 'insensitive' as const }
-        : { contains: committee }
+        : { contains: committee };
+    }
+        
+    conditions.push({
+      committee_names: committeeCondition
     });
   }
 

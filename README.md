@@ -101,10 +101,12 @@ npm start
 ```
 支援部署至 Vercel、Docker 或 Ubuntu+nginx+systemd。
 
-### 2.6 測試 (Unit / E2E)
-- Unit Tests：Jest + React Testing Library，測試放在 `app/__tests__`
-- E2E Tests：Cypress，spec 放在 `cypress/integration`
-- `package.json` 已定義 `test`、`test:ci`、`cypress:open`、`cypress:run`
+### 2.6 測試與驗證
+- **Unit Tests**：Jest + React Testing Library，測試放在 `app/__tests__`
+- **E2E Tests**：Cypress，spec 放在 `cypress/integration`
+- **資料庫測試**：`npm run db:test` - 測試資料庫連線與相容性
+- **Elasticsearch 測試**：`npm run es:test` - 測試 ES 連線與功能
+- **環境控制**：可透過 `ENABLE_ELASTICSEARCH=false` 停用 ES 搜尋功能
 
 詳細使用與開發說明請參考 [app/README.md](app/README.md)。
 
