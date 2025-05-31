@@ -67,7 +67,7 @@ const Footer: FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {/* Site Info */}
           <div>
-            <h3 className="text-lg font-semibold mb-4">IVOD 搜尋網站</h3>
+            <h3 className="text-lg font-semibold mb-4">IVOD 逐字稿檢索系統</h3>
             <p className="text-gray-300 text-sm leading-relaxed">
               提供第11屆立法院會議逐字記錄搜尋服務
             </p>
@@ -122,7 +122,7 @@ const Footer: FC = () => {
         <div className="border-t border-gray-700 mt-8 pt-6">
           <div className="flex flex-col md:flex-row justify-between items-center">
             <div className="text-gray-400 text-sm mb-4 md:mb-0">
-              © {currentYear} IVOD 搜尋網站. 採用 MIT License 授權.
+              © {currentYear} IVOD 逐字稿檢索系統。本網站採用 MIT License 授權。
             </div>
             <div className="text-gray-400 text-sm">
               開發者: billy3321、Yutin

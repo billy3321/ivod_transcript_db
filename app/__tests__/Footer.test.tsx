@@ -26,7 +26,7 @@ describe('Footer Component', () => {
     render(<Footer />);
     
     // Check main headings
-    expect(screen.getByText('IVOD 搜尋網站')).toBeInTheDocument()
+    expect(screen.getByText('IVOD 逐字稿檢索系統')).toBeInTheDocument()
     expect(screen.getByText('導覽')).toBeInTheDocument()
     expect(screen.getByText('相關連結')).toBeInTheDocument()
     
@@ -69,7 +69,7 @@ describe('Footer Component', () => {
     render(<Footer />);
     
     const currentYear = new Date().getFullYear()
-    const copyrightText = screen.getByText(`© ${currentYear} IVOD 搜尋網站. 採用 MIT License 授權.`)
+    const copyrightText = screen.getByText(`© ${currentYear} IVOD 逐字稿檢索系統。本網站採用 MIT License 授權。`)
     expect(copyrightText).toBeInTheDocument()
   })
 
@@ -139,7 +139,7 @@ describe('Footer Component', () => {
     // Check heading hierarchy
     const headings = screen.getAllByRole('heading', { level: 3 })
     expect(headings).toHaveLength(3)
-    expect(headings[0]).toHaveTextContent('IVOD 搜尋網站')
+    expect(headings[0]).toHaveTextContent('IVOD 逐字稿檢索系統')
     expect(headings[1]).toHaveTextContent('導覽')
     expect(headings[2]).toHaveTextContent('相關連結')
   })
