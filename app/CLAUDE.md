@@ -138,39 +138,172 @@ All API routes follow consistent patterns:
 - `ClientOnly.tsx` - Client-side rendering wrapper
 - `StructuredData.tsx` - SEO structured data injection
 
-## Search Implementation
+## Search System Architecture
 
-### Advanced Search Parser
-The app includes a sophisticated search parser (`lib/searchParser.ts`) that supports:
-- **Quoted Phrases**: `"exact phrase"` for precise matching
-- **Boolean Logic**: `term1 AND term2`, `term1 OR term2` with proper precedence
-- **Grouping**: `(term1 OR term2) AND term3` for complex queries
-- **Field Searches**: `title:"meeting name"`, `speaker:"legislator name"`
-- **Exclusions**: `-term` or `-"excluded phrase"` to filter out content
-- **Mixed Queries**: Complex combinations like `(speaker:"王委員" OR speaker:"李委員") AND "預算" -"國防"`
+### CRITICAL: Complete Search Logic Documentation
 
-### Elasticsearch Integration
-The app uses a dual search strategy:
-1. **Primary**: Elasticsearch full-text search with advanced query building
-2. **Fallback**: Database LIKE queries when ES unavailable
+The IVOD search system implements a sophisticated dual-layer search architecture that must adhere to specific behavioral requirements:
 
-Search logic in `lib/searchParser.ts`, `lib/elastic.ts` and `pages/api/search.ts` handles:
-- Advanced query parsing and AST generation
-- Elasticsearch query building with boolean logic
-- Database fallback with equivalent SQL queries
-- Connection failure graceful degradation
-- Result formatting consistency
-- Error logging and monitoring
+#### 1. **Non-Instant Search Behavior** 
+**REQUIREMENT**: Search is NEVER triggered automatically. Only manual button press initiates search.
 
-### URL State Management
-Search state is synchronized with URL parameters:
-- `q` - Search query
-- `mode` - Search mode (all/transcript)
-- `meeting` - Meeting name filter
-- `speaker` - Speaker filter
-- `committee` - Committee filter
-- `page` - Current page number
-- `sort` - Sort order
+**Implementation**:
+- Search input field updates `searchQuery` state only (no immediate search)
+- Advanced form field changes update `advancedInput` state only (no immediate search)  
+- Search is triggered ONLY by:
+  - Clicking "搜尋" button → calls `handleSearch()`
+  - Pressing Enter key → calls `handleSearch()`
+- `handleSearch()` updates `filters` state → triggers `useEffect` → performs actual search
+
+**Code Location**: `pages/index.tsx` lines 217-228, 230-234
+
+#### 2. **Upper Search: Advanced Syntax Support**
+**REQUIREMENT**: Main search bar supports complex query syntax for flexible searching.
+
+**Supported Syntax**:
+- **Quoted Phrases**: `"完整會議"` - exact phrase matching
+- **Boolean Operators**: `預算 AND 教育`, `王委員 OR 李委員` - logical combinations
+- **Grouping**: `(預算 OR 教育) AND 委員會` - parentheses for precedence
+- **Field-Specific**: `title:"會議名稱"`, `speaker:"立委姓名"`, `meeting:"會議"`, `committee:"委員會"`
+- **Exclusions**: `-詞彙`, `-"詞組"` - exclude specific content
+- **Complex Mixed**: `(speaker:"王委員" OR speaker:"李委員") AND "預算" -"國防"`
+
+**Search Modes**:
+- **"搜尋全部欄位"**: Searches across title, meeting_name, speaker_name, committee_names, transcripts
+- **"僅搜尋逐字稿"**: Searches only in ai_transcript and ly_transcript fields
+
+**Code Location**: `lib/searchParser.ts` (full advanced parsing), `pages/api/search.ts` (implementation)
+
+#### 3. **Lower Search: LIKE Fuzzy Matching**
+**REQUIREMENT**: Advanced form fields use LIKE queries for partial matching across all database backends.
+
+**Implementation Details**:
+- **會議名稱**, **立委姓名**, **委員會** fields use LIKE `%pattern%` queries
+- Automatically triggers Universal Search when any string field filter is present
+- Works across SQLite, PostgreSQL, MySQL with database-specific optimizations
+- Example: "社會福利" matches "社會福利及衛生環境委員會"
+
+**Trigger Condition**:
+```typescript
+function shouldUseUniversalSearch(params) {
+  const { meeting_name, speaker, committee } = params;
+  return !!(meeting_name || speaker || committee);
+}
+```
+
+**Code Location**: `lib/universal-search.ts`, `pages/api/ivods.ts` lines 45-53
+
+#### 4. **Combined Operation**
+**REQUIREMENT**: Upper and lower searches can work together or independently.
+
+**Combined Logic**:
+- **Together**: Upper search (q param) + Lower filters (speaker/committee/meeting_name) → Combined WHERE conditions
+- **Upper Only**: Only q parameter → Standard field search or transcript-only search  
+- **Lower Only**: Only advanced filters → LIKE fuzzy matching
+- **Date Ranges**: Compatible with both upper and lower searches
+
+**Search Flow**:
+1. Check if transcript-only mode → Use `/api/search` then `/api/ivods` with IDs
+2. Check if universal search needed → Use LIKE queries with partial matching
+3. Otherwise → Use standard Prisma queries
+
+**Code Location**: `pages/index.tsx` lines 154-211 (search flow), `pages/api/ivods.ts` (API logic)
+
+#### 5. **Elasticsearch Priority with DB Fallback**
+**REQUIREMENT**: Transcript searches prioritize Elasticsearch when available, fallback to database when not.
+
+**ES Integration**:
+- **Enabled Check**: `ENABLE_ELASTICSEARCH !== 'false'`
+- **Primary**: Uses Elasticsearch with advanced query building for transcript searches
+- **Fallback**: Automatically falls back to database with equivalent WHERE conditions
+- **Graceful Degradation**: Logs failures and continues with database search
+- **Advanced Syntax**: Full support for boolean logic, field searches, exclusions in both ES and DB
+
+**Fallback Indicators**:
+- `/api/search` returns `{ fallback: true }` when using database
+- Logs ES failures for monitoring
+- Maintains identical search behavior regardless of backend
+
+**Code Location**: `pages/api/search.ts` lines 38-85 (ES logic), `lib/searchParser.ts` (query building)
+
+#### 6. **Database Backend Compatibility**
+**REQUIREMENT**: All search functions work correctly across SQLite, PostgreSQL, MySQL with backend-specific optimizations.
+
+**Database-Specific Handling**:
+
+**MySQL**:
+- No `mode: 'insensitive'` support → Use base `contains`
+- JSON fields use `string_contains` → Limited partial matching → Use Universal Search
+- Committee fields → LIKE queries for proper partial matching
+
+**PostgreSQL**:
+- Array fields use `has` operator for committee_names
+- Full case-insensitive support with `mode: 'insensitive'`
+- JSON operations supported
+
+**SQLite**:
+- Basic `contains` queries only
+- No case-insensitive mode
+- String-based committee_names field
+
+**Universal Search Benefits**:
+- Provides consistent LIKE-based partial matching across all backends
+- Bypasses MySQL JSON field limitations
+- Maintains identical behavior regardless of database choice
+
+**Code Location**: `lib/utils.ts` (createContainsCondition), `lib/universal-search.ts` (LIKE implementation)
+
+### Search Implementation Components
+
+#### Advanced Search Parser (`lib/searchParser.ts`)
+Sophisticated parser supporting:
+- Boolean logic with proper precedence
+- Quoted phrase preservation
+- Field-specific searches with syntax validation
+- Exclusion syntax parsing
+- Parentheses grouping support
+- AST generation for complex queries
+
+#### Elasticsearch Integration (`pages/api/search.ts`, `lib/elastic.ts`)
+Dual search strategy:
+- Primary: ES full-text search with advanced query building
+- Fallback: Database search with equivalent conditions
+- Connection failure handling and monitoring
+- Result format consistency
+
+#### Universal Search System (`lib/universal-search.ts`)  
+LIKE-based search for partial matching:
+- Raw SQL queries for maximum compatibility
+- Parameter injection safety  
+- Database-agnostic implementation
+- Automatic triggering based on filter presence
+
+#### URL State Management (`pages/index.tsx`)
+Search state synchronized with URL:
+- `q` - Main search query
+- `scope` - Search mode (all/transcript)  
+- `meeting_name`, `speaker`, `committee` - Advanced filters
+- `date_from`, `date_to` - Date range filters
+- `page`, `sort` - Pagination and sorting
+- Debounced URL updates to prevent excessive navigation
+
+### Testing and Validation
+
+**Comprehensive Test Script**: `scripts/test-complete-search-logic.js`
+- Validates non-instant search behavior
+- Tests all advanced syntax patterns
+- Verifies LIKE fuzzy matching
+- Confirms combined search operations  
+- Checks ES/DB fallback behavior
+- Validates cross-database compatibility
+
+**Search Behavior Verification**:
+- Manual trigger requirement
+- Syntax parsing accuracy
+- Partial matching effectiveness
+- Combined operation logic
+- Fallback mechanism reliability
+- Database-specific optimizations
 
 ## Testing Strategy
 
