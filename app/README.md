@@ -139,6 +139,9 @@ cp .env.example .env
 npm run prisma:generate
 # npx prisma migrate dev --name init  # 如果需要建立新的遷移
 npm run dev
+
+# 測試資料庫連線
+npm run db:test
 ```
 
 在瀏覽器開啟 http://localhost:3000 查看應用程式。
