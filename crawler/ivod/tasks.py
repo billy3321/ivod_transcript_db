@@ -296,7 +296,150 @@ def run_retry(skip_ssl: bool = True):
             logger.warning(f"⚠️  Elasticsearch 索引自動更新時發生錯誤: {e}")
     elif successfully_retried_ids:
         logger.info(f"ℹ️  已重試 {len(successfully_retried_ids)} 筆記錄，但 Elasticsearch 不可用")
+
+
+def read_failed_ivods_from_file(error_log_path):
+    """從錯誤記錄檔案讀取失敗的IVOD_ID列表"""
+    failed_ivods = []
+    if not os.path.exists(error_log_path):
+        logger.warning(f"錯誤記錄檔案不存在: {error_log_path}")
+        return failed_ivods
     
+    with open(error_log_path, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if line:
+                parts = line.split(',')
+                if len(parts) >= 1:
+                    try:
+                        ivod_id = int(parts[0])
+                        failed_ivods.append(ivod_id)
+                    except ValueError:
+                        logger.warning(f"無效的IVOD_ID格式: {parts[0]}")
+    
+    # 去重複
+    return list(set(failed_ivods))
+
+
+def remove_from_error_log(ivod_id, error_log_path):
+    """從錯誤記錄檔案中移除成功處理的IVOD_ID"""
+    if not os.path.exists(error_log_path):
+        return
+    
+    # 讀取現有記錄
+    lines = []
+    with open(error_log_path, "r", encoding="utf-8") as f:
+        lines = f.readlines()
+    
+    # 過濾掉指定的IVOD_ID
+    filtered_lines = []
+    for line in lines:
+        if line.strip():
+            parts = line.strip().split(',')
+            if len(parts) >= 1 and parts[0] != str(ivod_id):
+                filtered_lines.append(line)
+    
+    # 寫回檔案
+    with open(error_log_path, "w", encoding="utf-8") as f:
+        f.writelines(filtered_lines)
+
+
+def run_fix(ivod_ids=None, error_log_path=None, skip_ssl: bool = True):
+    """
+    修復失敗的IVOD記錄
+    
+    Args:
+        ivod_ids: 指定要修復的IVOD_ID列表，如果為None且error_log_path為None則使用預設錯誤記錄檔案
+        error_log_path: 錯誤記錄檔案路徑，如果指定則從檔案讀取失敗的IVOD_ID列表
+        skip_ssl: 是否跳過SSL驗證
+    
+    Returns:
+        bool: 執行是否成功
+    """
+    logger.info("開始 Fix 任務...")
+    
+    br = make_browser(skip_ssl=skip_ssl)
+    db = Session()
+    
+    # 確定要修復的IVOD列表
+    if ivod_ids:
+        # 直接使用指定的IVOD_ID列表
+        target_ivods = ivod_ids
+        logger.info(f"指定修復 {len(target_ivods)} 個IVOD記錄")
+        
+    else:
+        # 從錯誤記錄檔案讀取
+        if not error_log_path:
+            error_log_path = os.getenv("ERROR_LOG_PATH", "logs/failed_ivods.txt")
+        
+        target_ivods = read_failed_ivods_from_file(error_log_path)
+        if not target_ivods:
+            logger.info("沒有找到需要修復的IVOD記錄")
+            db.close()
+            return True
+        
+        logger.info(f"從 {error_log_path} 找到 {len(target_ivods)} 個需要修復的IVOD記錄")
+    
+    success_count = 0
+    failed_count = 0
+    successfully_fixed_ids = []
+    
+    try:
+        for ivod_id in tqdm(target_ivods, desc="修復IVOD記錄"):
+            try:
+                logger.info(f"開始處理IVOD_ID: {ivod_id}")
+                rec = process_ivod(br, ivod_id)
+                
+                # 檢查是否已存在記錄
+                obj = db.get(IVODTranscript, ivod_id)
+                if obj:
+                    # 更新現有記錄
+                    for k, v in rec.items():
+                        setattr(obj, k, v)
+                    obj.last_updated = datetime.now()
+                    logger.info(f"更新IVOD {ivod_id} 成功")
+                else:
+                    # 新增記錄
+                    rec["last_updated"] = datetime.now()
+                    db.add(IVODTranscript(**rec))
+                    logger.info(f"新增IVOD {ivod_id} 成功")
+                
+                db.commit()
+                success_count += 1
+                successfully_fixed_ids.append(ivod_id)
+                
+                # 如果從錯誤記錄檔案讀取的，移除成功處理的記錄
+                if not ivod_ids and error_log_path:
+                    remove_from_error_log(ivod_id, error_log_path)
+                
+            except Exception as e:
+                logger.error(f"處理IVOD {ivod_id} 失敗: {e}", exc_info=True)
+                db.rollback()
+                failed_count += 1
+                # 重新記錄失敗
+                log_failed_ivod(ivod_id, "fix_retry")
+                continue
+        
+    finally:
+        db.close()
+    
+    logger.info(f"修復完成 - 成功: {success_count}, 失敗: {failed_count}")
+    
+    # 檢查 Elasticsearch 是否可用，如果可用且有成功修復的記錄就批量更新索引
+    if successfully_fixed_ids and check_elasticsearch_available():
+        logger.info(f"🔄 開始自動更新 Elasticsearch 索引（修復的 {len(successfully_fixed_ids)} 筆記錄）...")
+        try:
+            es_success = run_es(ivod_ids=successfully_fixed_ids)
+            if es_success:
+                logger.info("✅ Elasticsearch 索引自動更新完成")
+            else:
+                logger.warning("⚠️  Elasticsearch 索引自動更新失敗")
+        except Exception as e:
+            logger.warning(f"⚠️  Elasticsearch 索引自動更新時發生錯誤: {e}")
+    elif successfully_fixed_ids:
+        logger.info(f"ℹ️  已修復 {len(successfully_fixed_ids)} 筆記錄，但 Elasticsearch 不可用")
+    
+    logger.info("Fix 任務完成。")
     return True
 
 
