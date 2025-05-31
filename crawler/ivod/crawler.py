@@ -181,9 +181,14 @@ def fetch_ly(js, rec, obj, br):
         if "gazette" in js:
             blocks = js["gazette"]["blocks"]
             rec["ly_transcript"] = "\n\n".join("\n".join(b) for b in blocks)
+            rec["ly_status"] = "success"
         else:
             rec["ly_transcript"] = fetch_ly_speech(rec['ivod_id'])
-        rec["ly_status"] = "success"
+            if rec["ly_transcript"]:
+                rec["ly_status"] = "success"
+            else:
+                rec["ly_status"] = "failed"
+
     except Exception:
         rec["ly_transcript"] = ""
         rec["ly_status"] = "failed"
