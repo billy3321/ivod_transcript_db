@@ -290,20 +290,10 @@ export default function Home() {
           <div className="bg-white rounded-lg shadow-sm p-6 mb-8">
             {/* Main Search */}
             <div className="space-y-4 mb-4">
-              {/* Search Input Row */}
-              <div className="flex gap-3">
-                {/* Search Scope Dropdown */}
-                <select
-                  value={searchScope}
-                  onChange={(e) => setSearchScope(e.target.value as SearchScope)}
-                  className="flex-shrink-0 border border-gray-300 rounded-lg px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
-                >
-                  <option value="all">搜尋全部欄位</option>
-                  <option value="transcript">僅搜尋逐字稿</option>
-                </select>
-
-                {/* Search Input */}
-                <div className="relative flex-1">
+              {/* Mobile: Vertical Layout, Desktop: Horizontal Layout */}
+              <div className="flex flex-col sm:flex-row gap-3">
+                {/* Search Input - Full Width on Mobile, First on Desktop */}
+                <div className="relative flex-1 order-1 sm:order-2">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                     <Icon type="search" className="h-5 w-5 text-gray-400" />
                   </div>
@@ -317,13 +307,26 @@ export default function Home() {
                   />
                 </div>
 
-                {/* Search Button */}
-                <button
-                  onClick={handleSearch}
-                  className="flex-shrink-0 bg-blue-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
-                >
-                  搜尋
-                </button>
+                {/* Mobile: Second Row with Dropdown and Button */}
+                <div className="flex gap-3 order-2 sm:order-1 sm:contents">
+                  {/* Search Scope Dropdown */}
+                  <select
+                    value={searchScope}
+                    onChange={(e) => setSearchScope(e.target.value as SearchScope)}
+                    className="flex-1 sm:flex-shrink-0 sm:flex-initial border border-gray-300 rounded-lg px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+                  >
+                    <option value="all">搜尋全部欄位</option>
+                    <option value="transcript">僅搜尋逐字稿</option>
+                  </select>
+
+                  {/* Search Button */}
+                  <button
+                    onClick={handleSearch}
+                    className="flex-1 sm:flex-shrink-0 sm:flex-initial bg-blue-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors order-3"
+                  >
+                    搜尋
+                  </button>
+                </div>
               </div>
             </div>
 

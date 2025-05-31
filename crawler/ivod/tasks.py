@@ -462,6 +462,226 @@ def run_fix(ivod_ids=None, error_log_path=None, skip_ssl: bool = True):
     return True
 
 
+def run_backup(backup_file=None):
+    """
+    備份資料庫內容到 JSON 檔案
+    
+    Args:
+        backup_file: 備份檔案路徑，如果為 None 則自動生成
+    
+    Returns:
+        str: 備份檔案路徑，失敗時返回 None
+    """
+    logger.info("開始資料庫備份...")
+    
+    db = Session()
+    
+    try:
+        # 自動生成備份檔案名
+        if not backup_file:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            backup_file = f"backup/ivod_backup_{timestamp}.json"
+        
+        # 確保備份目錄存在
+        backup_dir = os.path.dirname(backup_file)
+        if backup_dir and not os.path.exists(backup_dir):
+            os.makedirs(backup_dir)
+            logger.info(f"建立備份目錄: {backup_dir}")
+        
+        # 查詢所有記錄
+        records = db.query(IVODTranscript).all()
+        record_count = len(records)
+        
+        if record_count == 0:
+            logger.warning("資料庫中沒有記錄可備份")
+            return None
+        
+        logger.info(f"找到 {record_count} 筆記錄，開始備份...")
+        
+        # 轉換為可序列化的格式
+        backup_data = {
+            "metadata": {
+                "backup_time": datetime.now().isoformat(),
+                "db_backend": DB_BACKEND,
+                "record_count": record_count,
+                "version": "1.0"
+            },
+            "data": []
+        }
+        
+        for record in tqdm(records, desc="備份記錄"):
+            record_dict = {
+                "ivod_id": record.ivod_id,
+                "ivod_url": record.ivod_url,
+                "date": record.date.isoformat() if record.date else None,
+                "meeting_code": record.meeting_code,
+                "meeting_code_str": record.meeting_code_str,
+                "meeting_name": record.meeting_name,
+                "meeting_time": record.meeting_time.isoformat() if record.meeting_time else None,
+                "title": record.title,
+                "speaker_name": record.speaker_name,
+                "video_length": record.video_length,
+                "commencement_time": record.commencement_time,
+                "video_url": record.video_url,
+                "committee_names": record.committee_names,
+                "ai_transcript": record.ai_transcript,
+                "ai_status": record.ai_status,
+                "ai_retries": record.ai_retries,
+                "ly_transcript": record.ly_transcript,
+                "ly_status": record.ly_status,
+                "ly_retries": record.ly_retries,
+                "last_updated": record.last_updated.isoformat() if record.last_updated else None
+            }
+            backup_data["data"].append(record_dict)
+        
+        # 寫入 JSON 檔案
+        with open(backup_file, 'w', encoding='utf-8') as f:
+            json.dump(backup_data, f, ensure_ascii=False, indent=2)
+        
+        file_size = os.path.getsize(backup_file) / (1024 * 1024)  # MB
+        logger.info(f"✅ 備份完成: {backup_file}")
+        logger.info(f"📊 備份統計: {record_count} 筆記錄，檔案大小: {file_size:.2f} MB")
+        
+        return backup_file
+        
+    except Exception as e:
+        logger.error(f"備份失敗: {e}", exc_info=True)
+        return None
+    finally:
+        db.close()
+
+
+def run_restore(backup_file, force_create_table=False, force_clear_data=False):
+    """
+    從備份檔案還原資料庫
+    
+    Args:
+        backup_file: 備份檔案路徑
+        force_create_table: 強制建立資料表（不詢問）
+        force_clear_data: 強制清除現有資料（不詢問）
+    
+    Returns:
+        bool: 還原是否成功
+    """
+    logger.info(f"開始從備份檔案還原: {backup_file}")
+    
+    # 檢查備份檔案是否存在
+    if not os.path.exists(backup_file):
+        logger.error(f"備份檔案不存在: {backup_file}")
+        return False
+    
+    try:
+        # 讀取備份檔案
+        with open(backup_file, 'r', encoding='utf-8') as f:
+            backup_data = json.load(f)
+        
+        # 驗證備份檔案格式
+        if "metadata" not in backup_data or "data" not in backup_data:
+            logger.error("備份檔案格式錯誤")
+            return False
+        
+        metadata = backup_data["metadata"]
+        records_data = backup_data["data"]
+        
+        logger.info(f"📊 備份檔案資訊:")
+        logger.info(f"   - 備份時間: {metadata.get('backup_time')}")
+        logger.info(f"   - 原始資料庫: {metadata.get('db_backend')}")
+        logger.info(f"   - 記錄數量: {metadata.get('record_count')}")
+        logger.info(f"   - 版本: {metadata.get('version')}")
+        
+        db = Session()
+        
+        try:
+            # 檢查資料表是否存在
+            table_exists = _check_table_exists(db)
+            
+            if not table_exists:
+                if not force_create_table:
+                    response = input("資料表不存在，是否要建立？(y/N): ").strip().lower()
+                    if response not in ['y', 'yes']:
+                        logger.info("使用者取消建立資料表")
+                        return False
+                
+                logger.info("建立資料表...")
+                from .db import Base, engine
+                Base.metadata.create_all(engine)
+                logger.info("✅ 資料表建立完成")
+            
+            # 檢查現有資料
+            existing_count = db.query(IVODTranscript).count()
+            
+            if existing_count > 0:
+                logger.warning(f"資料庫中已有 {existing_count} 筆記錄")
+                
+                if not force_clear_data:
+                    response = input("是否要清除現有資料？(y/N): ").strip().lower()
+                    if response not in ['y', 'yes']:
+                        logger.info("使用者選擇保留現有資料，還原取消")
+                        return False
+                
+                logger.info("清除現有資料...")
+                db.query(IVODTranscript).delete()
+                db.commit()
+                logger.info("✅ 現有資料已清除")
+            
+            # 還原資料
+            logger.info(f"開始還原 {len(records_data)} 筆記錄...")
+            
+            success_count = 0
+            error_count = 0
+            
+            for record_data in tqdm(records_data, desc="還原記錄"):
+                try:
+                    # 轉換日期字段
+                    if record_data.get("date"):
+                        record_data["date"] = datetime.fromisoformat(record_data["date"]).date()
+                    
+                    if record_data.get("meeting_time"):
+                        record_data["meeting_time"] = datetime.fromisoformat(record_data["meeting_time"])
+                    
+                    if record_data.get("last_updated"):
+                        record_data["last_updated"] = datetime.fromisoformat(record_data["last_updated"])
+                    
+                    # 建立記錄
+                    record = IVODTranscript(**record_data)
+                    db.add(record)
+                    success_count += 1
+                    
+                except Exception as e:
+                    logger.error(f"還原記錄失敗 (IVOD_ID: {record_data.get('ivod_id')}): {e}")
+                    error_count += 1
+                    continue
+            
+            # 提交所有變更
+            db.commit()
+            
+            logger.info(f"✅ 還原完成")
+            logger.info(f"📊 還原統計: 成功 {success_count} 筆，失敗 {error_count} 筆")
+            
+            return True
+            
+        except Exception as e:
+            logger.error(f"還原過程發生錯誤: {e}", exc_info=True)
+            db.rollback()
+            return False
+        finally:
+            db.close()
+            
+    except Exception as e:
+        logger.error(f"讀取備份檔案失敗: {e}", exc_info=True)
+        return False
+
+
+def _check_table_exists(db):
+    """檢查 IVODTranscript 資料表是否存在"""
+    try:
+        # 嘗試查詢資料表，如果不存在會拋出異常
+        db.query(IVODTranscript).limit(1).first()
+        return True
+    except Exception:
+        return False
+
+
 def _validate_date_range(start_date, end_date, default_start, today, is_end_date=False):
     """
     驗證日期範圍的輔助函數

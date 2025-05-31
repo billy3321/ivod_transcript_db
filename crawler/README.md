@@ -60,6 +60,11 @@ cp .env.example .env   # 如尚未有 .env
 
 # 更新 Elasticsearch 索引
 ./ivod_es.py
+
+# 備份與還原資料庫
+./ivod_backup.py backup                              # 備份資料庫
+./ivod_backup.py restore backup/ivod_backup_xxx.json # 還原資料庫
+./ivod_backup.py list                                # 列出備份檔案
 ```
 
 ## 4. 部署於 Ubuntu Linux
@@ -218,21 +223,128 @@ LOG_PATH=logs/
 ./ivod_full.py --end-date 2024-10-31
 ```
 
-## 7. 常見問題
+## 7. 資料庫備份與還原
+
+本系統提供完整的資料庫備份與還原功能，可有效避免重複抓取的問題。
+
+### 7.1 備份資料庫
+
+```bash
+# 自動生成備份檔名（建議）
+./ivod_backup.py backup
+
+# 指定備份檔名
+./ivod_backup.py backup --file backup/my_backup.json
+
+# 指定完整路徑
+./ivod_backup.py backup --file /path/to/custom_backup.json
+```
+
+**備份特色**：
+- **JSON 格式**：易於查看和移植的備份格式
+- **完整資訊**：包含所有欄位和 metadata
+- **自動命名**：預設使用時間戳 (`ivod_backup_20241201_143022.json`)
+- **跨資料庫**：支援 SQLite、PostgreSQL、MySQL
+- **進度顯示**：即時顯示備份進度和統計
+
+### 7.2 還原資料庫
+
+```bash
+# 基本還原（會詢問確認）
+./ivod_backup.py restore backup/ivod_backup_20241201_143022.json
+
+# 強制建立資料表（不詢問）
+./ivod_backup.py restore backup/my_backup.json --force-create
+
+# 強制清除現有資料（不詢問）
+./ivod_backup.py restore backup/my_backup.json --force-clear
+
+# 強制執行所有操作（適合自動化）
+./ivod_backup.py restore backup/my_backup.json --force-all
+```
+
+**還原安全機制**：
+1. **資料表檢查**：自動檢查資料表是否存在，不存在時詢問是否建立
+2. **資料保護**：發現現有資料時詢問是否清除
+3. **強制模式**：提供 `--force-*` 選項跳過確認，適合自動化腳本
+4. **錯誤處理**：個別記錄失敗不影響整體還原過程
+
+### 7.3 管理備份檔案
+
+```bash
+# 列出所有備份檔案（預設在 backup/ 目錄）
+./ivod_backup.py list
+
+# 指定備份目錄
+./ivod_backup.py list --backup-dir /path/to/backups
+```
+
+**列表功能**：
+- 顯示檔案名稱、路徑、大小、建立時間
+- 按時間排序（最新在前）
+- 提供使用範例
+
+### 7.4 實際應用場景
+
+#### 正式環境備份
+```bash
+# 每日備份（建議加入 cron）
+0 1 * * * cd /home/ivoduser/ivod_transcript_db/crawler && ./ivod_backup.py backup >> logs/backup.log 2>&1
+```
+
+#### 測試環境建立
+```bash
+# 從正式環境備份
+./ivod_backup.py backup --file production_backup.json
+
+# 複製到測試環境後還原
+./ivod_backup.py restore production_backup.json --force-all
+```
+
+#### 資料遷移
+```bash
+# 舊環境備份
+./ivod_backup.py backup --file migration_backup.json
+
+# 新環境還原
+./ivod_backup.py restore migration_backup.json --force-create
+```
+
+### 7.5 備份檔案格式
+
+備份檔案採用 JSON 格式，包含：
+- **metadata**：備份時間、資料庫類型、記錄數量、版本資訊
+- **data**：完整的資料記錄陣列
+
+範例結構：
+```json
+{
+  "metadata": {
+    "backup_time": "2024-12-01T14:30:22.123456",
+    "db_backend": "sqlite",
+    "record_count": 12345,
+    "version": "1.0"
+  },
+  "data": [ /* 完整記錄陣列 */ ]
+}
+```
+
+## 8. 常見問題
 
 - 若抓取到空結果，task 會將 status 標為 `failed`，同時記錄到錯誤檔案，可透過 `ivod_retry.py` 或 `ivod_fix.py` 補抓  
 - 全量拉取的預設起始日期為 `2024-02-01`，可透過 `--start-date` 參數自訂（不可早於此日期）
 - 如欲動態設定 `skip_ssl`，可自行在 wrapper 或呼叫 `ivod_tasks.run_*()` 時指定參數
 - 錯誤記錄檔案會自動去重複，避免重複記錄同一個IVOD_ID
 - 日期格式錯誤會立即停止執行並顯示詳細錯誤訊息
+- 備份檔案建議定期清理，避免佔用過多磁碟空間
 
 ---
 
 *完成上述步驟，即可在 Ubuntu 環境下每日自動更新立法院逐字稿，並自動重試失敗紀錄，避免遺漏與 SSL 驗證錯誤*。
 
-## 8. Elasticsearch 設定與索引
+## 9. Elasticsearch 設定與索引
 
-### 8.1 安裝中文分析插件
+### 9.1 安裝中文分析插件
 
 建議安裝 IK Analyzer 插件以改善繁體中文分詞：  
 ```bash
@@ -244,7 +356,7 @@ bin/elasticsearch-plugin install analysis-ik
 bin/elasticsearch-plugin install analysis-smartcn
 ```
 
-### 8.2 .env 變數設定
+### 9.2 .env 變數設定
 
 請在 `.env` 中設定：  
 ```ini
@@ -256,13 +368,13 @@ ES_SCHEME=http
 ES_INDEX=ivod_transcripts
 ```
 
-### 8.3 執行索引更新
+### 9.3 執行索引更新
 
 ```bash
 ./ivod_es.py
 ```
 
-## 9. Testing
+## 10. Testing
 
 本專案使用 pytest 作為測試框架，並將開發相依 (dev dependencies) 集中於 `requirements-dev.txt`。
 
@@ -270,7 +382,7 @@ ES_INDEX=ivod_transcripts
 pip install -r requirements-dev.txt
 ```
 
-### 9.1 單元測試 (Unit Tests)
+### 10.1 單元測試 (Unit Tests)
 - 使用 pytest 測試核心函式，如 `make_browser`、`fetch_ivod_list`、`process_ivod`。
 - 測試檔案可依模組結構，放於 `tests/core/`、`tests/crawler/`、`tests/db/`、`tests/tasks/` 等子目錄中：
   - `tests/core/`：`test_core.py`
@@ -279,11 +391,11 @@ pip install -r requirements-dev.txt
   - `tests/tasks/`：`test_tasks.py`、`test_run_es.py`
 - 可透過 requests-mock 模擬 HTTP 回應，並利用 sqlite in-memory (`DB_BACKEND=sqlite`, `DB_URL=:memory:`) 測試資料庫操作。
 
-### 9.2 整合測試 (Integration Tests)
+### 10.2 整合測試 (Integration Tests)
 - 建議於 `tests/crawler/` 子目錄中加入整合測試，標記 `@pytest.mark.integration`，如 `test_fetch_available_dates.py`、`test_fetch_ly_speech.py`。
 - 可使用 Docker Compose 啟動測試用的資料庫與 Elasticsearch service，並於測試前自動初始化資料庫 schema (呼叫 `ivod_core.Base.metadata.create_all`)。
 
-### 9.3 Integration Test Script
+### 10.3 Integration Test Script
 
 Run the following script to reset the test database and fetch IVOD transcripts for integration testing.
 By default it uses the SQLite path from your `.env` (e.g. `db/ivod_local.db`),
@@ -295,7 +407,7 @@ cd crawler
 TEST_SQLITE_PATH=../db/ivod_test.db python integration_test.py
 ```
 
-### 9.4 執行所有測試
+### 10.4 執行所有測試
 
 ```bash
 pytest --cov=ivod_core --cov=ivod_tasks --cov-report=term-missing
