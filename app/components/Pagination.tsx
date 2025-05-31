@@ -33,7 +33,7 @@ export default function Pagination({ currentPage, total, pageSize, onPageChange 
     }
 
     // 去重複並排序
-    const uniqueRange = [...new Set(range)].sort((a, b) => a - b);
+    const uniqueRange = Array.from(new Set(range)).sort((a, b) => a - b);
 
     // 在需要的地方加入省略號
     let prev = 0;
