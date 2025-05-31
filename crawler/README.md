@@ -43,6 +43,9 @@ cp .env.example .env   # 如尚未有 .env
 # 全量拉取 (第一次或需要重置時使用)
 ./ivod_full.py
 
+# 全量拉取特定日期範圍
+./ivod_full.py --start-date 2024-03-01 --end-date 2024-03-31
+
 # 增量更新 (每日定期執行)
 ./ivod_incremental.py
 
@@ -54,6 +57,9 @@ cp .env.example .env   # 如尚未有 .env
 
 # 補抓單一IVOD_ID
 ./ivod_fix.py --ivod-id 123456
+
+# 更新 Elasticsearch 索引
+./ivod_es.py
 ```
 
 ## 4. 部署於 Ubuntu Linux
@@ -154,20 +160,79 @@ ERROR_LOG_PATH=logs/failed_ivods.txt
 LOG_PATH=logs/
 ```
 
-## 6. 常見問題
+## 6. 全量拉取日期範圍功能
+
+從 `ivod_full.py` 現在支援自訂日期範圍，用於重抓特定時間段的影片資料。
+
+### 6.1 基本用法
+
+```bash
+# 預設模式：從 2024-02-01 至今天
+./ivod_full.py
+
+# 指定起始日期
+./ivod_full.py --start-date 2024-03-01
+
+# 指定結束日期
+./ivod_full.py --end-date 2024-12-31
+
+# 指定完整日期範圍
+./ivod_full.py --start-date 2024-03-01 --end-date 2024-03-31
+```
+
+### 6.2 安全限制
+
+為確保資料一致性，系統設有以下限制：
+
+- **起始日期限制**：不可早於 `2024-02-01`（系統預設起始日期）
+- **結束日期限制**：不可晚於今天
+- **日期格式**：必須為 `YYYY-MM-DD` 格式
+
+### 6.3 智能調整
+
+如果輸入的日期超出限制，系統會自動調整並顯示警告：
+
+```bash
+# 如果指定過早的起始日期
+./ivod_full.py --start-date 2024-01-01
+# 系統會自動調整為 2024-02-01 並顯示警告
+
+# 如果指定未來的結束日期
+./ivod_full.py --end-date 2025-12-31
+# 系統會自動調整為今天並顯示警告
+```
+
+### 6.4 實際應用場景
+
+```bash
+# 重抓某個月份的資料
+./ivod_full.py --start-date 2024-06-01 --end-date 2024-06-30
+
+# 重抓某個季度的資料
+./ivod_full.py --start-date 2024-04-01 --end-date 2024-06-30
+
+# 從特定日期抓到今天
+./ivod_full.py --start-date 2024-11-01
+
+# 抓取到特定日期為止
+./ivod_full.py --end-date 2024-10-31
+```
+
+## 7. 常見問題
 
 - 若抓取到空結果，task 會將 status 標為 `failed`，同時記錄到錯誤檔案，可透過 `ivod_retry.py` 或 `ivod_fix.py` 補抓  
-- 如需調整「全量起始日」，請修改 `ivod_tasks.py` `run_full()` 中的 `start` 參數  
+- 全量拉取的預設起始日期為 `2024-02-01`，可透過 `--start-date` 參數自訂（不可早於此日期）
 - 如欲動態設定 `skip_ssl`，可自行在 wrapper 或呼叫 `ivod_tasks.run_*()` 時指定參數
 - 錯誤記錄檔案會自動去重複，避免重複記錄同一個IVOD_ID
+- 日期格式錯誤會立即停止執行並顯示詳細錯誤訊息
 
 ---
 
 *完成上述步驟，即可在 Ubuntu 環境下每日自動更新立法院逐字稿，並自動重試失敗紀錄，避免遺漏與 SSL 驗證錯誤*。
 
-## 7. Elasticsearch 設定與索引
+## 8. Elasticsearch 設定與索引
 
-### 7.1 安裝中文分析插件
+### 8.1 安裝中文分析插件
 
 建議安裝 IK Analyzer 插件以改善繁體中文分詞：  
 ```bash
@@ -179,7 +244,7 @@ bin/elasticsearch-plugin install analysis-ik
 bin/elasticsearch-plugin install analysis-smartcn
 ```
 
-### 7.2 .env 變數設定
+### 8.2 .env 變數設定
 
 請在 `.env` 中設定：  
 ```ini
@@ -191,13 +256,13 @@ ES_SCHEME=http
 ES_INDEX=ivod_transcripts
 ```
 
-### 7.3 執行索引更新
+### 8.3 執行索引更新
 
 ```bash
 ./ivod_es.py
 ```
 
-## 8. Testing
+## 9. Testing
 
 本專案使用 pytest 作為測試框架，並將開發相依 (dev dependencies) 集中於 `requirements-dev.txt`。
 
@@ -205,7 +270,7 @@ ES_INDEX=ivod_transcripts
 pip install -r requirements-dev.txt
 ```
 
-### 8.1 單元測試 (Unit Tests)
+### 9.1 單元測試 (Unit Tests)
 - 使用 pytest 測試核心函式，如 `make_browser`、`fetch_ivod_list`、`process_ivod`。
 - 測試檔案可依模組結構，放於 `tests/core/`、`tests/crawler/`、`tests/db/`、`tests/tasks/` 等子目錄中：
   - `tests/core/`：`test_core.py`
@@ -214,11 +279,11 @@ pip install -r requirements-dev.txt
   - `tests/tasks/`：`test_tasks.py`、`test_run_es.py`
 - 可透過 requests-mock 模擬 HTTP 回應，並利用 sqlite in-memory (`DB_BACKEND=sqlite`, `DB_URL=:memory:`) 測試資料庫操作。
 
-### 8.2 整合測試 (Integration Tests)
+### 9.2 整合測試 (Integration Tests)
 - 建議於 `tests/crawler/` 子目錄中加入整合測試，標記 `@pytest.mark.integration`，如 `test_fetch_available_dates.py`、`test_fetch_ly_speech.py`。
 - 可使用 Docker Compose 啟動測試用的資料庫與 Elasticsearch service，並於測試前自動初始化資料庫 schema (呼叫 `ivod_core.Base.metadata.create_all`)。
 
-### 8.3 Integration Test Script
+### 9.3 Integration Test Script
 
 Run the following script to reset the test database and fetch IVOD transcripts for integration testing.
 By default it uses the SQLite path from your `.env` (e.g. `db/ivod_local.db`),
@@ -230,7 +295,7 @@ cd crawler
 TEST_SQLITE_PATH=../db/ivod_test.db python integration_test.py
 ```
 
-### 8.4 執行所有測試
+### 9.4 執行所有測試
 
 ```bash
 pytest --cov=ivod_core --cov=ivod_tasks --cov-report=term-missing

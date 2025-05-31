@@ -100,9 +100,14 @@ def setup_logging():
     )
 
 
-def run_full(skip_ssl: bool = True):
+def run_full(skip_ssl: bool = True, start_date: str = None, end_date: str = None):
     """
-    全量拉取：從固定起始日跑到今天，逐筆 upsert 到資料庫。
+    全量拉取：從指定起始日跑到指定結束日（或今天），逐筆 upsert 到資料庫。
+    
+    Args:
+        skip_ssl: 是否跳過SSL驗證
+        start_date: 自訂起始日期 (YYYY-MM-DD)，如果早於預設起始日期則使用預設值
+        end_date: 自訂結束日期 (YYYY-MM-DD)，如果晚於今天則使用今天
     """
     setup_logging()
     
@@ -115,7 +120,21 @@ def run_full(skip_ssl: bool = True):
     br = make_browser(skip_ssl=skip_ssl)
     db = Session()
 
-    start, end = "2024-02-01", datetime.now().strftime("%Y-%m-%d")
+    # 預設起始和結束日期
+    default_start = "2024-02-01"
+    today = datetime.now().strftime("%Y-%m-%d")
+    
+    # 驗證和設定實際使用的日期範圍
+    actual_start = _validate_date_range(start_date, end_date, default_start, today)
+    actual_end = _validate_date_range(start_date, end_date, default_start, today, is_end_date=True)
+    
+    start, end = actual_start, actual_end
+    
+    logger.info(f"📅 日期範圍：{start} 至 {end}")
+    if start_date and start_date != actual_start:
+        logger.warning(f"⚠️  起始日期 {start_date} 早於預設起始日期，使用 {actual_start}")
+    if end_date and end_date != actual_end:
+        logger.warning(f"⚠️  結束日期 {end_date} 晚於今天，使用 {actual_end}")
     for date_str in tqdm(date_range(start, end), desc="日期"):
         try:
             ids = fetch_ivod_list(br, date_str)
@@ -441,6 +460,59 @@ def run_fix(ivod_ids=None, error_log_path=None, skip_ssl: bool = True):
     
     logger.info("Fix 任務完成。")
     return True
+
+
+def _validate_date_range(start_date, end_date, default_start, today, is_end_date=False):
+    """
+    驗證日期範圍的輔助函數
+    
+    Args:
+        start_date: 使用者指定的起始日期
+        end_date: 使用者指定的結束日期
+        default_start: 預設起始日期
+        today: 今天的日期
+        is_end_date: 是否為結束日期驗證
+    
+    Returns:
+        str: 驗證後的日期
+    """
+    if is_end_date:
+        # 驗證結束日期
+        if not end_date:
+            return today
+        
+        # 檢查日期格式
+        try:
+            end_dt = datetime.strptime(end_date, "%Y-%m-%d")
+            today_dt = datetime.strptime(today, "%Y-%m-%d")
+        except ValueError:
+            logger.error(f"❌ 結束日期格式錯誤: {end_date}，應為 YYYY-MM-DD")
+            return today
+        
+        # 不可晚於今天
+        if end_dt > today_dt:
+            return today
+        
+        return end_date
+    
+    else:
+        # 驗證起始日期
+        if not start_date:
+            return default_start
+        
+        # 檢查日期格式
+        try:
+            start_dt = datetime.strptime(start_date, "%Y-%m-%d")
+            default_dt = datetime.strptime(default_start, "%Y-%m-%d")
+        except ValueError:
+            logger.error(f"❌ 起始日期格式錯誤: {start_date}，應為 YYYY-MM-DD")
+            return default_start
+        
+        # 不可早於預設起始日期
+        if start_dt < default_dt:
+            return default_start
+        
+        return start_date
 
 
 def check_elasticsearch_available():
