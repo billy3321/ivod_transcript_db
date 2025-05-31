@@ -28,7 +28,7 @@ export default function Custom404() {
             <h1 className="text-6xl font-bold text-gray-900 mb-4">404</h1>
             <h2 className="text-2xl font-semibold text-gray-700 mb-4">找不到頁面</h2>
             <p className="text-gray-600 mb-8 leading-relaxed">
-              抱歉，您訪問的頁面不存在或已被移動。<br />
+              抱歉，此頁面不存在。<br />
               請檢查網址是否正確，或回到首頁重新尋找。
             </p>
 
