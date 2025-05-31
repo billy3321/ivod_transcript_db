@@ -188,6 +188,10 @@ def fetch_ly(js, rec, obj, br):
                 rec["ly_status"] = "success"
             else:
                 rec["ly_status"] = "failed"
+                if obj:
+                    obj.ly_retries += 1
+                else:
+                    rec["ly_retries"] = 1
 
     except Exception:
         rec["ly_transcript"] = ""
