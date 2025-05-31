@@ -21,7 +21,7 @@ from tqdm import tqdm
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from ivod.core import make_browser, process_ivod, Session, IVODTranscript
-from ivod.tasks import setup_logging, log_failed_ivod
+from ivod.tasks import setup_logging, log_failed_ivod, run_es, check_elasticsearch_available
 
 logger = logging.getLogger(__name__)
 
@@ -69,8 +69,8 @@ def read_failed_ivods(error_log_path):
     # 去重複
     return list(set(failed_ivods))
 
-def fix_single_ivod(ivod_id, skip_ssl=True):
-    """修復單一IVOD記錄"""
+def fix_single_ivod_without_es(ivod_id, skip_ssl=True):
+    """修復單一IVOD記錄（不更新ES，用於批量處理）"""
     br = make_browser(skip_ssl=skip_ssl)
     db = Session()
     
@@ -102,6 +102,54 @@ def fix_single_ivod(ivod_id, skip_ssl=True):
     finally:
         db.close()
 
+def fix_single_ivod(ivod_id, skip_ssl=True):
+    """修復單一IVOD記錄"""
+    br = make_browser(skip_ssl=skip_ssl)
+    db = Session()
+    
+    try:
+        logger.info(f"開始處理IVOD_ID: {ivod_id}")
+        rec = process_ivod(br, ivod_id)
+        
+        # 檢查是否已存在記錄
+        obj = db.get(IVODTranscript, ivod_id)
+        if obj:
+            # 更新現有記錄
+            for k, v in rec.items():
+                setattr(obj, k, v)
+            obj.last_updated = datetime.now()
+            logger.info(f"更新IVOD {ivod_id} 成功")
+        else:
+            # 新增記錄
+            rec["last_updated"] = datetime.now()
+            db.add(IVODTranscript(**rec))
+            logger.info(f"新增IVOD {ivod_id} 成功")
+        
+        db.commit()
+        
+        # 檢查 Elasticsearch 是否可用，如果可用就自動更新索引
+        if check_elasticsearch_available():
+            logger.info(f"🔄 開始自動更新 Elasticsearch 索引（IVOD {ivod_id}）...")
+            try:
+                es_success = run_es(ivod_ids=[ivod_id])
+                if es_success:
+                    logger.info("✅ Elasticsearch 索引自動更新完成")
+                else:
+                    logger.warning("⚠️  Elasticsearch 索引自動更新失敗")
+            except Exception as e:
+                logger.warning(f"⚠️  Elasticsearch 索引自動更新時發生錯誤: {e}")
+        else:
+            logger.info(f"ℹ️  已修復 IVOD {ivod_id}，但 Elasticsearch 不可用")
+        
+        return True
+        
+    except Exception as e:
+        logger.error(f"處理IVOD {ivod_id} 失敗: {e}", exc_info=True)
+        db.rollback()
+        return False
+    finally:
+        db.close()
+
 def fix_from_file(error_log_path, skip_ssl=True):
     """從錯誤記錄檔案批量修復IVOD記錄"""
     failed_ivods = read_failed_ivods(error_log_path)
@@ -114,10 +162,13 @@ def fix_from_file(error_log_path, skip_ssl=True):
     
     success_count = 0
     failed_count = 0
+    successfully_fixed_ids = []
     
     for ivod_id in tqdm(failed_ivods, desc="修復IVOD記錄"):
-        if fix_single_ivod(ivod_id, skip_ssl):
+        # 使用沒有ES更新的單一記錄修復版本，批次處理後統一更新ES
+        if fix_single_ivod_without_es(ivod_id, skip_ssl):
             success_count += 1
+            successfully_fixed_ids.append(ivod_id)
             # 從錯誤記錄檔案中移除成功處理的記錄
             remove_from_error_log(ivod_id, error_log_path)
         else:
@@ -126,6 +177,20 @@ def fix_from_file(error_log_path, skip_ssl=True):
             log_failed_ivod(ivod_id, "fix_retry")
     
     logger.info(f"修復完成 - 成功: {success_count}, 失敗: {failed_count}")
+    
+    # 檢查 Elasticsearch 是否可用，如果可用且有成功修復的記錄就批量更新索引
+    if successfully_fixed_ids and check_elasticsearch_available():
+        logger.info(f"🔄 開始自動更新 Elasticsearch 索引（修復的 {len(successfully_fixed_ids)} 筆記錄）...")
+        try:
+            es_success = run_es(ivod_ids=successfully_fixed_ids)
+            if es_success:
+                logger.info("✅ Elasticsearch 索引自動更新完成")
+            else:
+                logger.warning("⚠️  Elasticsearch 索引自動更新失敗")
+        except Exception as e:
+            logger.warning(f"⚠️  Elasticsearch 索引自動更新時發生錯誤: {e}")
+    elif successfully_fixed_ids:
+        logger.info(f"ℹ️  已修復 {len(successfully_fixed_ids)} 筆記錄，但 Elasticsearch 不可用")
 
 def main():
     parser = argparse.ArgumentParser(description="IVOD補抓腳本")
