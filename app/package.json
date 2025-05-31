@@ -17,6 +17,8 @@
     "db:test": "node scripts/db-test.js",
     "es:test": "node scripts/es-test.js",
     "search:test": "node scripts/search-test.js",
+    "search:interface:test": "node scripts/search-interface-test.js",
+    "search:comprehensive:test": "node scripts/comprehensive-search-test.js",
     "clean": "rm -rf .next",
     "clean:all": "rm -rf .next node_modules/.cache .cache",
     "clean:hard": "rm -rf .next node_modules/.cache .cache && npm run prisma:generate",

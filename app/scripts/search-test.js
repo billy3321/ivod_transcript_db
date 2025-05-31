@@ -291,7 +291,7 @@ async function testCommitteeSearch() {
         logError(`PostgreSQL 陣列搜尋失敗: ${error.message}`);
       }
     } else {
-      logInfo(`測試 ${dbBackend} JSON/字串欄位搜尋 (contains 操作符)...`);
+      logInfo(`測試 ${dbBackend} JSON/字串欄位搜尋 (string_contains 操作符)...`);
       try {
         const results = await prisma.iVODTranscript.findMany({
           where: {
@@ -305,13 +305,44 @@ async function testCommitteeSearch() {
           take: 3
         });
         
-        logSuccess(`${dbBackend} 字串搜尋找到 ${results.length} 筆結果`);
+        logSuccess(`${dbBackend} string_contains 搜尋找到 ${results.length} 筆結果`);
         results.forEach((result, index) => {
           logInfo(`  ${index + 1}. [${result.ivod_id}] ${result.title?.substring(0, 50)}...`);
           logInfo(`     委員會: ${JSON.stringify(result.committee_names)}`);
         });
       } catch (error) {
-        logError(`${dbBackend} 字串搜尋失敗: ${error.message}`);
+        logError(`${dbBackend} string_contains 搜尋失敗: ${error.message}`);
+      }
+    }
+    
+    // Test universal LIKE search for partial matching
+    logInfo('\n測試通用 LIKE 搜尋 (部分匹配)...');
+    const likeTestCases = [
+      { search: '社會福利', description: '搜尋「社會福利」' },
+      { search: '教育文化', description: '搜尋「教育文化」' },
+      { search: '教育及文化', description: '搜尋「教育及文化」' },
+      { search: '委員會', description: '搜尋「委員會」' }
+    ];
+    
+    for (const testCase of likeTestCases) {
+      try {
+        const results = await prisma.$queryRaw`
+          SELECT ivod_id, committee_names 
+          FROM ivod_transcripts 
+          WHERE committee_names LIKE ${`%${testCase.search}%`}
+          LIMIT 3
+        `;
+        
+        if (results.length > 0) {
+          logSuccess(`LIKE ${testCase.description}: 找到 ${results.length} 筆結果`);
+          results.forEach(r => {
+            logInfo(`    [${r.ivod_id}] ${JSON.stringify(r.committee_names)}`);
+          });
+        } else {
+          logWarning(`LIKE ${testCase.description}: 沒有找到結果`);
+        }
+      } catch (error) {
+        logError(`LIKE ${testCase.description} 失敗: ${error.message}`);
       }
     }
     

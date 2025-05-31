@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
-import { getDbBackend } from '@/lib/utils';
+import { getDbBackend, createContainsCondition, convertToDate } from '@/lib/utils';
+import { universalSearch, shouldUseUniversalSearch } from '@/lib/universal-search';
 import { logger } from '@/lib/logger';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -26,8 +27,33 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   
   const pageNum = parseInt(page as string, 10);
   const size = parseInt(pageSize as string, 10);
-  const skip = (pageNum - 1) * size;
 
+  // Check if we should use universal search for better partial matching
+  const searchParams = {
+    q: q as string,
+    meeting_name: meeting_name as string,
+    speaker: speaker as string,
+    committee: committee as string,
+    date_from: date_from as string,
+    date_to: date_to as string,
+    ids: ids as string,
+    page: pageNum,
+    pageSize: size,
+    sort: sort as 'date_desc' | 'date_asc'
+  };
+
+  if (shouldUseUniversalSearch(searchParams)) {
+    try {
+      const result = await universalSearch(searchParams);
+      return res.status(200).json(result);
+    } catch (error: any) {
+      logger.logDatabaseError(error, 'universal_search_fallback', searchParams);
+      // Fall through to standard Prisma search
+    }
+  }
+
+  // Standard Prisma search (fallback or when universal search is not needed)
+  const skip = (pageNum - 1) * size;
   const orderBy: any = sort === 'date_asc' ? { date: 'asc' } : { date: 'desc' };
 
   let where: any = {};
@@ -39,40 +65,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   
   // General search in multiple fields
   if (q && typeof q === 'string') {
-    // Helper function to create contains condition with database-specific field handling
-    const createContainsCondition = (field: string, value: string) => {
-      // Special handling for committee_names field based on database backend
-      if (field === 'committee_names') {
-        if (dbBackend === 'postgresql') {
-          // PostgreSQL array field - use 'has' for array contains operation
-          return { [field]: { has: value } };
-        } else if (dbBackend === 'mysql') {
-          // MySQL JSON field - use string_contains for JSON search
-          return { [field]: { string_contains: value } };
-        } else {
-          // SQLite string field - use regular contains
-          return { [field]: { contains: value } };
-        }
-      }
-      
-      // For MySQL, case insensitive mode is not supported on string fields
-      if (dbBackend === 'mysql') {
-        return { [field]: { contains: value } };
-      }
-      
-      return isInsensitiveSupported
-        ? { [field]: { contains: value, mode: 'insensitive' as const } }
-        : { [field]: { contains: value } };
-    };
-
     const searchFields = [
-      createContainsCondition('title', q),
-      createContainsCondition('meeting_name', q),
-      createContainsCondition('speaker_name', q),
-      createContainsCondition('committee_names', q),
-      createContainsCondition('meeting_code_str', q),
-      createContainsCondition('ai_transcript', q),
-      createContainsCondition('ly_transcript', q),
+      createContainsCondition('title', q, dbBackend),
+      createContainsCondition('meeting_name', q, dbBackend),
+      createContainsCondition('speaker_name', q, dbBackend),
+      createContainsCondition('committee_names', q, dbBackend),
+      createContainsCondition('meeting_code_str', q, dbBackend),
+      createContainsCondition('ai_transcript', q, dbBackend),
+      createContainsCondition('ly_transcript', q, dbBackend),
     ];
     
     conditions.push({
@@ -82,53 +82,37 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   // Specific field searches
   if (meeting_name && typeof meeting_name === 'string') {
-    conditions.push({
-      meeting_name: isInsensitiveSupported 
-        ? { contains: meeting_name, mode: 'insensitive' as const }
-        : { contains: meeting_name }
-    });
+    const meetingCondition = createContainsCondition('meeting_name', meeting_name, dbBackend);
+    conditions.push(meetingCondition);
   }
 
   if (speaker && typeof speaker === 'string') {
-    conditions.push({
-      speaker_name: isInsensitiveSupported 
-        ? { contains: speaker, mode: 'insensitive' as const }
-        : { contains: speaker }
-    });
+    const speakerCondition = createContainsCondition('speaker_name', speaker, dbBackend);
+    conditions.push(speakerCondition);
   }
 
   if (committee && typeof committee === 'string') {
-    // Handle committee_names field based on database backend
-    let committeeCondition;
-    if (dbBackend === 'postgresql') {
-      // PostgreSQL array field - use 'has' for array contains operation
-      committeeCondition = { has: committee };
-    } else if (dbBackend === 'mysql') {
-      // MySQL JSON field - use string_contains for JSON search
-      committeeCondition = { string_contains: committee };
-    } else {
-      // SQLite string field - use regular contains with case sensitivity if supported
-      committeeCondition = isInsensitiveSupported 
-        ? { contains: committee, mode: 'insensitive' as const }
-        : { contains: committee };
-    }
-        
-    conditions.push({
-      committee_names: committeeCondition
-    });
+    const committeeCondition = createContainsCondition('committee_names', committee, dbBackend);
+    conditions.push(committeeCondition);
   }
 
   // Date range filters
   if (date_from && typeof date_from === 'string') {
-    conditions.push({
-      date: { gte: date_from }
-    });
+    const fromDate = convertToDate(date_from);
+    if (fromDate) {
+      conditions.push({
+        date: { gte: fromDate }
+      });
+    }
   }
 
   if (date_to && typeof date_to === 'string') {
-    conditions.push({
-      date: { lte: date_to }
-    });
+    const toDate = convertToDate(date_to);
+    if (toDate) {
+      conditions.push({
+        date: { lte: toDate }
+      });
+    }
   }
 
   // Filter by specific IVOD IDs (for transcript search results)

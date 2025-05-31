@@ -136,3 +136,52 @@ export function formatTimestamp(timestamp: string | Date | null): string {
     return timestamp?.toString() || '';
   }
 }
+
+/**
+ * Create database-specific contains condition for search queries
+ * Handles different field types and database backends properly
+ */
+export function createContainsCondition(field: string, value: string, dbBackend: 'sqlite' | 'postgresql' | 'mysql' = 'sqlite') {
+  // Special handling for committee_names field based on database backend
+  if (field === 'committee_names') {
+    if (dbBackend === 'postgresql') {
+      // PostgreSQL array field - use 'has' for array contains operation
+      return { [field]: { has: value } };
+    } else if (dbBackend === 'mysql') {
+      // MySQL JSON field - use string_contains (even though it doesn't work for partial matching)
+      // The calling code should handle this differently for partial matching
+      return { [field]: { string_contains: value } };
+    } else {
+      // SQLite string field - use regular contains
+      return { [field]: { contains: value } };
+    }
+  }
+  
+  // For MySQL, case insensitive mode is not supported on string fields
+  if (dbBackend === 'mysql') {
+    return { [field]: { contains: value } };
+  }
+  
+  // For other databases, use case-insensitive search when supported
+  const isInsensitiveSupported = dbBackend !== 'sqlite';
+  return isInsensitiveSupported
+    ? { [field]: { contains: value, mode: 'insensitive' as const } }
+    : { [field]: { contains: value } };
+}
+
+/**
+ * Convert date string to proper Date object for database queries
+ */
+export function convertToDate(dateString: string): Date | null {
+  if (!dateString) return null;
+  
+  try {
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) {
+      return null;
+    }
+    return date;
+  } catch {
+    return null;
+  }
+}
