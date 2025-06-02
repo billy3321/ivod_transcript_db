@@ -11,7 +11,7 @@ ivod_es.py
 
 import argparse
 import sys
-from ivod.tasks import run_es
+from ivod.db import run_elasticsearch_indexing
 
 def main():
     parser = argparse.ArgumentParser(
@@ -81,7 +81,7 @@ def main():
     
     # 執行索引更新
     try:
-        success = run_es(ivod_ids=ivod_ids, full_mode=full_mode)
+        success = run_elasticsearch_indexing(ivod_ids=ivod_ids, full_mode=full_mode)
         if success:
             print("✅ Elasticsearch 索引更新成功")
             sys.exit(0)

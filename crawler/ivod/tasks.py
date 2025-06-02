@@ -176,7 +176,7 @@ def run_full(skip_ssl: bool = True, start_date: str = None, end_date: str = None
     if check_elasticsearch_available():
         logger.info("🔄 開始自動更新 Elasticsearch 索引...")
         try:
-            es_success = run_es(full_mode=True)
+            es_success = run_elasticsearch_indexing(full_mode=True)
             if es_success:
                 logger.info("✅ Elasticsearch 索引自動更新完成")
             else:
@@ -244,7 +244,7 @@ def run_incremental(skip_ssl: bool = True):
     if check_elasticsearch_available():
         logger.info("🔄 開始自動更新 Elasticsearch 索引（增量模式）...")
         try:
-            es_success = run_es()  # 使用預設增量模式
+            es_success = run_elasticsearch_indexing()  # 使用預設增量模式
             if es_success:
                 logger.info("✅ Elasticsearch 索引自動更新完成")
             else:
@@ -306,7 +306,7 @@ def run_retry(skip_ssl: bool = True):
     if successfully_retried_ids and check_elasticsearch_available():
         logger.info(f"🔄 開始自動更新 Elasticsearch 索引（重試的 {len(successfully_retried_ids)} 筆記錄）...")
         try:
-            es_success = run_es(ivod_ids=successfully_retried_ids)
+            es_success = run_elasticsearch_indexing(ivod_ids=successfully_retried_ids)
             if es_success:
                 logger.info("✅ Elasticsearch 索引自動更新完成")
             else:
@@ -448,7 +448,7 @@ def run_fix(ivod_ids=None, error_log_path=None, skip_ssl: bool = True):
     if successfully_fixed_ids and check_elasticsearch_available():
         logger.info(f"🔄 開始自動更新 Elasticsearch 索引（修復的 {len(successfully_fixed_ids)} 筆記錄）...")
         try:
-            es_success = run_es(ivod_ids=successfully_fixed_ids)
+            es_success = run_elasticsearch_indexing(ivod_ids=successfully_fixed_ids)
             if es_success:
                 logger.info("✅ Elasticsearch 索引自動更新完成")
             else:
@@ -735,263 +735,12 @@ def _validate_date_range(start_date, end_date, default_start, today, is_end_date
         return start_date
 
 
-def check_elasticsearch_available():
-    """
-    檢查 Elasticsearch 是否可用
-    返回 True 如果 ES 正常運作，False 如果不可用
-    """
-    # Check if Elasticsearch is explicitly disabled
-    es_enabled = os.getenv("ENABLE_ELASTICSEARCH", "true").lower() != "false"
-    if not es_enabled:
-        logger.info("ℹ️  Elasticsearch 已被 ENABLE_ELASTICSEARCH=false 停用，跳過 ES 索引更新")
-        return False
-        
-    if Elasticsearch is None:
-        logger.info("ℹ️  Elasticsearch 套件未安裝，跳過 ES 索引更新")
-        return False
-        
-    es_host = os.getenv("ES_HOST", "localhost")
-    es_port = int(os.getenv("ES_PORT", 9200))
-    es_scheme = os.getenv("ES_SCHEME", "http")
-    es_user = os.getenv("ES_USER")
-    es_pass = os.getenv("ES_PASS")
-
-    auth = (es_user, es_pass) if es_user and es_pass else None
-    
-    try:
-        es = Elasticsearch([{"host": es_host, "port": es_port, "scheme": es_scheme}], http_auth=auth)
-        
-        # 測試連線
-        if es.ping():
-            logger.info(f"✅ Elasticsearch 可用: {es_host}:{es_port}")
-            return True
-        else:
-            logger.info(f"ℹ️  無法連線到 Elasticsearch: {es_host}:{es_port}，跳過 ES 索引更新")
-            return False
-            
-    except Exception as e:
-        logger.info(f"ℹ️  Elasticsearch 連線失敗: {e}，跳過 ES 索引更新")
-        return False
-
-
-def _compare_es_document(es, es_index, db_obj):
-    """
-    比較 Elasticsearch 中的文件與資料庫記錄是否一致
-    返回 True 如果需要更新，False 如果已是最新
-    """
-    try:
-        es_doc = es.get(index=es_index, id=db_obj.ivod_id)
-        es_source = es_doc['_source']
-        
-        # 比較關鍵欄位
-        db_ai = db_obj.ai_transcript or ""
-        db_ly = db_obj.ly_transcript or ""
-        db_title = db_obj.title or ""
-        
-        es_ai = es_source.get('ai_transcript', "")
-        es_ly = es_source.get('ly_transcript', "")
-        es_title = es_source.get('title', "")
-        
-        # 如果任何欄位不同，就需要更新
-        return not (db_ai == es_ai and db_ly == es_ly and db_title == es_title)
-        
-    except Exception:
-        # 如果文件不存在或其他錯誤，需要索引
-        return True
-
-
+# Elasticsearch functions have been moved to db.py
+# This maintains backward compatibility for existing code
 def run_es(ivod_ids=None, full_mode=False):
     """
-    智能更新 Elasticsearch 索引：
-    - 比較資料庫與 ES 中的內容，只更新有差異的記錄
-    - 支援指定 ivod_ids 進行選擇性更新
-    - 支援 full_mode 進行完整資料庫比對
-    
-    參數:
-    - ivod_ids: 可選的 IVOD ID 列表，僅處理指定的記錄
-    - full_mode: 是否進行完整資料庫比對 (預設 False)
+    舊版 run_es 函數的相容性包裝器
+    實際功能已移至 db.py 的 run_elasticsearch_indexing 函數
     """
     setup_logging()
-    
-    # Check if Elasticsearch is explicitly disabled
-    es_enabled = os.getenv("ENABLE_ELASTICSEARCH", "true").lower() != "false"
-    if not es_enabled:
-        logger.info("ℹ️  Elasticsearch 已被 ENABLE_ELASTICSEARCH=false 停用，跳過索引更新")
-        return True  # Return True since this is expected behavior, not an error
-    
-    if Elasticsearch is None:
-        logger.error("❌ Elasticsearch 未安裝，請執行: pip install elasticsearch")
-        return False
-        
-    es_host = os.getenv("ES_HOST", "localhost")
-    es_port = int(os.getenv("ES_PORT", 9200))
-    es_scheme = os.getenv("ES_SCHEME", "http")
-    es_user = os.getenv("ES_USER")
-    es_pass = os.getenv("ES_PASS")
-    es_index = os.getenv("ES_INDEX", "ivod_transcripts")
-
-    auth = (es_user, es_pass) if es_user and es_pass else None
-    
-    try:
-        es = Elasticsearch([{"host": es_host, "port": es_port, "scheme": es_scheme}], http_auth=auth)
-        
-        # 測試連線
-        if not es.ping():
-            logger.error(f"❌ 無法連線到 Elasticsearch: {es_host}:{es_port}")
-            return False
-            
-        logger.info(f"✅ 已連線到 Elasticsearch: {es_host}:{es_port}")
-        
-    except Exception as e:
-        logger.error(f"❌ Elasticsearch 連線失敗: {e}")
-        return False
-
-    index_body = {
-        "settings": {
-            "analysis": {
-                "analyzer": {
-                    "chinese_analyzer": {
-                        "tokenizer": "ik_max_word",
-                        "filter": ["lowercase"]
-                    }
-                }
-            }
-        },
-        "mappings": {
-            "properties": {
-                "ivod_id": {"type": "integer"},
-                "ai_transcript": {"type": "text", "analyzer": "chinese_analyzer"},
-                "ly_transcript": {"type": "text", "analyzer": "chinese_analyzer"},
-                "title": {"type": "text", "analyzer": "chinese_analyzer"},
-                "last_updated": {"type": "date"}
-            }
-        }
-    }
-
-    # 確保索引存在
-    try:
-        if not es.indices.exists(index=es_index):
-            es.indices.create(index=es_index, body=index_body)
-            logger.info(f"✅ 已創建 Elasticsearch 索引: {es_index}")
-        else:
-            logger.info(f"✅ Elasticsearch 索引已存在: {es_index}")
-    except Exception as e:
-        logger.error(f"❌ 創建索引失敗: {e}")
-        return False
-
-    db = Session()
-    
-    try:
-        # 決定要處理的記錄
-        if ivod_ids:
-            # 處理指定的 IVOD IDs
-            query = db.query(IVODTranscript).filter(IVODTranscript.ivod_id.in_(ivod_ids))
-            desc = f"處理指定的 {len(ivod_ids)} 筆記錄"
-            logger.info(f"🔍 選擇性更新模式: 處理 {len(ivod_ids)} 筆指定記錄")
-        elif full_mode:
-            # 完整資料庫比對模式
-            query = db.query(IVODTranscript)
-            desc = "完整資料庫比對"
-            logger.info("🔍 完整比對模式: 檢查所有資料庫記錄")
-        else:
-            # 預設：只處理最近更新的記錄 (過去7天)
-            seven_days_ago = datetime.now() - timedelta(days=7)
-            query = db.query(IVODTranscript).filter(IVODTranscript.last_updated >= seven_days_ago)
-            desc = "處理近期更新記錄"
-            logger.info("🔍 增量更新模式: 處理過去7天更新的記錄")
-        
-        records = query.all()
-        logger.info(f"📊 找到 {len(records)} 筆候選記錄")
-        
-        if not records:
-            logger.info("ℹ️  沒有記錄需要處理")
-            return True
-        
-        # 批次處理記錄
-        updated_count = 0
-        skipped_count = 0
-        error_count = 0
-        batch_size = 100
-        batch_docs = []
-        
-        for obj in tqdm(records, desc=desc):
-            try:
-                # 檢查是否需要更新
-                needs_update = _compare_es_document(es, es_index, obj)
-                
-                if not needs_update:
-                    skipped_count += 1
-                    continue
-                
-                # 準備文件內容
-                doc = {
-                    "ivod_id": obj.ivod_id,
-                    "ai_transcript": obj.ai_transcript or "",
-                    "ly_transcript": obj.ly_transcript or "",
-                    "title": obj.title or "",
-                    "last_updated": obj.last_updated.isoformat() if obj.last_updated else None
-                }
-                
-                batch_docs.append({
-                    "index": {
-                        "_index": es_index,
-                        "_id": obj.ivod_id
-                    }
-                })
-                batch_docs.append(doc)
-                
-                # 當批次滿了就執行批次索引
-                if len(batch_docs) >= batch_size * 2:  # 每個文件有兩個項目
-                    try:
-                        response = es.bulk(body=batch_docs)
-                        if response.get('errors'):
-                            logger.warning(f"⚠️  批次索引部分失敗")
-                            for item in response['items']:
-                                if 'index' in item and item['index'].get('error'):
-                                    error_count += 1
-                                    logger.error(f"索引失敗 ID {item['index']['_id']}: {item['index']['error']}")
-                                else:
-                                    updated_count += 1
-                        else:
-                            updated_count += len(batch_docs) // 2
-                        
-                        batch_docs = []
-                    except Exception as e:
-                        logger.error(f"❌ 批次索引失敗: {e}")
-                        error_count += len(batch_docs) // 2
-                        batch_docs = []
-                        
-            except Exception as e:
-                logger.error(f"❌ 處理記錄 {obj.ivod_id} 時發生錯誤: {e}")
-                error_count += 1
-                continue
-        
-        # 處理最後一批
-        if batch_docs:
-            try:
-                response = es.bulk(body=batch_docs)
-                if response.get('errors'):
-                    logger.warning(f"⚠️  最後批次索引部分失敗")
-                    for item in response['items']:
-                        if 'index' in item and item['index'].get('error'):
-                            error_count += 1
-                            logger.error(f"索引失敗 ID {item['index']['_id']}: {item['index']['error']}")
-                        else:
-                            updated_count += 1
-                else:
-                    updated_count += len(batch_docs) // 2
-            except Exception as e:
-                logger.error(f"❌ 最後批次索引失敗: {e}")
-                error_count += len(batch_docs) // 2
-        
-        # 記錄統計結果
-        logger.info(f"✅ Elasticsearch 索引更新完成:")
-        logger.info(f"   - 已更新: {updated_count} 筆")
-        logger.info(f"   - 已跳過: {skipped_count} 筆 (內容相同)")
-        logger.info(f"   - 失敗: {error_count} 筆")
-        logger.info(f"   - 總計處理: {updated_count + skipped_count + error_count} 筆")
-        
-        return error_count == 0
-        
-    finally:
-        db.close()
+    return run_elasticsearch_indexing(ivod_ids=ivod_ids, full_mode=full_mode)
