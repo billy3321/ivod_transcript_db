@@ -5,6 +5,7 @@ ivod_tasks.py
 
 將 full、incremental、retry 三種主要工作流程集中在此，供 ivod_full.py、ivod_incremental.py、ivod_retry.py 呼叫。
 """
+import json
 import logging
 from datetime import datetime, timedelta
 import os
@@ -16,48 +17,16 @@ try:
 except ImportError:
     Elasticsearch = None
 
-from .core import date_range, make_browser, fetch_ivod_list, process_ivod, Session, IVODTranscript
-from .db import DB_BACKEND, engine, Base
+from .core import date_range, make_browser, fetch_ivod_list, process_ivod
+from .db import (
+    DB_BACKEND, engine, Base, Session, IVODTranscript,
+    check_and_create_database_tables,
+    check_elasticsearch_available, run_elasticsearch_indexing
+)
 
 logger = logging.getLogger(__name__)
 
-def check_and_create_database_tables():
-    """
-    檢查資料庫連線狀況並確保表格存在
-    """
-    from sqlalchemy import inspect, text
-    
-    try:
-        # 檢查資料庫連線
-        with engine.connect() as conn:
-            result = conn.execute(text("SELECT 1"))
-            logger.info(f"✅ 資料庫連線成功 (Backend: {DB_BACKEND})")
-        
-        # 檢查表格是否存在
-        inspector = inspect(engine)
-        tables = inspector.get_table_names()
-        
-        if 'ivod_transcripts' not in tables:
-            logger.info("⚠️  ivod_transcripts 表格不存在，正在創建...")
-            Base.metadata.create_all(engine)
-            logger.info("✅ 表格創建成功")
-        else:
-            logger.info("✅ ivod_transcripts 表格已存在")
-            
-            # 檢查表格結構
-            columns = inspector.get_columns('ivod_transcripts')
-            logger.info(f"✅ 表格包含 {len(columns)} 個欄位")
-            
-            # 檢查現有記錄數
-            with Session() as session:
-                count = session.query(IVODTranscript).count()
-                logger.info(f"✅ 現有記錄數: {count}")
-        
-        return True
-        
-    except Exception as e:
-        logger.error(f"❌ 資料庫檢查失敗: {e}")
-        return False
+# check_and_create_database_tables 函數已移至 db.py 中
 
 def log_failed_ivod(ivod_id, error_type="general"):
     """記錄失敗的IVOD_ID到錯誤日誌檔案"""
@@ -521,7 +490,10 @@ def run_backup(backup_file=None):
                 "title": record.title,
                 "speaker_name": record.speaker_name,
                 "video_length": record.video_length,
-                "commencement_time": record.commencement_time,
+                "video_start": record.video_start,
+                "video_end": record.video_end,
+                "video_type": record.video_type,
+                "category": record.category,
                 "video_url": record.video_url,
                 "committee_names": record.committee_names,
                 "ai_transcript": record.ai_transcript,
