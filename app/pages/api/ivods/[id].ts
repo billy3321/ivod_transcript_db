@@ -65,6 +65,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       res.status(200).json({ data });
     }
   } catch (error: any) {
+    // 檢查是否為表格不存在的錯誤
+    if (error.message && error.message.includes('does not exist')) {
+      logger.warn('Database table does not exist for IVOD detail', {
+        metadata: { tableName: 'ivod_transcripts', ivodId: id }
+      });
+      return res.status(404).json({ error: 'Not found' });
+    }
+    
     logger.logDatabaseError(error, 'ivod_detail', {
       ivodId: id
     });

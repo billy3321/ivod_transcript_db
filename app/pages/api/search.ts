@@ -147,12 +147,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         }
       });
     } catch (dbError: any) {
-      logger.logDatabaseError(dbError, 'search', {
-        query: q,
-        parsedQuery: parsedQuery
-      });
-      res.status(500).json({ error: 'Search failed' });
-      return;
+      // 檢查是否為表格不存在的錯誤
+      if (dbError.message && dbError.message.includes('does not exist')) {
+        logger.warn('Database table does not exist for search, returning empty result', {
+          metadata: { tableName: 'ivod_transcripts', query: q }
+        });
+        hits = [];
+      } else {
+        logger.logDatabaseError(dbError, 'search', {
+          query: q,
+          parsedQuery: parsedQuery
+        });
+        res.status(500).json({ error: 'Search failed' });
+        return;
+      }
     }
   }
   

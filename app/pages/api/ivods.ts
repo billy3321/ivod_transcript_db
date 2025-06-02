@@ -168,6 +168,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     
     res.status(200).json({ data, total });
   } catch (error: any) {
+    // 檢查是否為表格不存在的錯誤
+    if (error.message && error.message.includes('does not exist')) {
+      logger.warn('Database table does not exist, returning empty result', {
+        metadata: { tableName: 'ivod_transcripts', query: where }
+      });
+      return res.status(200).json({ data: [], total: 0 });
+    }
+    
     logger.logDatabaseError(error, 'ivods_list', {
       where,
       orderBy,

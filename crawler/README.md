@@ -67,43 +67,254 @@ cp .env.example .env   # 如尚未有 .env
 ./ivod_backup.py list                                # 列出備份檔案
 ```
 
-## 4. 部署於 Ubuntu Linux
+## 4. Production 環境部署
 
-### 4.1 建置系統帳號 & 程式碼
+### 4.1 系統環境準備
 
+#### 建立專用系統帳號
 ```bash
-sudo useradd -m ivoduser
+# 建立專用帳號（建議以服務名稱命名）
+sudo useradd -m -s /bin/bash ivoduser
+sudo usermod -aG sudo ivoduser  # 如需 sudo 權限
+
+# 切換到服務帳號
 sudo su - ivoduser
+```
+
+#### 部署程式碼
+```bash
 cd ~
-git clone <repo-url> ivod_transcript_db
-cd ivod_transcript_db
+git clone <your-repo-url> ivod_transcript_db
+cd ivod_transcript_db/crawler
+
+# 建立 Python 虛擬環境
 python3 -m venv venv
 source venv/bin/activate
+
+# 安裝相依套件
+pip install --upgrade pip
 pip install -r requirements.txt
-cp .env.example .env
-# 編輯 .env 設定
-mkdir logs
+
+# 建立必要目錄
+mkdir -p logs
+mkdir -p backup
 ```
 
-### 4.2 Cron 定時任務
+### 4.2 Production 環境設定
 
-編輯 `crontab -e`，加入：
+#### 環境變數設定
+```bash
+# 複製環境設定範本
+cp .env.example .env
 
+# 編輯 Production 環境設定
+nano .env
+```
+
+**建議的 Production `.env` 設定**：
+```ini
+# === Production 環境標記 ===
+DB_ENV=production
+
+# === 資料庫設定（建議使用 PostgreSQL）===
+DB_BACKEND=postgresql
+PG_HOST=localhost
+PG_PORT=5432
+PG_USER=ivod_user
+PG_PASS=your_secure_password_here
+PG_DB=ivod_db
+
+# === Elasticsearch 設定 ===
+ES_HOST=localhost
+ES_PORT=9200
+ES_SCHEME=http
+ES_INDEX=ivod_transcripts
+
+# === SSL 設定 ===
+SKIP_SSL=True  # 如遇到 SSL 憑證問題
+
+# === 錯誤記錄設定 ===
+ERROR_LOG_PATH=logs/failed_ivods.txt
+LOG_PATH=logs/
+```
+
+#### 資料庫初始化
+```bash
+# 測試資料庫連線
+python test_connection.py
+
+# 如資料表不存在，會提示建立
+python test_connection.py --create-tables
+```
+
+### 4.3 自動化排程設定 (Cron)
+
+#### 編輯 Cron 排程
+```bash
+crontab -e
+```
+
+#### 建議的 Production Cron 設定
 ```cron
+# === 每日自動化任務 ===
 # 每天 02:00 執行增量更新
-0 2 * * * cd /home/ivoduser/ivod_transcript_db && /home/ivoduser/ivod_transcript_db/venv/bin/python ivod_incremental.py >> logs/incremental.log 2>&1
+0 2 * * * cd /home/ivoduser/ivod_transcript_db/crawler && source venv/bin/activate && ./ivod_incremental.py >> logs/incremental.log 2>&1
 
-# 每天 03:00 執行重新嘗試失敗
-0 3 * * * cd /home/ivoduser/ivod_transcript_db && /home/ivoduser/ivod_transcript_db/venv/bin/python ivod_retry.py >> logs/retry.log 2>&1
-
-# 每月 1 日 04:00 全量拉取 (視需要)
-0 4 1 * * cd /home/ivoduser/ivod_transcript_db && /home/ivoduser/ivod_transcript_db/venv/bin/python ivod_full.py >> logs/full.log 2>&1
+# 每天 03:00 執行重新嘗試失敗記錄
+0 3 * * * cd /home/ivoduser/ivod_transcript_db/crawler && source venv/bin/activate && ./ivod_retry.py >> logs/retry.log 2>&1
 
 # 每天 04:00 執行錯誤記錄補抓
-0 4 * * * cd /home/ivoduser/ivod_transcript_db && /home/ivoduser/ivod_transcript_db/venv/bin/python ivod_fix.py >> logs/fix.log 2>&1
+0 4 * * * cd /home/ivoduser/ivod_transcript_db/crawler && source venv/bin/activate && ./ivod_fix.py >> logs/fix.log 2>&1
+
+# 每天 05:00 更新 Elasticsearch 索引
+0 5 * * * cd /home/ivoduser/ivod_transcript_db/crawler && source venv/bin/activate && ./ivod_es.py >> logs/elasticsearch.log 2>&1
+
+# === 每週/每月任務 ===
+# 每週日 01:00 執行資料庫備份
+0 1 * * 0 cd /home/ivoduser/ivod_transcript_db/crawler && source venv/bin/activate && ./ivod_backup.py backup >> logs/backup.log 2>&1
+
+# 每月 1 日 06:00 執行全量拉取（可選，用於資料完整性檢查）
+# 0 6 1 * * cd /home/ivoduser/ivod_transcript_db/crawler && source venv/bin/activate && ./ivod_full.py >> logs/full.log 2>&1
 ```
 
-> 若偏好 Systemd Timer，可另行設定。
+#### Cron 排程說明
+- **02:00 增量更新**：抓取最近兩週的資料，確保不遺漏延遲發佈的逐字稿
+- **03:00 重試失敗**：重新嘗試之前失敗的記錄
+- **04:00 錯誤補抓**：從錯誤記錄檔案批量修復
+- **05:00 ES 索引**：更新搜尋索引
+- **週日備份**：定期備份資料庫
+- **月初全量**：可選的完整性檢查
+
+### 4.4 手動執行指令
+
+#### 切換到工作環境
+```bash
+# 切換到服務帳號
+sudo su - ivoduser
+
+# 進入專案目錄
+cd ivod_transcript_db/crawler
+
+# 啟動虛擬環境
+source venv/bin/activate
+```
+
+#### 手動執行各種任務
+```bash
+# === 資料抓取任務 ===
+# 執行全量拉取（首次部署或重建資料庫時）
+./ivod_full.py
+
+# 執行全量拉取（指定日期範圍）
+./ivod_full.py --start-date 2024-06-01 --end-date 2024-06-30
+
+# 執行增量更新（日常維護）
+./ivod_incremental.py
+
+# 重試失敗記錄
+./ivod_retry.py
+
+# 補抓錯誤記錄（批量模式）
+./ivod_fix.py
+
+# 補抓特定 IVOD_ID
+./ivod_fix.py --ivod-id 123456
+
+# === 索引與備份任務 ===
+# 更新 Elasticsearch 索引
+./ivod_es.py
+
+# 備份資料庫
+./ivod_backup.py backup
+
+# 還原資料庫
+./ivod_backup.py restore backup/ivod_backup_20241201_143022.json
+
+# === 測試與診斷 ===
+# 測試資料庫連線
+python test_connection.py
+
+# 測試 Elasticsearch 連線
+python test_elasticsearch.py
+
+# 執行整合測試
+TEST_SQLITE_PATH=../db/ivod_test.db python integration_test.py
+```
+
+### 4.5 監控與維護
+
+#### 查看執行日誌
+```bash
+# 查看最近的增量更新日誌
+tail -f logs/incremental.log
+
+# 查看錯誤記錄
+cat logs/failed_ivods.txt
+
+# 查看所有日誌檔案
+ls -la logs/
+```
+
+#### 日誌檔案說明
+- `incremental.log`：增量更新執行記錄
+- `retry.log`：重試任務執行記錄
+- `fix.log`：錯誤補抓執行記錄
+- `elasticsearch.log`：ES 索引更新記錄
+- `backup.log`：資料庫備份記錄
+- `failed_ivods.txt`：失敗的 IVOD_ID 記錄
+
+#### 系統資源監控
+```bash
+# 檢查磁碟使用量
+df -h
+
+# 檢查記憶體使用量
+free -h
+
+# 檢查執行中的 Python 程序
+ps aux | grep python
+
+# 檢查資料庫連線狀態
+python test_connection.py --test-db
+```
+
+### 4.6 服務管理 (可選)
+
+如需要將爬蟲作為系統服務管理，可建立 systemd service：
+
+```bash
+# 建立服務檔案
+sudo nano /etc/systemd/system/ivod-crawler.service
+```
+
+服務檔案內容：
+```ini
+[Unit]
+Description=IVOD Transcript Crawler Service
+After=network.target
+
+[Service]
+Type=oneshot
+User=ivoduser
+Group=ivoduser
+WorkingDirectory=/home/ivoduser/ivod_transcript_db/crawler
+Environment=PATH=/home/ivoduser/ivod_transcript_db/crawler/venv/bin
+ExecStart=/home/ivoduser/ivod_transcript_db/crawler/venv/bin/python ivod_incremental.py
+StandardOutput=append:/home/ivoduser/ivod_transcript_db/crawler/logs/service.log
+StandardError=append:/home/ivoduser/ivod_transcript_db/crawler/logs/service.log
+
+[Install]
+WantedBy=multi-user.target
+```
+
+啟用服務：
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable ivod-crawler.service
+sudo systemctl start ivod-crawler.service
+```
+
+> **注意**：若偏好使用 Systemd Timer 取代 Cron，可另行設定 `.timer` 檔案。
 
 ## 5. 錯誤記錄與補抓機制
 

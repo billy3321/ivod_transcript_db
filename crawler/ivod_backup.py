@@ -16,6 +16,25 @@ from datetime import datetime
 
 from ivod.tasks import run_backup, run_restore, setup_logging
 
+def setup_environment(env="development"):
+    """設定環境變數"""
+    if env == "development":
+        # 開發環境：不設定特殊環境變數，使用預設的 development 環境
+        os.environ.pop("TESTING", None)
+        os.environ.pop("DB_ENV", None)
+        print(f"🔧 設定為 {env} 環境")
+    elif env == "testing":
+        # 測試環境
+        os.environ["TESTING"] = "true"
+        print(f"🔧 設定為 {env} 環境")
+    elif env == "production":
+        # 生產環境：設定 DB_ENV
+        os.environ["DB_ENV"] = "production"
+        os.environ.pop("TESTING", None)
+        print(f"🔧 設定為 {env} 環境")
+    else:
+        raise ValueError(f"不支援的環境: {env}")
+
 def main():
     parser = argparse.ArgumentParser(
         description="IVOD 資料庫備份與還原工具",
@@ -23,8 +42,9 @@ def main():
         epilog="""
 使用範例:
   # 備份資料庫
-  %(prog)s backup                                    # 自動生成備份檔名
-  %(prog)s backup --file backup/my_backup.json      # 指定備份檔名
+  %(prog)s backup                                           # 備份 development 環境（預設）
+  %(prog)s backup --env production                          # 備份 production 環境
+  %(prog)s backup --file backup/my_backup.json             # 指定備份檔名
   
   # 還原資料庫
   %(prog)s restore backup/ivod_backup_20241201_143022.json  # 從備份檔還原
@@ -33,8 +53,16 @@ def main():
   %(prog)s restore backup/my_backup.json --force-all       # 強制執行所有操作
   
   # 列出備份檔案
-  %(prog)s list                                      # 列出所有備份檔案
+  %(prog)s list                                             # 列出所有備份檔案
         """
+    )
+    
+    # 添加全域環境選項
+    parser.add_argument(
+        '--env',
+        choices=['development', 'production', 'testing'],
+        default='development',
+        help='選擇要操作的資料庫環境 (預設: development)'
     )
     
     subparsers = parser.add_subparsers(dest='command', help='可用命令')
@@ -77,6 +105,9 @@ def main():
     )
     
     args = parser.parse_args()
+    
+    # 設定環境變數
+    setup_environment(args.env)
     
     # 設置日誌
     setup_logging()
