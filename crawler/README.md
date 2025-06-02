@@ -374,7 +374,58 @@ ES_INDEX=ivod_transcripts
 ./ivod_es.py
 ```
 
-## 10. Testing
+## 10. 資料庫與連線測試
+
+### 10.1 連線測試腳本
+
+為確保資料庫和 Elasticsearch 設定正確，本專案提供了完整的連線測試工具：
+
+```bash
+# 測試所有環境的資料庫連線和表格狀態
+./test_connection.py
+
+# 只測試特定環境
+./test_connection.py --env production
+./test_connection.py --env development
+./test_connection.py --env testing
+
+# 只測試資料庫連線
+./test_connection.py --test-db
+
+# 只檢查表格狀態
+./test_connection.py --test-tables
+
+# 只測試 Elasticsearch
+./test_connection.py --test-elasticsearch
+
+# 互動式建立缺失的表格
+./test_connection.py --create-tables
+```
+
+**測試項目包括**：
+- **資料庫連線**：測試 SQLite、PostgreSQL、MySQL 連線能力
+- **表格狀態**：檢查 `ivod_transcripts` 表格是否存在及記錄數
+- **Elasticsearch**：測試 ES 連線、索引狀態、文件數量
+- **多環境支援**：自動檢測 production、development、testing 三種環境
+
+**互動式功能**：
+- 自動檢測缺失的表格
+- 詢問使用者是否建立表格
+- 提供批量建立或單一環境建立選項
+
+### 10.2 環境配置
+
+測試腳本會根據以下規則自動檢測環境：
+- **testing**：`TESTING=true`、`PYTEST_RUNNING=true`，或執行 `integration_test.py`
+- **production**：`DB_ENV=production`
+- **development**：預設環境
+
+每個環境使用獨立的資料庫和索引：
+- **SQLite**：`ivod_local.db`（production）、`ivod_dev.db`（development）、`ivod_test.db`（testing）
+- **PostgreSQL/MySQL**：`ivod_db`、`ivod_dev_db`、`ivod_test_db`
+- **Elasticsearch**：`ivod_transcripts`、`ivod_dev_transcripts`、`ivod_test_transcripts`
+
+## 11. Testing
 
 本專案使用 pytest 作為測試框架，並將開發相依 (dev dependencies) 集中於 `requirements-dev.txt`。
 
@@ -382,7 +433,7 @@ ES_INDEX=ivod_transcripts
 pip install -r requirements-dev.txt
 ```
 
-### 10.1 單元測試 (Unit Tests)
+### 11.1 單元測試 (Unit Tests)
 - 使用 pytest 測試核心函式，如 `make_browser`、`fetch_ivod_list`、`process_ivod`。
 - 測試檔案可依模組結構，放於 `tests/core/`、`tests/crawler/`、`tests/db/`、`tests/tasks/` 等子目錄中：
   - `tests/core/`：`test_core.py`
@@ -391,11 +442,11 @@ pip install -r requirements-dev.txt
   - `tests/tasks/`：`test_tasks.py`、`test_run_es.py`
 - 可透過 requests-mock 模擬 HTTP 回應，並利用 sqlite in-memory (`DB_BACKEND=sqlite`, `DB_URL=:memory:`) 測試資料庫操作。
 
-### 10.2 整合測試 (Integration Tests)
+### 11.2 整合測試 (Integration Tests)
 - 建議於 `tests/crawler/` 子目錄中加入整合測試，標記 `@pytest.mark.integration`，如 `test_fetch_available_dates.py`、`test_fetch_ly_speech.py`。
 - 可使用 Docker Compose 啟動測試用的資料庫與 Elasticsearch service，並於測試前自動初始化資料庫 schema (呼叫 `ivod_core.Base.metadata.create_all`)。
 
-### 10.3 Integration Test Script
+### 11.3 Integration Test Script
 
 Run the following script to reset the test database and fetch IVOD transcripts for integration testing.
 By default it uses the SQLite path from your `.env` (e.g. `db/ivod_local.db`),
@@ -407,7 +458,7 @@ cd crawler
 TEST_SQLITE_PATH=../db/ivod_test.db python integration_test.py
 ```
 
-### 10.4 執行所有測試
+### 11.4 執行所有測試
 
 ```bash
 pytest --cov=ivod_core --cov=ivod_tasks --cov-report=term-missing
