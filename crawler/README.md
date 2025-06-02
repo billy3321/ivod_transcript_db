@@ -374,32 +374,150 @@ ES_INDEX=ivod_transcripts
 ./ivod_es.py
 ```
 
-## 10. 資料庫與連線測試
+## 10. 資料庫設定與連線測試
 
-### 10.1 連線測試腳本
+### 10.1 資料庫後端設定
 
-為確保資料庫和 Elasticsearch 設定正確，本專案提供了完整的連線測試工具：
+本專案支援三種資料庫後端（SQLite、PostgreSQL、MySQL），請根據需求選擇適合的後端並完成相關設定。
+
+#### 10.1.1 SQLite 設定（建議用於開發和測試）
+
+```bash
+# 在 .env 中設定
+DB_BACKEND=sqlite
+SQLITE_PATH=../db/ivod_local.db        # Production 環境
+DEV_SQLITE_PATH=../db/ivod_dev.db      # Development 環境
+TEST_SQLITE_PATH=../db/ivod_test.db    # Testing 環境
+
+# 建立資料庫目錄
+mkdir -p ../db
+```
+
+#### 10.1.2 PostgreSQL 設定（建議用於正式環境）
+
+**1. 安裝 PostgreSQL 服務**
+```bash
+# Ubuntu/Debian
+sudo apt update
+sudo apt install postgresql postgresql-contrib
+
+# CentOS/RHEL
+sudo yum install postgresql-server postgresql-contrib
+sudo postgresql-setup initdb
+
+# macOS
+brew install postgresql
+brew services start postgresql
+```
+
+**2. 建立資料庫和使用者**
+```bash
+# 以 postgres 使用者登入
+sudo -u postgres psql
+
+# 建立使用者
+CREATE USER ivod_user WITH PASSWORD 'your_secure_password';
+
+# 建立資料庫（三個環境）
+CREATE DATABASE ivod_db;                    -- Production
+CREATE DATABASE ivod_dev_db;                -- Development  
+CREATE DATABASE ivod_test_db;               -- Testing
+
+# 授權給使用者
+GRANT ALL PRIVILEGES ON DATABASE ivod_db TO ivod_user;
+GRANT ALL PRIVILEGES ON DATABASE ivod_dev_db TO ivod_user;
+GRANT ALL PRIVILEGES ON DATABASE ivod_test_db TO ivod_user;
+
+# 退出
+\q
+```
+
+**3. 在 .env 中設定**
+```bash
+DB_BACKEND=postgresql
+PG_HOST=localhost
+PG_PORT=5432
+PG_USER=ivod_user
+PG_PASS=your_secure_password
+PG_DB=ivod_db                    # Production 環境
+PG_DEV_DB=ivod_dev_db           # Development 環境
+PG_TEST_DB=ivod_test_db         # Testing 環境
+```
+
+#### 10.1.3 MySQL 設定
+
+**1. 安裝 MySQL 服務**
+```bash
+# Ubuntu/Debian
+sudo apt update
+sudo apt install mysql-server
+
+# CentOS/RHEL
+sudo yum install mysql-server
+sudo systemctl start mysqld
+
+# macOS
+brew install mysql
+brew services start mysql
+```
+
+**2. 建立資料庫和使用者**
+```bash
+# 以 root 使用者登入
+mysql -u root -p
+
+# 建立資料庫（三個環境）
+CREATE DATABASE ivod_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE DATABASE ivod_dev_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE DATABASE ivod_test_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+# 建立使用者並授權
+CREATE USER 'ivod_user'@'localhost' IDENTIFIED BY 'your_secure_password';
+GRANT ALL PRIVILEGES ON ivod_db.* TO 'ivod_user'@'localhost';
+GRANT ALL PRIVILEGES ON ivod_dev_db.* TO 'ivod_user'@'localhost';
+GRANT ALL PRIVILEGES ON ivod_test_db.* TO 'ivod_user'@'localhost';
+FLUSH PRIVILEGES;
+
+# 退出
+EXIT;
+```
+
+**3. 在 .env 中設定**
+```bash
+DB_BACKEND=mysql
+MYSQL_HOST=localhost
+MYSQL_PORT=3306
+MYSQL_USER=ivod_user
+MYSQL_PASS=your_secure_password
+MYSQL_DB=ivod_db                 # Production 環境
+MYSQL_DEV_DB=ivod_dev_db        # Development 環境
+MYSQL_TEST_DB=ivod_test_db      # Testing 環境
+```
+
+### 10.2 連線測試腳本
+
+為確保資料庫和 Elasticsearch 設定正確，本專案提供了完整的連線測試工具，會自動檢測問題並提供修復建議：
 
 ```bash
 # 測試所有環境的資料庫連線和表格狀態
-./test_connection.py
+python test_connection.py
 
 # 只測試特定環境
-./test_connection.py --env production
-./test_connection.py --env development
-./test_connection.py --env testing
+python test_connection.py --env production
+python test_connection.py --env development
+python test_connection.py --env testing
 
 # 只測試資料庫連線
-./test_connection.py --test-db
+python test_connection.py --test-db
 
 # 只檢查表格狀態
-./test_connection.py --test-tables
+python test_connection.py --test-tables
 
 # 只測試 Elasticsearch
-./test_connection.py --test-elasticsearch
+python test_connection.py --test-elasticsearch
 
 # 互動式建立缺失的表格
-./test_connection.py --create-tables
+python test_connection.py --create-tables
 ```
 
 **測試項目包括**：
@@ -408,12 +526,59 @@ ES_INDEX=ivod_transcripts
 - **Elasticsearch**：測試 ES 連線、索引狀態、文件數量
 - **多環境支援**：自動檢測 production、development、testing 三種環境
 
+**自動診斷功能**：
+- 偵測常見的資料庫連線問題
+- 提供針對性的 SQL 修復指令
+- 自動產生資料庫、使用者建立指令
+- 顯示權限設定和服務啟動指令
+
 **互動式功能**：
 - 自動檢測缺失的表格
 - 詢問使用者是否建立表格
 - 提供批量建立或單一環境建立選項
 
-### 10.2 環境配置
+### 10.3 常見問題與修復
+
+**PostgreSQL 連線問題**：
+```bash
+# 檢查服務狀態
+sudo systemctl status postgresql
+
+# 啟動服務
+sudo systemctl start postgresql
+
+# 重置使用者密碼
+sudo -u postgres psql
+ALTER USER ivod_user PASSWORD 'new_password';
+\q
+```
+
+**MySQL 連線問題**：
+```bash
+# 檢查服務狀態
+sudo systemctl status mysql
+
+# 啟動服務
+sudo systemctl start mysql
+
+# 重置使用者密碼
+mysql -u root -p
+ALTER USER 'ivod_user'@'localhost' IDENTIFIED BY 'new_password';
+FLUSH PRIVILEGES;
+EXIT;
+```
+
+**SQLite 權限問題**：
+```bash
+# 檢查檔案權限
+ls -la ../db/
+
+# 修正權限
+chmod 664 ../db/*.db
+chmod 755 ../db
+```
+
+### 10.4 環境配置
 
 測試腳本會根據以下規則自動檢測環境：
 - **testing**：`TESTING=true`、`PYTEST_RUNNING=true`，或執行 `integration_test.py`

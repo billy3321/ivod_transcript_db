@@ -91,7 +91,9 @@ def test_database_connection(env: str = None) -> Dict[str, bool]:
                         results[test_env] = False
                 
             except Exception as e:
-                print(f"❌ {test_env} 環境連線失敗: {e}")
+                logger.error(f"{test_env} 環境連線失敗: {e}")
+                print(f"❌ {test_env} 環境連線失敗")
+                _print_database_fix_instructions(db_backend, test_env, str(e))
                 results[test_env] = False
         
         return results
@@ -160,7 +162,8 @@ def check_table_existence(env: str = None) -> Dict[str, Dict[str, any]]:
                             table_info['record_count'] = count
                             print(f"📊 記錄數: {count:,}")
                     except Exception as e:
-                        print(f"⚠️  無法查詢記錄數: {e}")
+                        logger.error(f"無法查詢記錄數: {e}")
+                        print(f"⚠️  無法查詢記錄數")
                         table_info['error'] = str(e)
                 else:
                     print(f"❌ ivod_transcripts 表格不存在")
@@ -168,7 +171,10 @@ def check_table_existence(env: str = None) -> Dict[str, Dict[str, any]]:
                 results[test_env] = table_info
                 
             except Exception as e:
-                print(f"❌ {test_env} 環境檢查失敗: {e}")
+                logger.error(f"{test_env} 環境檢查失敗: {e}")
+                print(f"❌ {test_env} 環境檢查失敗")
+                db_backend = os.getenv("DB_BACKEND", "sqlite").lower()
+                _print_database_fix_instructions(db_backend, test_env, str(e))
                 results[test_env] = {'exists': False, 'error': str(e)}
         
         return results
@@ -211,6 +217,29 @@ def test_elasticsearch_connection(env: str = None) -> Dict[str, bool]:
             print("   請執行: pip install elasticsearch")
             return {}
         
+        # 首先檢查 Elasticsearch 服務是否運行
+        import subprocess
+        try:
+            # 檢查 9200 端口是否有服務監聽
+            result = subprocess.run(['lsof', '-i', ':9200'], capture_output=True, text=True, timeout=5)
+            if result.returncode != 0:
+                print("❌ Elasticsearch 服務未運行")
+                print("\n🔧 修復建議:")
+                print("1. 安裝 Elasticsearch:")
+                print("   # macOS: brew install elasticsearch")
+                print("   # Ubuntu: sudo apt install elasticsearch")
+                print("2. 啟動服務:")
+                print("   # macOS: brew services start elasticsearch")
+                print("   # Ubuntu: sudo systemctl start elasticsearch")
+                print("3. 檢查狀態:")
+                print("   curl http://localhost:9200")
+                return {}
+        except subprocess.TimeoutExpired:
+            print("⚠️  服務檢查超時")
+        except FileNotFoundError:
+            # lsof 不可用，繼續嘗試連線
+            pass
+        
         for test_env in environments:
             print(f"\n📊 測試環境: {test_env}")
             print("-" * 30)
@@ -222,7 +251,7 @@ def test_elasticsearch_connection(env: str = None) -> Dict[str, bool]:
                 print(f"🔗 ES 主機: {es_config['host']}:{es_config['port']}")
                 print(f"📁 ES 索引: {es_config['index']}")
                 
-                # 建立連線
+                # 建立連線，設定較短的超時時間
                 auth = (es_config["user"], es_config["password"]) if es_config["user"] and es_config["password"] else None
                 if auth:
                     print(f"🔐 使用認證: {es_config['user']}:***")
@@ -231,7 +260,7 @@ def test_elasticsearch_connection(env: str = None) -> Dict[str, bool]:
                     "host": es_config["host"], 
                     "port": es_config["port"], 
                     "scheme": es_config["scheme"]
-                }], http_auth=auth)
+                }], http_auth=auth, request_timeout=5, retry_on_timeout=False)
                 
                 # 測試連線
                 if es.ping():
@@ -248,7 +277,8 @@ def test_elasticsearch_connection(env: str = None) -> Dict[str, bool]:
                             doc_count = stats['indices'][index_name]['total']['docs']['count']
                             print(f"📊 索引文件數: {doc_count:,}")
                         except Exception as e:
-                            print(f"⚠️  無法獲取索引統計: {e}")
+                            logger.error(f"無法獲取索引統計: {e}")
+                            print(f"⚠️  無法獲取索引統計")
                     else:
                         print(f"⚠️  索引 '{index_name}' 不存在")
                     
@@ -258,7 +288,17 @@ def test_elasticsearch_connection(env: str = None) -> Dict[str, bool]:
                     results[test_env] = False
                     
             except Exception as e:
-                print(f"❌ {test_env} 環境 ES 連線失敗: {e}")
+                # 記錄詳細錯誤到日誌
+                logger.error(f"{test_env} 環境 ES 連線失敗: {e}")
+                
+                # 終端機顯示簡潔訊息
+                error_msg = str(e)
+                if "Connection refused" in error_msg:
+                    print(f"❌ {test_env} 環境 ES 連線被拒絕 (服務未運行)")
+                elif "timeout" in error_msg.lower():
+                    print(f"❌ {test_env} 環境 ES 連線超時")
+                else:
+                    print(f"❌ {test_env} 環境 ES 連線失敗")
                 results[test_env] = False
         
         return results
@@ -344,6 +384,8 @@ def create_missing_tables(env: str = None) -> bool:
     
     except Exception as e:
         logger.error(f"建立表格失敗: {e}")
+        db_backend = os.getenv("DB_BACKEND", "sqlite").lower()
+        _print_database_fix_instructions(db_backend, env, str(e))
         return False
 
 def interactive_create_tables():
@@ -381,6 +423,114 @@ def interactive_create_tables():
                 missing_envs.remove(choice)
         else:
             print("❌ 無效選擇，請重新輸入")
+
+def _print_database_fix_instructions(db_backend: str, env: str, error_message: str):
+    """根據錯誤類型打印修復指令"""
+    error_lower = error_message.lower()
+    
+    print("\n" + "🔧 修復建議:")
+    print("-" * 40)
+    
+    if db_backend == "sqlite":
+        if "no such file" in error_lower or "unable to open" in error_lower:
+            print("❌ SQLite 資料庫檔案不存在")
+            print("\n💡 修復步驟:")
+            print("1. 確認資料庫目錄存在:")
+            print(f"   mkdir -p ../db")
+            print("2. 建立資料庫表格:")
+            print(f"   python test_connection.py --create-tables")
+        elif "permission denied" in error_lower:
+            print("❌ 權限不足")
+            print("\n💡 修復步驟:")
+            print("1. 檢查檔案權限:")
+            print(f"   ls -la ../db/")
+            print("2. 修正權限:")
+            print(f"   chmod 664 ../db/*.db")
+            print(f"   chmod 755 ../db")
+    
+    elif db_backend == "postgresql":
+        if "connection refused" in error_lower:
+            print("❌ PostgreSQL 服務未啟動")
+            print("\n💡 修復步驟:")
+            print("1. 啟動 PostgreSQL 服務:")
+            print("   sudo systemctl start postgresql")
+            print("   # 或在 macOS: brew services start postgresql")
+            print("2. 確認服務狀態:")
+            print("   sudo systemctl status postgresql")
+        elif "database" in error_lower and "does not exist" in error_lower:
+            print("❌ PostgreSQL 資料庫不存在")
+            print("\n💡 修復步驟:")
+            print("1. 以 postgres 使用者登入:")
+            print("   sudo -u postgres psql")
+            print("2. 建立資料庫:")
+            if env == "production":
+                db_name = os.getenv("PG_DB", "ivod_db")
+            elif env == "development":
+                db_name = os.getenv("PG_DEV_DB", "ivod_dev_db")
+            else:  # testing
+                db_name = os.getenv("PG_TEST_DB", "ivod_test_db")
+            print(f"   CREATE DATABASE {db_name};")
+            print("3. 建立使用者並授權:")
+            user = os.getenv("PG_USER", "ivod_user")
+            password = os.getenv("PG_PASS", "ivod_password")
+            print(f"   CREATE USER {user} WITH PASSWORD '{password}';")
+            print(f"   GRANT ALL PRIVILEGES ON DATABASE {db_name} TO {user};")
+            print("   \\q")
+        elif "authentication failed" in error_lower or "password" in error_lower:
+            print("❌ PostgreSQL 認證失敗")
+            print("\n💡 修復步驟:")
+            print("1. 檢查 .env 檔案的使用者密碼設定")
+            print("2. 重設使用者密碼:")
+            print("   sudo -u postgres psql")
+            user = os.getenv("PG_USER", "ivod_user")
+            password = os.getenv("PG_PASS", "ivod_password")
+            print(f"   ALTER USER {user} PASSWORD '{password}';")
+            print("   \\q")
+    
+    elif db_backend == "mysql":
+        if "connection refused" in error_lower:
+            print("❌ MySQL 服務未啟動")
+            print("\n💡 修復步驟:")
+            print("1. 啟動 MySQL 服務:")
+            print("   sudo systemctl start mysql")
+            print("   # 或在 macOS: brew services start mysql")
+            print("2. 確認服務狀態:")
+            print("   sudo systemctl status mysql")
+        elif "unknown database" in error_lower:
+            print("❌ MySQL 資料庫不存在")
+            print("\n💡 修復步驟:")
+            print("1. 以 root 使用者登入:")
+            print("   mysql -u root -p")
+            print("2. 建立資料庫:")
+            if env == "production":
+                db_name = os.getenv("MYSQL_DB", "ivod_db")
+            elif env == "development":
+                db_name = os.getenv("MYSQL_DEV_DB", "ivod_dev_db")
+            else:  # testing
+                db_name = os.getenv("MYSQL_TEST_DB", "ivod_test_db")
+            print(f"   CREATE DATABASE {db_name} CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;")
+            print("3. 建立使用者並授權:")
+            user = os.getenv("MYSQL_USER", "ivod_user")
+            password = os.getenv("MYSQL_PASS", "ivod_password")
+            print(f"   CREATE USER '{user}'@'localhost' IDENTIFIED BY '{password}';")
+            print(f"   GRANT ALL PRIVILEGES ON {db_name}.* TO '{user}'@'localhost';")
+            print("   FLUSH PRIVILEGES;")
+            print("   EXIT;")
+        elif "access denied" in error_lower:
+            print("❌ MySQL 認證失敗")
+            print("\n💡 修復步驟:")
+            print("1. 檢查 .env 檔案的使用者密碼設定")
+            print("2. 重設使用者密碼:")
+            print("   mysql -u root -p")
+            user = os.getenv("MYSQL_USER", "ivod_user")
+            password = os.getenv("MYSQL_PASS", "ivod_password")
+            print(f"   ALTER USER '{user}'@'localhost' IDENTIFIED BY '{password}';")
+            print("   FLUSH PRIVILEGES;")
+            print("   EXIT;")
+    
+    print("\n4. 重新執行測試:")
+    print(f"   python test_connection.py --env {env}")
+    print("-" * 40)
 
 def print_summary(db_results: Dict, table_results: Dict, es_results: Dict):
     """列印測試結果摘要"""
