@@ -1,22 +1,30 @@
 import dotenv from 'dotenv';
 import { resolve } from 'path';
+import { getDatabaseConfig, getDatabaseEnvironment } from './database-env';
 
 dotenv.config();
-const backend = process.env.DB_BACKEND;
-if (backend) {
-  if (backend === 'sqlite') {
-    const sqlitePath = process.env.SQLITE_PATH || '../db/ivod_test.db';
-    process.env.DATABASE_URL = `file://${resolve(sqlitePath)}`;
-  } else if (backend === 'postgresql') {
-    const { PG_USER, PG_PASS, PG_HOST, PG_PORT, PG_DB } = process.env;
-    process.env.DATABASE_URL = `${backend}://${PG_USER}:${PG_PASS}@${PG_HOST}:${PG_PORT}/${PG_DB}`;
-  } else if (backend === 'mysql') {
-    const { MYSQL_USER, MYSQL_PASS, MYSQL_HOST, MYSQL_PORT, MYSQL_DB } = process.env;
-    process.env.DATABASE_URL = `mysql://${MYSQL_USER}:${MYSQL_PASS}@${MYSQL_HOST}:${MYSQL_PORT}/${MYSQL_DB}`;
-  }
+
+// 根據環境設定資料庫連線
+const dbConfig = getDatabaseConfig();
+const dbEnv = getDatabaseEnvironment();
+
+// 設定 DATABASE_URL 環境變數供 Prisma 使用
+if (process.env.DB_BACKEND?.toLowerCase() === 'sqlite') {
+  // SQLite config has path property
+  const sqliteConfig = dbConfig as { path: string; url: string };
+  process.env.DATABASE_URL = `file://${resolve(sqliteConfig.path)}`;
+} else {
+  // PostgreSQL/MySQL config has url property
+  process.env.DATABASE_URL = dbConfig.url;
 }
 
 import { PrismaClient } from '@prisma/client';
+
+// 在開發環境顯示資料庫環境資訊
+if (process.env.NODE_ENV !== 'production') {
+  console.log(`🗄️  Database Environment: ${dbEnv}`);
+  console.log(`🔗 Database URL: ${process.env.DATABASE_URL}`);
+}
 
 const prisma = new PrismaClient();
 export default prisma;

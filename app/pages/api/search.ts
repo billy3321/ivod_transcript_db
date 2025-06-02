@@ -1,9 +1,10 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import client from '@/lib/elastic';
+import client, { esConfig } from '@/lib/elastic';
 import prisma from '@/lib/prisma';
 import { getDbBackend } from '@/lib/utils';
 import { logger } from '@/lib/logger';
 import { parseAdvancedSearchQuery, buildElasticsearchQuery, buildDatabaseQuery } from '@/lib/searchParser';
+import { extractSearchExcerpt, isTranscriptSearch } from '@/lib/searchHighlight';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { q = '' } = req.query;
@@ -31,7 +32,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     parseSuccess: parsedQuery.parseSuccess
   });
   
-  let hits: Array<{ id: number; transcript: string | null }> = [];
+  let hits: Array<{ 
+    id: number; 
+    transcript: string | null;
+    excerpt?: {
+      text: string;
+      plainText: string;
+      hasMatch: boolean;
+      matchPosition: number;
+    }
+  }> = [];
   let usedES = true;
   
   // Check if Elasticsearch is enabled
@@ -50,7 +60,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       // Try Elasticsearch with advanced query building
       const esQuery = buildElasticsearchQuery(parsedQuery);
       const result = await client.search({
-        index: process.env.NEXT_PUBLIC_ES_INDEX,
+        index: esConfig.index,
         body: {
           query: esQuery,
           _source: ['ivod_id', 'ai_transcript', 'ly_transcript'],
@@ -58,10 +68,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         },
       });
       
-      hits = result.hits.hits.map(hit => ({
-        id: (hit._source as any).ivod_id,
-        transcript: (hit._source as any).ai_transcript || (hit._source as any).ly_transcript,
-      }));
+      hits = result.hits.hits.map(hit => {
+        // 優先使用 ly_transcript，如果沒有才使用 ai_transcript
+        const lyTranscript = (hit._source as any).ly_transcript;
+        const aiTranscript = (hit._source as any).ai_transcript;
+        const transcript = lyTranscript || aiTranscript;
+        
+        const searchExcerpt = (q && q.trim() && isTranscriptSearch(q as string)) 
+          ? extractSearchExcerpt(transcript, q as string)
+          : undefined;
+        
+        return {
+          id: (hit._source as any).ivod_id,
+          transcript,
+          excerpt: searchExcerpt?.hasMatch ? searchExcerpt : undefined
+        };
+      });
       
       logger.info('Elasticsearch search completed', {
         metadata: {
@@ -102,10 +124,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         take: 100 // Limit results similar to Elasticsearch
       });
       
-      hits = records.map(rec => ({
-        id: rec.ivod_id,
-        transcript: rec.ai_transcript || rec.ly_transcript,
-      }));
+      hits = records.map(rec => {
+        // 優先使用 ly_transcript，如果沒有才使用 ai_transcript
+        const transcript = rec.ly_transcript || rec.ai_transcript;
+        const searchExcerpt = (q && q.trim() && isTranscriptSearch(q as string))
+          ? extractSearchExcerpt(transcript, q as string)
+          : undefined;
+        
+        return {
+          id: rec.ivod_id,
+          transcript,
+          excerpt: searchExcerpt?.hasMatch ? searchExcerpt : undefined
+        };
+      });
       
       logger.info('Database fallback search completed', {
         metadata: {

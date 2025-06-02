@@ -2,44 +2,22 @@
 # 1. Configure DB URL from environment
 import os
 from dotenv import load_dotenv
+from .database_env import get_database_config, get_database_environment, print_database_info
 
 # Load environment variables from .env file
 load_dotenv()
 
+# 獲取資料庫環境設定
+db_config = get_database_config()
+db_env = get_database_environment()
+
+# 設定資料庫連線
 DB_BACKEND = os.getenv("DB_BACKEND", "sqlite").lower()
-if DB_BACKEND == "sqlite":
-    # Use in-memory DB by default, override with SQLITE_PATH for file-based DB
-    sqlite_path = os.getenv("SQLITE_PATH")
-    if sqlite_path:
-        DB_URL = f"sqlite:///{sqlite_path}"
-    else:
-        DB_URL = "sqlite:///:memory:"
-elif DB_BACKEND == "postgresql":
-    PG = {
-        "host": os.getenv("PG_HOST"),
-        "port": os.getenv("PG_PORT", "5432"),
-        "db":   os.getenv("PG_DB"),
-        "user": os.getenv("PG_USER"),
-        "pass": os.getenv("PG_PASS"),
-    }
-    DB_URL = (
-        f"postgresql://{PG['user']}:{PG['pass']}@"
-        f"{PG['host']}:{PG['port']}/{PG['db']}"
-    )
-elif DB_BACKEND == "mysql":
-    MYSQL = {
-        "host": os.getenv("MYSQL_HOST"),
-        "port": os.getenv("MYSQL_PORT", "3306"),
-        "db":   os.getenv("MYSQL_DB"),
-        "user": os.getenv("MYSQL_USER"),
-        "pass": os.getenv("MYSQL_PASS"),
-    }
-    DB_URL = (
-        f"mysql+pymysql://{MYSQL['user']}:{MYSQL['pass']}@"
-        f"{MYSQL['host']}:{MYSQL['port']}/{MYSQL['db']}?charset=utf8mb4"
-    )
-else:
-    raise ValueError(f"Unsupported DB_BACKEND: {DB_BACKEND}")
+DB_URL = db_config["url"]
+
+# 在非生產環境顯示資料庫環境資訊
+if os.getenv("ENVIRONMENT") != "production":
+    print_database_info()
 
 # 2. SQLAlchemy setup
 from sqlalchemy import (
@@ -162,23 +140,20 @@ def check_elasticsearch_available():
         logger.info("ℹ️  Elasticsearch 套件未安裝，跳過 ES 索引更新")
         return False
         
-    es_host = os.getenv("ES_HOST", "localhost")
-    es_port = int(os.getenv("ES_PORT", 9200))
-    es_scheme = os.getenv("ES_SCHEME", "http")
-    es_user = os.getenv("ES_USER")
-    es_pass = os.getenv("ES_PASS")
-
-    auth = (es_user, es_pass) if es_user and es_pass else None
+    from .database_env import get_elasticsearch_config
+    
+    es_config = get_elasticsearch_config()
+    auth = (es_config["user"], es_config["password"]) if es_config["user"] and es_config["password"] else None
     
     try:
-        es = Elasticsearch([{"host": es_host, "port": es_port, "scheme": es_scheme}], http_auth=auth)
+        es = Elasticsearch([{"host": es_config["host"], "port": es_config["port"], "scheme": es_config["scheme"]}], http_auth=auth)
         
         # 測試連線
         if es.ping():
-            logger.info(f"✅ Elasticsearch 可用: {es_host}:{es_port}")
+            logger.info(f"✅ Elasticsearch 可用: {es_config['host']}:{es_config['port']}")
             return True
         else:
-            logger.info(f"ℹ️  無法連線到 Elasticsearch: {es_host}:{es_port}，跳過 ES 索引更新")
+            logger.info(f"ℹ️  無法連線到 Elasticsearch: {es_config['host']}:{es_config['port']}，跳過 ES 索引更新")
             return False
             
     except Exception as e:
@@ -194,25 +169,21 @@ def get_elasticsearch_client():
         logger.error("❌ Elasticsearch 未安裝，請執行: pip install elasticsearch")
         return None, None
         
-    es_host = os.getenv("ES_HOST", "localhost")
-    es_port = int(os.getenv("ES_PORT", 9200))
-    es_scheme = os.getenv("ES_SCHEME", "http")
-    es_user = os.getenv("ES_USER")
-    es_pass = os.getenv("ES_PASS")
-    es_index = os.getenv("ES_INDEX", "ivod_transcripts")
-
-    auth = (es_user, es_pass) if es_user and es_pass else None
+    from .database_env import get_elasticsearch_config
+    
+    es_config = get_elasticsearch_config()
+    auth = (es_config["user"], es_config["password"]) if es_config["user"] and es_config["password"] else None
     
     try:
-        es = Elasticsearch([{"host": es_host, "port": es_port, "scheme": es_scheme}], http_auth=auth)
+        es = Elasticsearch([{"host": es_config["host"], "port": es_config["port"], "scheme": es_config["scheme"]}], http_auth=auth)
         
         # 測試連線
         if not es.ping():
-            logger.error(f"❌ 無法連線到 Elasticsearch: {es_host}:{es_port}")
+            logger.error(f"❌ 無法連線到 Elasticsearch: {es_config['host']}:{es_config['port']}")
             return None, None
             
-        logger.info(f"✅ 已連線到 Elasticsearch: {es_host}:{es_port}")
-        return es, es_index
+        logger.info(f"✅ 已連線到 Elasticsearch: {es_config['host']}:{es_config['port']}")
+        return es, es_config["index"]
         
     except Exception as e:
         logger.error(f"❌ Elasticsearch 連線失敗: {e}")

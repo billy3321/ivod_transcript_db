@@ -158,10 +158,13 @@ export default function Home() {
     
     if (searchScope === 'transcript' && filters.q) {
       // For transcript-only search, use /api/search first, then get IVOD details
+      let searchResultsWithExcerpts: any[] = [];
+      
       fetch(`/api/search?q=${encodeURIComponent(filters.q)}`)
         .then(res => res.json())
         .then(searchData => {
-          setTranscriptSearchResults(searchData.data || []);
+          searchResultsWithExcerpts = searchData.data || [];
+          setTranscriptSearchResults(searchResultsWithExcerpts);
           
           if (searchData.data && searchData.data.length > 0) {
             // Get IVOD IDs from search results
@@ -183,6 +186,14 @@ export default function Home() {
           }
         })
         .then(ivodData => {
+          // 將搜尋摘要合併到 IVOD 資料中
+          if (searchResultsWithExcerpts.length > 0 && ivodData.data) {
+            const transcriptMap = new Map(searchResultsWithExcerpts.map((item: any) => [item.id, item.excerpt]));
+            ivodData.data = ivodData.data.map((ivod: any) => ({
+              ...ivod,
+              excerpt: transcriptMap.get(ivod.ivod_id)
+            }));
+          }
           setData(ivodData);
         })
         .catch(error => {

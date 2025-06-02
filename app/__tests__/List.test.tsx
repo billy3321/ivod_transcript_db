@@ -176,4 +176,96 @@ describe('List', () => {
     expect(screen.getByText('質詢')).toBeInTheDocument();
     expect(screen.getByText('14:30:00 - 15:15:30')).toBeInTheDocument();
   });
+
+  it('displays search excerpt when available', () => {
+    const items = [
+      {
+        ivod_id: 6,
+        date: '2022-01-06',
+        title: '搜尋測試',
+        meeting_name: '搜尋會議',
+        committee_names: ['搜尋委員會'],
+        speaker_name: '測試委員',
+        video_length: '30:00',
+        video_start: null,
+        video_end: null,
+        video_type: null,
+        category: null,
+        meeting_code: null,
+        meeting_code_str: null,
+        meeting_time: null,
+        excerpt: {
+          text: '這是一段包含<mark class="bg-red-200 text-red-800 px-1 rounded">搜尋關鍵字</mark>的摘要文字...',
+          plainText: '這是一段包含搜尋關鍵字的摘要文字...',
+          hasMatch: true,
+          matchPosition: 6
+        }
+      },
+    ];
+    render(<List items={items} />);
+
+    // Check if search excerpt section is displayed
+    expect(screen.getByText('搜尋結果摘要')).toBeInTheDocument();
+    
+    // Check if the highlighted content is present
+    const excerptContainer = screen.getByText(/這是一段包含.*搜尋關鍵字.*的摘要文字/);
+    expect(excerptContainer).toBeInTheDocument();
+  });
+
+  it('does not display search excerpt when not available', () => {
+    const items = [
+      {
+        ivod_id: 7,
+        date: '2022-01-07',
+        title: '無摘要測試',
+        meeting_name: '無摘要會議',
+        committee_names: ['測試委員會'],
+        speaker_name: '測試委員',
+        video_length: '20:00',
+        video_start: null,
+        video_end: null,
+        video_type: null,
+        category: null,
+        meeting_code: null,
+        meeting_code_str: null,
+        meeting_time: null,
+        // No excerpt property
+      },
+    ];
+    render(<List items={items} />);
+
+    // Should not show search excerpt section
+    expect(screen.queryByText('搜尋結果摘要')).not.toBeInTheDocument();
+  });
+
+  it('does not display search excerpt when hasMatch is false', () => {
+    const items = [
+      {
+        ivod_id: 8,
+        date: '2022-01-08',
+        title: '無匹配測試',
+        meeting_name: '無匹配會議',
+        committee_names: ['測試委員會'],
+        speaker_name: '測試委員',
+        video_length: '25:00',
+        video_start: null,
+        video_end: null,
+        video_type: null,
+        category: null,
+        meeting_code: null,
+        meeting_code_str: null,
+        meeting_time: null,
+        excerpt: {
+          text: '',
+          plainText: '',
+          hasMatch: false,
+          matchPosition: -1
+        }
+      },
+    ];
+    render(<List items={items} />);
+
+    // Should not show search excerpt section
+    expect(screen.queryByText('搜尋結果摘要')).not.toBeInTheDocument();
+  });
 });

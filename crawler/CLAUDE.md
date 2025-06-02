@@ -12,6 +12,7 @@ This is a Python-based web scraper that extracts transcripts from Taiwan's Legis
 - **`core.py`** - Central processing module for assembling IVOD records from scraped data
 - **`crawler.py`** - HTTP scraping utilities with mechanize browser, SSL handling, and data fetching
 - **`db.py`** - Database abstraction supporting SQLite/PostgreSQL/MySQL with SQLAlchemy ORM
+- **`database_env.py`** - Environment-specific database configuration (development/production/testing)
 - **`tasks.py`** - Main workflow orchestration (full/incremental/retry/elasticsearch indexing)
 
 ### Main Execution Scripts
@@ -87,31 +88,83 @@ pytest tests/crawler/test_crawler.py
 
 ## Environment Configuration
 
-Required `.env` variables:
+The crawler supports three separate database environments to prevent data interference:
+
+### Environment Detection
+- **Testing**: `TESTING=true`, `PYTEST_RUNNING=true`, or `integration_test.py` execution → Uses test databases
+- **Production**: `DB_ENV=production` → Uses production databases
+- **Development**: Default environment for normal crawler operations
+
+### Required `.env` variables:
 ```bash
+# Database Environment Control
+# DB_ENV=production  # Set to use production database in development
+
 # Database backend selection
 DB_BACKEND=sqlite|postgresql|mysql
 
-# Database connections (choose based on DB_BACKEND)
+# === SQLite Settings (only if DB_BACKEND=sqlite) ===
+# Production database (existing configuration, names unchanged) - normal crawler operations
 SQLITE_PATH=../db/ivod_local.db
-# PG_HOST=localhost PG_PORT=5432 PG_DB=ivod_db PG_USER=... PG_PASS=...
-# MYSQL_HOST=localhost MYSQL_PORT=3306 MYSQL_DB=ivod_db MYSQL_USER=... MYSQL_PASS=...
+
+# Development database (for development testing)
+DEV_SQLITE_PATH=../db/ivod_dev.db
+
+# Testing database (for integration_test.py)
+TEST_SQLITE_PATH=../db/ivod_test.db
+
+# === PostgreSQL Settings (only if DB_BACKEND=postgresql) ===
+PG_HOST=localhost
+PG_PORT=5432
+PG_USER=ivod_user
+PG_PASS=ivod_password
+
+# Production database (existing configuration, names unchanged) - normal crawler operations
+PG_DB=ivod_db
+
+# Development database (for development testing)
+PG_DEV_DB=ivod_dev_db
+
+# Testing database (for integration_test.py)
+PG_TEST_DB=ivod_test_db
+
+# === MySQL Settings (only if DB_BACKEND=mysql) ===
+MYSQL_HOST=localhost
+MYSQL_PORT=3306
+MYSQL_USER=ivod_user
+MYSQL_PASS=ivod_password
+
+# Production database (existing configuration, names unchanged) - normal crawler operations
+MYSQL_DB=ivod_db
+
+# Development database (for development testing)
+MYSQL_DEV_DB=ivod_dev_db
+
+# Testing database (for integration_test.py)
+MYSQL_TEST_DB=ivod_test_db
 
 # SSL configuration
 SKIP_SSL=False
 
-# Elasticsearch (optional)
+# === Elasticsearch Settings ===
 ES_HOST=localhost
 ES_PORT=9200
 ES_SCHEME=http
-ES_INDEX=ivod_transcripts
-# ES_USER=username ES_PASS=password
 
-# Testing
-TEST_SQLITE_PATH=../db/ivod_test.db
+# Production index (existing configuration, names unchanged) - normal crawler operations
+ES_INDEX=ivod_transcripts
+
+# Development index (for development testing)
+ES_DEV_INDEX=ivod_dev_transcripts
+
+# Testing index (for integration_test.py)
+ES_TEST_INDEX=ivod_test_transcripts
+
+# ES_USER=username ES_PASS=password
 
 # Error logging
 ERROR_LOG_PATH=logs/failed_ivods.txt
+LOG_PATH=logs/
 ```
 
 ## Key Implementation Details

@@ -9,15 +9,14 @@ import os
 import json
 from datetime import datetime, date, timedelta
 
+# 設定為測試環境
+os.environ["TESTING"] = "true"
+
 from dotenv import load_dotenv
-# Load .env and override default SQLite path if TEST_SQLITE_PATH is set
 load_dotenv()
 import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 from tqdm import tqdm
-test_db = os.getenv("TEST_SQLITE_PATH")
-if test_db:
-    os.environ["SQLITE_PATH"] = test_db
 from ivod.core import (
     DB_BACKEND,
     make_browser,

@@ -13,9 +13,11 @@ This is a Next.js TypeScript application that provides a web interface for searc
 - **Main Pages**: `pages/index.tsx` (search interface), `pages/ivod/[id].tsx` (detail view)
 - **API Layer**: `pages/api/` - RESTful endpoints for data access
 - **Components**: `components/` - Modular React components with error handling
-- **Database**: `lib/prisma.ts` - Database client with multi-backend support
+- **Database**: `lib/prisma.ts` - Database client with multi-backend and environment support
+- **Database Environment**: `lib/database-env.ts` - Environment-specific database configuration
 - **Search**: `lib/elastic.ts` - Elasticsearch integration with DB fallback
 - **Search Parser**: `lib/searchParser.ts` - Advanced query parsing with boolean logic
+- **Search Highlighting**: `lib/searchHighlight.ts` - Extract and highlight search excerpts
 - **Logging**: `lib/logger.ts` - Structured logging system with file rotation
 - **Error Handling**: `lib/useErrorHandler.ts` - React hook for error management
 
@@ -27,12 +29,14 @@ This is a Next.js TypeScript application that provides a web interface for searc
    - Field-specific searches (title:, speaker:, meeting:, committee:)
    - Exclusion syntax (-term, -"phrase")
    - Dual search modes: "All fields" and "Transcript only"
-2. **Advanced Filtering**: By meeting name, speaker, committee, date range
-3. **Multi-Database Support**: SQLite/PostgreSQL/MySQL via dynamic Prisma schema
-4. **Responsive Design**: Mobile-first with Tailwind CSS
-5. **SEO Optimization**: Meta tags, structured data, sitemap generation
-6. **Comprehensive Logging**: Structured error logging with admin interface
-7. **Error Boundary**: React error boundaries with automatic error reporting
+2. **Search Excerpts**: Context snippets with highlighted keywords in search results
+3. **Advanced Filtering**: By meeting name, speaker, committee, date range
+4. **Multi-Database Support**: SQLite/PostgreSQL/MySQL via dynamic Prisma schema
+5. **Environment Separation**: Separate databases for development, production, and testing
+6. **Responsive Design**: Mobile-first with Tailwind CSS
+7. **SEO Optimization**: Meta tags, structured data, sitemap generation
+8. **Comprehensive Logging**: Structured error logging with admin interface
+9. **Error Boundary**: React error boundaries with automatic error reporting
 
 ## Development Commands
 
@@ -60,25 +64,76 @@ npm run lint              # ESLint checks
 
 ## Environment Configuration
 
-Required `.env` variables:
+The application supports three separate database environments to prevent data interference:
+
+### Environment Detection
+- **Testing**: `NODE_ENV=test` or `JEST_WORKER_ID` present → Uses test databases
+- **Production**: `NODE_ENV=production` → Uses production databases
+- **Development**: Default environment, or use `DB_ENV=production` to access production data in dev
+
+### Required `.env` variables:
 ```bash
+# Database Environment Control
+# DB_ENV=production  # Set to use production database in development
+
 # Database backend selection
 DB_BACKEND=sqlite|postgresql|mysql
 
-# Database connections (choose based on DB_BACKEND)
+# === SQLite Settings (only if DB_BACKEND=sqlite) ===
+# Production database (existing configuration, names unchanged)
 SQLITE_PATH=../db/ivod_local.db
-# PG_HOST=localhost PG_PORT=5432 PG_DB=ivod_db PG_USER=... PG_PASS=...
-# MYSQL_HOST=localhost MYSQL_PORT=3306 MYSQL_DB=ivod_db MYSQL_USER=... MYSQL_PASS=...
 
-# Elasticsearch (optional)
+# Development database (for npm run dev)
+DEV_SQLITE_PATH=../db/ivod_dev.db
+
+# Testing database (for test execution)
+TEST_SQLITE_PATH=../db/ivod_test.db
+
+# === PostgreSQL Settings (only if DB_BACKEND=postgresql) ===
+PG_HOST=localhost
+PG_PORT=5432
+PG_USER=ivod_user
+PG_PASS=ivod_password
+
+# Production database (existing configuration, names unchanged)
+PG_DB=ivod_db
+
+# Development database (for npm run dev)
+PG_DEV_DB=ivod_dev_db
+
+# Testing database (for test execution)
+PG_TEST_DB=ivod_test_db
+
+# === MySQL Settings (only if DB_BACKEND=mysql) ===
+MYSQL_HOST=localhost
+MYSQL_PORT=3306
+MYSQL_USER=ivod_user
+MYSQL_PASS=ivod_password
+
+# Production database (existing configuration, names unchanged)
+MYSQL_DB=ivod_db
+
+# Development database (for npm run dev)
+MYSQL_DEV_DB=ivod_dev_db
+
+# Testing database (for test execution)
+MYSQL_TEST_DB=ivod_test_db
+
+# === Elasticsearch Settings ===
 ES_HOST=localhost
 ES_PORT=9200
 ES_SCHEME=http
-ES_INDEX=ivod_transcripts
-NEXT_PUBLIC_ES_INDEX=ivod_transcripts
 
-# Testing
-TEST_SQLITE_PATH=../db/ivod_test.db
+# Production index (existing configuration, names unchanged)
+ES_INDEX=ivod_transcripts
+
+# Development index (for npm run dev)
+ES_DEV_INDEX=ivod_dev_transcripts
+
+# Testing index (for test execution)
+ES_TEST_INDEX=ivod_test_transcripts
+
+NEXT_PUBLIC_ES_INDEX=ivod_transcripts
 
 # Logging configuration
 LOG_LEVEL=info
@@ -172,7 +227,14 @@ The IVOD search system implements a sophisticated dual-layer search architecture
 - **"搜尋全部欄位"**: Searches across title, meeting_name, speaker_name, committee_names, transcripts
 - **"僅搜尋逐字稿"**: Searches only in ai_transcript and ly_transcript fields
 
-**Code Location**: `lib/searchParser.ts` (full advanced parsing), `pages/api/search.ts` (implementation)
+**Search Excerpts**: 
+- **Context Snippets**: Display ~50 characters before/after keyword matches with surrounding context
+- **Keyword Highlighting**: Search terms highlighted in red using HTML `<mark>` tags
+- **Transcript Priority**: Prioritizes `ly_transcript` over `ai_transcript` when both exist
+- **Selective Display**: Only shows excerpts for transcript-based searches (when main search box has content)
+- **XSS Protection**: Proper HTML escaping while preserving highlight markup
+
+**Code Location**: `lib/searchParser.ts` (full advanced parsing), `lib/searchHighlight.ts` (excerpt extraction), `pages/api/search.ts` (implementation)
 
 #### 3. **Lower Search: LIKE Fuzzy Matching**
 **REQUIREMENT**: Advanced form fields use LIKE queries for partial matching across all database backends.
