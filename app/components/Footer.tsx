@@ -4,10 +4,11 @@ import { formatTimestamp } from '@/lib/utils';
 
 // 全域快取，避免重複 API 呼叫
 // 因為資料庫每天才更新一次，所以只需要在進入網頁時讀取一次即可
-let databaseStatusCache: { lastUpdated: string | null; loading: boolean; fetched: boolean } = {
+let databaseStatusCache: { lastUpdated: string | null; loading: boolean; fetched: boolean; error: string | null } = {
   lastUpdated: null,
   loading: false,
-  fetched: false
+  fetched: false,
+  error: null
 };
 
 // 重置快取的函數（主要用於測試）
@@ -15,7 +16,8 @@ export const resetDatabaseStatusCache = () => {
   databaseStatusCache = {
     lastUpdated: null,
     loading: false,
-    fetched: false
+    fetched: false,
+    error: null
   };
 };
 
@@ -23,12 +25,14 @@ const Footer: FC = () => {
   const currentYear = new Date().getFullYear();
   const [lastUpdated, setLastUpdated] = useState<string | null>(databaseStatusCache.lastUpdated);
   const [isLoadingStatus, setIsLoadingStatus] = useState(!databaseStatusCache.fetched);
+  const [databaseError, setDatabaseError] = useState<string | null>(databaseStatusCache.error);
 
   useEffect(() => {
     // 如果已經獲取過資料，直接使用快取
     // 資料庫每天才更新一次，所以不需要重複獲取
     if (databaseStatusCache.fetched) {
       setLastUpdated(databaseStatusCache.lastUpdated);
+      setDatabaseError(databaseStatusCache.error);
       setIsLoadingStatus(false);
       return;
     }
@@ -46,9 +50,25 @@ const Footer: FC = () => {
         if (response.ok) {
           const data = await response.json();
           databaseStatusCache.lastUpdated = data.lastUpdated;
+          databaseStatusCache.error = null;
           setLastUpdated(data.lastUpdated);
+          setDatabaseError(null);
+        } else {
+          // 處理非 200 狀態碼
+          const errorText = `資料庫連線異常 (${response.status})`;
+          databaseStatusCache.error = errorText;
+          databaseStatusCache.lastUpdated = null;
+          setDatabaseError(errorText);
+          setLastUpdated(null);
+          console.error('Database status API returned error:', response.status);
         }
       } catch (error) {
+        // 處理網絡錯誤或其他異常
+        const errorText = '無法連接資料庫';
+        databaseStatusCache.error = errorText;
+        databaseStatusCache.lastUpdated = null;
+        setDatabaseError(errorText);
+        setLastUpdated(null);
         console.error('Failed to fetch database status:', error);
       } finally {
         databaseStatusCache.loading = false;
@@ -130,10 +150,18 @@ const Footer: FC = () => {
           </div>
           
           {/* Database Update Status */}
-          {!isLoadingStatus && lastUpdated && (
+          {!isLoadingStatus && (
             <div className="mt-4 pt-4 border-t border-gray-700">
-              <div className="text-center text-gray-400 text-sm">
-                本資料庫最後更新時間為：{formatTimestamp(lastUpdated)}
+              <div className="text-center text-sm">
+                {databaseError ? (
+                  <div className="text-red-400">
+                    {databaseError}
+                  </div>
+                ) : lastUpdated ? (
+                  <div className="text-gray-400">
+                    本資料庫最後更新時間為：{formatTimestamp(lastUpdated)}
+                  </div>
+                ) : null}
               </div>
             </div>
           )}
