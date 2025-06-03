@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
 import Link from 'next/link';
@@ -143,12 +143,19 @@ export default function Home() {
   }, [urlQueryParams, router]);
 
   // Reset page when filters change (but not page itself)
+  const prevFiltersRef = useRef<SearchFilters>(filters);
   useEffect(() => {
-    const { q, meeting_name, speaker, committee, date_from, date_to } = filters;
-    if (q || meeting_name || speaker || committee || date_from || date_to) {
+    const prevFilters = prevFiltersRef.current;
+    const hasFilterChanged = Object.keys(filters).some(key => 
+      filters[key as keyof SearchFilters] !== prevFilters[key as keyof SearchFilters]
+    );
+    
+    if (hasFilterChanged && page !== 1) {
       setPage(1);
     }
-  }, [filters]);
+    
+    prevFiltersRef.current = filters;
+  }, [filters, page]);
 
   // Fetch data when search params change
   useEffect(() => {
@@ -204,20 +211,63 @@ export default function Home() {
         .finally(() => setLoading(false));
     } else {
       // For general search or no query, use /api/ivods normally
-      Promise.all([
-        fetch(`/api/ivods?${searchParams}`).then(res => res.json()),
-        Promise.resolve({ data: [] })
-      ])
-      .then(([ivodData, searchData]) => {
-        setData(ivodData);
-        setTranscriptSearchResults([]);
-      })
-      .catch(error => {
-        console.error('Error fetching data:', error);
-        setData({ data: [], total: 0 });
-        setTranscriptSearchResults([]);
-      })
-      .finally(() => setLoading(false));
+      if (filters.q && searchScope === 'all') {
+        // For general search with query, also get search excerpts
+        let searchResultsWithExcerpts: any[] = [];
+        
+        fetch(`/api/search?q=${encodeURIComponent(filters.q)}`)
+          .then(res => res.json())
+          .then(searchData => {
+            searchResultsWithExcerpts = searchData.data || [];
+            setTranscriptSearchResults(searchResultsWithExcerpts);
+            
+            if (searchData.data && searchData.data.length > 0) {
+              // Get IVOD IDs from search results to ensure we only get matching records
+              const ivodIds = searchData.data.map((item: any) => item.id);
+              
+              // Create search params with the matching IDs
+              const matchingSearchParams = new URLSearchParams(searchParams);
+              matchingSearchParams.append('ids', ivodIds.join(','));
+              
+              return fetch(`/api/ivods?${matchingSearchParams.toString()}`).then(res => res.json());
+            } else {
+              return { data: [], total: 0 };
+            }
+          })
+          .then(ivodData => {
+            // Merge excerpts into IVOD data
+            if (searchResultsWithExcerpts.length > 0 && ivodData.data) {
+              const transcriptMap = new Map(searchResultsWithExcerpts.map((item: any) => [item.id, item.excerpt]));
+              ivodData.data = ivodData.data.map((ivod: any) => ({
+                ...ivod,
+                excerpt: transcriptMap.get(ivod.ivod_id)
+              }));
+            }
+            setData(ivodData);
+          })
+        .catch(error => {
+          console.error('Error fetching data:', error);
+          setData({ data: [], total: 0 });
+          setTranscriptSearchResults([]);
+        })
+        .finally(() => setLoading(false));
+      } else {
+        // No query, just get IVOD data
+        Promise.all([
+          fetch(`/api/ivods?${searchParams}`).then(res => res.json()),
+          Promise.resolve({ data: [] })
+        ])
+        .then(([ivodData, searchData]) => {
+          setData(ivodData);
+          setTranscriptSearchResults([]);
+        })
+        .catch(error => {
+          console.error('Error fetching data:', error);
+          setData({ data: [], total: 0 });
+          setTranscriptSearchResults([]);
+        })
+        .finally(() => setLoading(false));
+      }
     }
   }, [searchParams, filters, sortOrder, page, searchScope, router.isReady]);
 
