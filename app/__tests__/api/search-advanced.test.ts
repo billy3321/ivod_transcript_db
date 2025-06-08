@@ -11,7 +11,9 @@ jest.mock('@/lib/searchParser', () => ({
 
 // Mock Elasticsearch client
 jest.mock('@/lib/elastic', () => ({
-  search: jest.fn(),
+  __esModule: true,
+  default: { search: jest.fn() },
+  esConfig: { index: 'test_index' }
 }));
 
 // Mock Prisma
@@ -25,6 +27,7 @@ jest.mock('@/lib/prisma', () => ({
 jest.mock('@/lib/logger', () => ({
   logger: {
     logApiRequest: jest.fn(),
+    logApiError: jest.fn(),
     warn: jest.fn(),
     info: jest.fn(),
     logDatabaseError: jest.fn(),
@@ -34,6 +37,12 @@ jest.mock('@/lib/logger', () => ({
 // Mock utils
 jest.mock('@/lib/utils', () => ({
   getDbBackend: jest.fn().mockReturnValue('postgresql'),
+}));
+
+// Mock search highlight
+jest.mock('@/lib/searchHighlight', () => ({
+  extractSearchExcerpt: jest.fn(),
+  isTranscriptSearch: jest.fn().mockReturnValue(true),
 }));
 
 import client from '@/lib/elastic';
@@ -105,8 +114,8 @@ describe('/api/search - Advanced Search', () => {
     const responseData = JSON.parse(res._getData());
     expect(responseData.data).toHaveLength(1);
     expect(responseData.data[0].id).toBe(123);
-    expect(responseData.fallback).toBe(false);
-    expect(responseData.parsed.hasAdvancedSyntax).toBe(false);
+    expect(responseData.meta.fallback).toBe(false);
+    expect(responseData.meta.parsed.hasAdvancedSyntax).toBe(false);
   });
 
   it('should handle quoted phrase search', async () => {
@@ -157,7 +166,7 @@ describe('/api/search - Advanced Search', () => {
 
     expect(res._getStatusCode()).toBe(200);
     const responseData = JSON.parse(res._getData());
-    expect(responseData.parsed.hasAdvancedSyntax).toBe(true);
+    expect(responseData.meta.parsed.hasAdvancedSyntax).toBe(true);
     expect(mockBuildElasticsearchQuery).toHaveBeenCalledWith(
       expect.objectContaining({
         quotedPhrases: ['exact phrase'],
@@ -368,7 +377,7 @@ describe('/api/search - Advanced Search', () => {
     const responseData = JSON.parse(res._getData());
     expect(responseData.data).toHaveLength(1);
     expect(responseData.data[0].id).toBe(202);
-    expect(responseData.fallback).toBe(true);
+    expect(responseData.meta.fallback).toBe(true);
     expect(mockBuildDatabaseQuery).toHaveBeenCalledWith(
       expect.objectContaining({
         generalTerms: ['test', 'query'],
@@ -417,20 +426,40 @@ describe('/api/search - Advanced Search', () => {
 
     expect(res._getStatusCode()).toBe(200);
     const responseData = JSON.parse(res._getData());
-    expect(responseData.parsed.parseSuccess).toBe(false);
-    expect(responseData.parsed.hasAdvancedSyntax).toBe(false);
+    expect(responseData.meta.parsed.parseSuccess).toBe(false);
+    expect(responseData.meta.parsed.hasAdvancedSyntax).toBe(false);
   });
 
-  it('should reject array queries', async () => {
+  it('should handle array queries by taking first element', async () => {
     const { req, res } = createMocks({
       method: 'GET',
       query: { q: ['query1', 'query2'] },
     });
 
+    mockParseAdvancedSearchQuery.mockReturnValue({
+      generalTerms: ['query1'],
+      hasAdvancedSyntax: false,
+      parseSuccess: true,
+      fieldTerms: {},
+      excludeTerms: [],
+    });
+
+    mockBuildElasticsearchQuery.mockReturnValue({
+      multi_match: {
+        query: 'query1',
+        fields: ['ai_transcript', 'ly_transcript'],
+      },
+    });
+
+    mockClient.search.mockResolvedValue({
+      hits: {
+        hits: [],
+      },
+    } as any);
+
     await searchHandler(req, res);
 
-    expect(res._getStatusCode()).toBe(400);
-    const responseData = JSON.parse(res._getData());
-    expect(responseData.error).toBe('Invalid query');
+    expect(res._getStatusCode()).toBe(200);
+    expect(mockParseAdvancedSearchQuery).toHaveBeenCalledWith('query1');
   });
 });

@@ -1,9 +1,27 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 jest.mock('@/lib/prisma', () => ({ __esModule: true, default: { iVODTranscript: { findMany: jest.fn(), count: jest.fn() } } }));
-jest.mock('@/lib/utils', () => ({ getDbBackend: jest.fn() }));
+jest.mock('@/lib/utils', () => ({ 
+  ...jest.requireActual('@/lib/utils'),
+  getDbBackend: jest.fn(),
+  createContainsCondition: jest.fn(),
+  convertToDate: jest.fn()
+}));
+jest.mock('@/lib/universal-search', () => ({
+  universalSearch: jest.fn(),
+  shouldUseUniversalSearch: jest.fn()
+}));
+jest.mock('@/lib/logger', () => ({
+  logger: {
+    info: jest.fn(),
+    warn: jest.fn(),
+    error: jest.fn(),
+    logApiError: jest.fn(),
+  }
+}));
 import handler from '@/pages/api/ivods';
 import prisma from '@/lib/prisma';
-import { getDbBackend } from '@/lib/utils';
+import { getDbBackend, createContainsCondition, convertToDate } from '@/lib/utils';
+import { shouldUseUniversalSearch } from '@/lib/universal-search';
 
 describe('GET /api/ivods', () => {
   let statusMock: jest.Mock;
@@ -14,9 +32,23 @@ describe('GET /api/ivods', () => {
   beforeEach(() => {
     jsonMock = jest.fn();
     statusMock = jest.fn(() => ({ json: jsonMock }));
-    req = { query: {} };
+    req = { 
+      query: {},
+      method: 'GET',
+      headers: { 'user-agent': 'test-agent' },
+      url: '/api/ivods'
+    };
     res = { status: statusMock };
     (getDbBackend as jest.Mock).mockReturnValue('postgresql'); // Default to PostgreSQL for most tests
+    
+    // Set up universal search to not be used by default
+    (shouldUseUniversalSearch as jest.Mock).mockReturnValue(false);
+    
+    // Set up default mock implementations
+    (createContainsCondition as jest.Mock).mockImplementation((field, value, backend) => ({
+      [field]: { contains: value, ...(backend !== 'sqlite' ? { mode: 'insensitive' } : {}) }
+    }));
+    (convertToDate as jest.Mock).mockImplementation((dateStr) => dateStr);
   });
 
   afterEach(() => {
@@ -59,7 +91,12 @@ describe('GET /api/ivods', () => {
     expect(statusMock).toHaveBeenCalledWith(200);
     expect(jsonMock).toHaveBeenCalledWith({
       data: [{ ivod_id: 1, date: '2023-01-01', meeting_name: 'Meeting 1' }],
-      total: 100
+      success: true,
+      meta: {
+        total: 100,
+        page: 1,
+        pageSize: 20
+      }
     });
   });
 
@@ -234,15 +271,18 @@ describe('GET /api/ivods', () => {
     await handler(req as NextApiRequest, res as NextApiResponse);
 
     expect(statusMock).toHaveBeenCalledWith(500);
-    expect(jsonMock).toHaveBeenCalledWith({ error: 'Database connection failed' });
+    expect(jsonMock).toHaveBeenCalledWith({ 
+      success: false,
+      error: 'Internal server error' // Test environment uses generic error message
+    });
   });
 
-  it('ignores array query parameters', async () => {
+  it('handles array query parameters by taking first element', async () => {
     const mockFindMany = (prisma.iVODTranscript.findMany as unknown) as jest.Mock;
     const mockCount = (prisma.iVODTranscript.count as unknown) as jest.Mock;
     
     req.query = { 
-      q: ['search1', 'search2'], // array should be ignored
+      q: ['search1', 'search2'], // parseStringParam takes first element 'search1'
       meeting_name: 'Valid Meeting'
     };
     mockFindMany.mockResolvedValue([]);
@@ -253,6 +293,17 @@ describe('GET /api/ivods', () => {
     expect(mockFindMany).toHaveBeenCalledWith({
       where: {
         AND: [
+          {
+            OR: [
+              { title: { contains: 'search1', mode: 'insensitive' } },
+              { meeting_name: { contains: 'search1', mode: 'insensitive' } },
+              { speaker_name: { contains: 'search1', mode: 'insensitive' } },
+              { committee_names: { contains: 'search1', mode: 'insensitive' } },
+              { meeting_code_str: { contains: 'search1', mode: 'insensitive' } },
+              { ai_transcript: { contains: 'search1', mode: 'insensitive' } },
+              { ly_transcript: { contains: 'search1', mode: 'insensitive' } },
+            ],
+          },
           { meeting_name: { contains: 'Valid Meeting', mode: 'insensitive' } },
         ]
       },
@@ -260,6 +311,16 @@ describe('GET /api/ivods', () => {
       skip: 0,
       take: 20,
       select: expect.any(Object),
+    });
+    expect(statusMock).toHaveBeenCalledWith(200);
+    expect(jsonMock).toHaveBeenCalledWith({
+      data: [],
+      success: true,
+      meta: {
+        total: 0,
+        page: 1,
+        pageSize: 20
+      }
     });
   });
 
@@ -297,6 +358,16 @@ describe('GET /api/ivods', () => {
         take: 20,
         select: expect.any(Object),
       });
+      expect(statusMock).toHaveBeenCalledWith(200);
+      expect(jsonMock).toHaveBeenCalledWith({
+        data: [],
+        success: true,
+        meta: {
+          total: 0,
+          page: 1,
+          pageSize: 20
+        }
+      });
     });
 
     it('handles specific field searches without mode insensitive', async () => {
@@ -324,6 +395,16 @@ describe('GET /api/ivods', () => {
         take: 20,
         select: expect.any(Object),
       });
+      expect(statusMock).toHaveBeenCalledWith(200);
+      expect(jsonMock).toHaveBeenCalledWith({
+        data: [],
+        success: true,
+        meta: {
+          total: 0,
+          page: 1,
+          pageSize: 20
+        }
+      });
     });
 
     it('handles IVOD ID filtering', async () => {
@@ -347,6 +428,16 @@ describe('GET /api/ivods', () => {
         take: 20,
         select: expect.any(Object),
       });
+      expect(statusMock).toHaveBeenCalledWith(200);
+      expect(jsonMock).toHaveBeenCalledWith({
+        data: [],
+        success: true,
+        meta: {
+          total: 0,
+          page: 1,
+          pageSize: 20
+        }
+      });
     });
 
     it('ignores invalid IVOD IDs', async () => {
@@ -369,6 +460,16 @@ describe('GET /api/ivods', () => {
         skip: 0,
         take: 20,
         select: expect.any(Object),
+      });
+      expect(statusMock).toHaveBeenCalledWith(200);
+      expect(jsonMock).toHaveBeenCalledWith({
+        data: [],
+        success: true,
+        meta: {
+          total: 0,
+          page: 1,
+          pageSize: 20
+        }
       });
     });
   });

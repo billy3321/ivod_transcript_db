@@ -63,11 +63,11 @@ describe('Home Page', () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText('IVOD 逐字稿檢索系統')).toBeInTheDocument();
+      // Title is now in Head, check for main interface elements instead
       expect(screen.getByPlaceholderText('搜尋會議名稱、立委姓名、逐字稿內容...')).toBeInTheDocument();
       expect(screen.getByText('進階搜尋')).toBeInTheDocument();
-      expect(screen.getByText('搜尋全部欄位')).toBeInTheDocument();
-      expect(screen.getByText('搜尋')).toBeInTheDocument();
+      expect(screen.getByDisplayValue('搜尋全部欄位')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: '搜尋' })).toBeInTheDocument();
     });
   });
 
@@ -86,7 +86,7 @@ describe('Home Page', () => {
     });
 
     const searchInput = screen.getByPlaceholderText('搜尋會議名稱、立委姓名、逐字稿內容...');
-    const searchButton = screen.getByText('搜尋');
+    const searchButton = screen.getByRole('button', { name: '搜尋' });
     
     await act(async () => {
       fireEvent.change(searchInput, { target: { value: '測試搜尋' } });
@@ -452,8 +452,8 @@ describe('Home Page', () => {
     render(<Home />);
 
     await waitFor(() => {
-      // The component doesn't currently show fallback indicator, so just check it loaded
-      expect(screen.getByText('IVOD 逐字稿檢索系統')).toBeInTheDocument();
+      // Check for interface elements instead of page title
+      expect(screen.getByPlaceholderText('搜尋逐字稿內容...')).toBeInTheDocument();
     });
   });
 

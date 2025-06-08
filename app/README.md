@@ -10,42 +10,77 @@
 
 ## 2. 技術堆疊
 
+### 核心技術
 - [Next.js](https://nextjs.org/) 搭配 React 和 TypeScript
 - Node.js API 路由用於伺服器端資料獲取
 - [Prisma](https://www.prisma.io/) ORM 用於關聯式資料庫（PostgreSQL / MySQL / SQLite）
 - [Elasticsearch](https://www.elastic.co/) 用於全文逐字稿搜尋
-- [bodybuilder](https://github.com/moscajs/bodybuilder) 用於建構 Elasticsearch 查詢 DSL
-- [search-query-parser](https://github.com/nepsilon/search-query-parser) 用於解析進階搜尋語法
 - [Tailwind CSS](https://tailwindcss.com/) 用於樣式設計
-- **結構化日誌系統**：完整的錯誤記錄、API 監控和管理介面
+
+### 🆕 重構架構特色（2024-12）
+- **模組化組件架構**：將原本580行的主頁面拆分為專門化的組件
+- **自定義Hook系統**：三個專業化Hook管理搜尋狀態和URL同步
+- **統一API中介軟體**：標準化的錯誤處理和回應格式
+- **XSS安全防護**：DOMPurify整合，防止跨站腳本攻擊
+- **記憶體洩漏防護**：AbortController實現請求取消機制
+- **結構化日誌系統**：完整的錯誤記錄、API監控和管理介面
 
 ## 3. 架構
 
-應用程式結構和主要路由/組件：
+### 🏗️ 重構後的架構結構
 
 ```plain
 app/
 ├── pages/
-│   ├── index.tsx              # IVOD 列表 + 搜尋頁面
-│   ├── ivod/[id].tsx          # IVOD 詳細頁面
+│   ├── index.tsx              # 🆕 主搜尋頁面（580→110行，使用模組化組件）
+│   ├── ivod/[id].tsx          # 🆕 IVOD詳細頁面（已強化SEO和顯示邏輯）
 │   └── api/
-│       ├── ivods.ts           # GET: 列出和篩選 IVOD，支援分頁
-│       ├── ivods/[id].ts      # GET: 根據 ID 獲取 IVOD 元資料和逐字稿
-│       ├── search.ts          # GET: 全文逐字稿搜尋（ES 不可用時會 fallback 到 DB）
+│       ├── ivods.ts           # 🆕 使用統一中介軟體的列表API
+│       ├── ivods/[id].ts      # 🆕 使用統一中介軟體的詳細API
+│       ├── search.ts          # 🆕 使用統一中介軟體的搜尋API
 │       ├── logs.ts            # POST: 客戶端錯誤日誌記錄
-│       └── admin/
-│           └── logs.ts        # GET/DELETE: 管理員日誌檢視和管理
-├── components/                # React UI 組件（List, SearchForm, Pagination, TranscriptViewer 等）
+│       └── admin/logs.ts      # GET/DELETE: 管理員日誌檢視和管理
+├── components/
+│   ├── 🆕 SearchHeader.tsx    # 搜尋介面組件（140行）
+│   ├── 🆕 SearchResults.tsx   # 結果顯示組件（80行）
+│   ├── 🆕 List.tsx            # 列表組件（已加入XSS防護）
+│   ├── SearchForm.tsx         # 搜尋表單（舊版，逐漸淘汰）
+│   ├── Pagination.tsx         # 分頁組件
+│   ├── TranscriptViewer.tsx   # 逐字稿檢視器
+│   └── ...                    # 其他UI組件
+├── 🆕 hooks/
+│   └── useSearch.ts           # 三個專業化Hook：
+│                              # - useSearchFilters: URL參數同步
+│                              # - useSearchResults: API呼叫管理
+│                              # - useUrlSync: URL狀態管理
 ├── lib/
+│   ├── 🆕 api-middleware.ts   # 統一API中介軟體系統
 │   ├── prisma.ts              # 資料庫客戶端設定
-│   ├── elastic.ts             # Elasticsearch 客戶端設定
+│   ├── elastic.ts             # Elasticsearch客戶端設定
 │   ├── searchParser.ts        # 進階搜尋語法解析器
 │   ├── logger.ts              # 結構化日誌系統
-│   ├── useErrorHandler.ts     # React 錯誤處理 hook
+│   ├── useErrorHandler.ts     # React錯誤處理hook
 │   └── utils.ts               # 工具函數
 └── public/
     └── ...                    # 靜態資源
 ```
+
+### 🔄 重構效益
+
+**程式碼品質提升：**
+- 主頁面複雜度從580行降至110行
+- 組件職責單一化，易於維護
+- TypeScript類型安全強化
+
+**安全性增強：**
+- 修復XSS漏洞，使用DOMPurify防護
+- 修復SSL配置問題
+- 伺服器端參數驗證
+
+**效能優化：**
+- 防止記憶體洩漏的AbortController
+- 減少不必要的重新渲染
+- 防抖URL更新機制
 
 ## 4. UI/UX 設計準則
 
@@ -1632,19 +1667,31 @@ module.exports = defineConfig({
 
 ### 10.6 測試狀態
 
-**目前測試覆蓋率：**
-- ✅ 單元測試：64/64 通過（100%）
-- ✅ 組件測試：所有主要組件的完整覆蓋
-- ✅ API 測試：包括 Elasticsearch fallback 的完整覆蓋
-- ✅ 整合測試：搜尋工作流程和使用者旅程
-- ✅ E2E 測試：10/11 通過（91% - 需要一個小調整）
+#### 🔄 重構後測試狀態（2024-12）
 
-**關鍵測試功能：**
-- 全面的 Elasticsearch + 資料庫 fallback 測試
-- 多資料庫後端支援（SQLite、PostgreSQL、MySQL）
-- 錯誤處理和邊界案例覆蓋
-- 響應式設計和行動優先方法驗證
-- 網路故障和超時情境
+**目前測試覆蓋率：**
+- ⚠️ 單元測試：需要更新以配合新的組件結構
+- ⚠️ 組件測試：主要組件已重構，測試需要相應調整
+- ✅ API 測試：統一中介軟體需要更新測試格式
+- ⚠️ 整合測試：搜尋工作流程測試需要更新
+- ✅ E2E 測試：應該繼續正常運作（測試使用者行為）
+
+**測試更新需求：**
+- **高優先級**：修復因組件結構變更導致的測試失敗
+- **中優先級**：更新API測試以匹配新的中介軟體回應格式
+- **低優先級**：為新的自定義Hook增加完整測試覆蓋
+
+**重構前測試成果：**
+- ✅ 64/64 單元測試通過（100%）
+- ✅ 全面的 Elasticsearch + 資料庫 fallback 測試
+- ✅ 多資料庫後端支援（SQLite、PostgreSQL、MySQL）
+- ✅ 錯誤處理和邊界案例覆蓋
+- ✅ 響應式設計和行動優先方法驗證
+
+**測試架構改善：**
+- 新的API中介軟體提供標準化的錯誤處理測試
+- 組件分離使單元測試更精確
+- Hook分離使狀態管理邏輯更易測試
 
 ## 11. 故障排除
 

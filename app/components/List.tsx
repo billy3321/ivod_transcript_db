@@ -1,13 +1,24 @@
 import Link from 'next/link';
+import DOMPurify from 'dompurify';
 import { IVOD } from '@/types';
 import { formatCommitteeNames, formatIVODTitle, formatVideoTime, formatVideoType, formatTimestamp } from '@/lib/utils';
 import Icon from './Icon';
 
 interface ListProps {
   items: IVOD[];
+  loading?: boolean;
 }
 
-export default function List({ items }: ListProps) {
+export default function List({ items, loading = false }: ListProps) {
+  if (loading) {
+    return (
+      <div className="bg-white rounded-lg shadow-sm p-12 text-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+        <p className="text-gray-700">載入中...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
       {items.map(item => (
@@ -36,7 +47,11 @@ export default function List({ items }: ListProps) {
                   </div>
                   <div 
                     className="text-sm text-gray-700 leading-relaxed"
-                    dangerouslySetInnerHTML={{ __html: item.excerpt.text }}
+                    dangerouslySetInnerHTML={{ 
+                      __html: typeof window !== 'undefined' 
+                        ? DOMPurify.sanitize(item.excerpt.text)
+                        : item.excerpt.text.replace(/<[^>]*>/g, '') // Server-side fallback
+                    }}
                   />
                 </div>
               )}

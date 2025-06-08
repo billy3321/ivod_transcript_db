@@ -9,6 +9,7 @@ jest.mock('@/lib/logger', () => ({
     warn: jest.fn(),
     info: jest.fn(),
     debug: jest.fn(),
+    logApiError: jest.fn(),
     getClientIP: jest.fn().mockReturnValue('127.0.0.1'),
   },
 }));
@@ -43,7 +44,10 @@ describe('/api/logs', () => {
         component: 'TestComponent',
         action: 'test_action',
         ip: '127.0.0.1',
-        timestamp: expect.any(String),
+        userAgent: undefined,
+        metadata: expect.objectContaining({
+          timestamp: expect.any(String),
+        }),
       })
     );
   });
@@ -143,7 +147,9 @@ describe('/api/logs', () => {
         customField: 'customValue',
         ip: '127.0.0.1',
         userAgent: 'test-browser/1.0',
-        timestamp: expect.any(String),
+        metadata: expect.objectContaining({
+          timestamp: expect.any(String),
+        }),
       })
     );
   });
@@ -164,7 +170,10 @@ describe('/api/logs', () => {
       'Test message without context',
       expect.objectContaining({
         ip: '127.0.0.1',
-        timestamp: expect.any(String),
+        userAgent: undefined,
+        metadata: expect.objectContaining({
+          timestamp: expect.any(String),
+        }),
       })
     );
   });

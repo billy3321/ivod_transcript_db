@@ -50,7 +50,7 @@ def main():
     from ivod.core import (
         DB_BACKEND,
         make_browser,
-        fetch_lastest_date,
+        fetch_latest_date,
         fetch_ivod_list,
         process_ivod,
         Session,

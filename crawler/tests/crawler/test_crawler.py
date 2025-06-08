@@ -12,7 +12,7 @@ from ivod.crawler import (
     random_sleep,
     date_range,
     make_browser,
-    fetch_lastest_date,
+    fetch_latest_date,
     fetch_ivod_list,
     fetch_ivod_info,
     fetch_ai,

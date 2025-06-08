@@ -1,15 +1,38 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 // Mock Elasticsearch and Prisma clients before importing the handler
-jest.mock('@/lib/elastic', () => ({ __esModule: true, default: { search: jest.fn() } }));
+jest.mock('@/lib/elastic', () => ({ 
+  __esModule: true, 
+  default: { search: jest.fn() },
+  esConfig: { index: 'test_index' }
+}));
 jest.mock('@/lib/prisma', () => ({ __esModule: true, default: { iVODTranscript: { findMany: jest.fn() } } }));
 jest.mock('@/lib/utils', () => ({
   ...jest.requireActual('@/lib/utils'),
   getDbBackend: jest.fn(),
 }));
+jest.mock('@/lib/logger', () => ({
+  logger: {
+    info: jest.fn(),
+    warn: jest.fn(),
+    error: jest.fn(),
+    logApiError: jest.fn(),
+  }
+}));
+jest.mock('@/lib/searchParser', () => ({
+  parseAdvancedSearchQuery: jest.fn(),
+  buildElasticsearchQuery: jest.fn(),
+  buildDatabaseQuery: jest.fn(),
+}));
+jest.mock('@/lib/searchHighlight', () => ({
+  extractSearchExcerpt: jest.fn(),
+  isTranscriptSearch: jest.fn(),
+}));
 import handler from '@/pages/api/search';
 import client from '@/lib/elastic';
 import prisma from '@/lib/prisma';
 import { getDbBackend } from '@/lib/utils';
+import { parseAdvancedSearchQuery, buildElasticsearchQuery } from '@/lib/searchParser';
+import { isTranscriptSearch } from '@/lib/searchHighlight';
 
 describe('GET /api/search', () => {
   let statusMock: jest.Mock;
@@ -20,8 +43,44 @@ describe('GET /api/search', () => {
   beforeEach(() => {
     jsonMock = jest.fn();
     statusMock = jest.fn(() => ({ json: jsonMock }));
-    req = { query: { q: 'test' } };
+    req = { 
+      query: { q: 'test' },
+      method: 'GET',
+      headers: { 'user-agent': 'test-agent' },
+      url: '/api/search'
+    };
     res = { status: statusMock };
+    
+    // Enable Elasticsearch for tests
+    process.env.ENABLE_ELASTICSEARCH = 'true';
+    
+    // Setup default mock returns
+    (parseAdvancedSearchQuery as jest.Mock).mockReturnValue({
+      hasAdvancedSyntax: false,
+      parseSuccess: true
+    });
+    (buildElasticsearchQuery as jest.Mock).mockReturnValue({ match_all: {} });
+    (isTranscriptSearch as jest.Mock).mockReturnValue(true);
+    
+    // Mock buildDatabaseQuery to return the expected database query
+    const { buildDatabaseQuery } = require('@/lib/searchParser');
+    (buildDatabaseQuery as jest.Mock).mockImplementation((parsedQuery, dbBackend) => {
+      if (dbBackend === 'sqlite') {
+        return {
+          OR: [
+            { ai_transcript: { contains: 'test' } },
+            { ly_transcript: { contains: 'test' } },
+          ]
+        };
+      } else {
+        return {
+          OR: [
+            { ai_transcript: { contains: 'test', mode: 'insensitive' } },
+            { ly_transcript: { contains: 'test', mode: 'insensitive' } },
+          ]
+        };
+      }
+    });
   });
 
   afterEach(() => {
@@ -42,7 +101,7 @@ describe('GET /api/search', () => {
     await handler(req as NextApiRequest, res as NextApiResponse);
 
     expect(mockSearch).toHaveBeenCalledWith({
-      index: process.env.NEXT_PUBLIC_ES_INDEX,
+      index: expect.any(String),
       body: expect.any(Object),
     });
     expect(statusMock).toHaveBeenCalledWith(200);
@@ -51,7 +110,11 @@ describe('GET /api/search', () => {
         { id: 1, transcript: 'foo' },
         { id: 2, transcript: 'bar' },
       ],
-      fallback: false,
+      success: true,
+      meta: {
+        fallback: false,
+        parsed: expect.any(Object)
+      }
     });
   });
 
@@ -75,56 +138,91 @@ describe('GET /api/search', () => {
         ],
       },
       select: { ivod_id: true, ai_transcript: true, ly_transcript: true },
+      take: 100
     });
     expect(statusMock).toHaveBeenCalledWith(200);
     expect(jsonMock).toHaveBeenCalledWith({
       data: [{ id: 3, transcript: 'fallback' }],
-      fallback: true,
+      success: true,
+      meta: {
+        fallback: true,
+        parsed: expect.any(Object)
+      }
     });
   });
 
-  it('returns 400 on invalid query array', async () => {
-    req = { query: { q: ['a', 'b'] } };
-    await handler(req as NextApiRequest, res as NextApiResponse);
-
-    expect(statusMock).toHaveBeenCalledWith(400);
-    expect(jsonMock).toHaveBeenCalledWith({ error: 'Invalid query' });
-  });
-
-  it('handles empty query string', async () => {
+  it('handles query array by taking first element', async () => {
     const mockSearch = (client.search as unknown) as jest.Mock;
     mockSearch.mockResolvedValue({
       hits: { hits: [] },
     });
-
-    req = { query: { q: '' } };
+    
+    req = { 
+      query: { q: ['valid query', 'second element'] },
+      method: 'GET',
+      headers: { 'user-agent': 'test-agent' },
+      url: '/api/search'
+    };
     await handler(req as NextApiRequest, res as NextApiResponse);
 
-    expect(mockSearch).toHaveBeenCalledWith({
-      index: process.env.NEXT_PUBLIC_ES_INDEX,
-      body: expect.any(Object),
-    });
     expect(statusMock).toHaveBeenCalledWith(200);
     expect(jsonMock).toHaveBeenCalledWith({
       data: [],
-      fallback: false,
+      success: true,
+      meta: {
+        fallback: false,
+        parsed: expect.any(Object)
+      }
     });
   });
 
-  it('handles missing query parameter', async () => {
-    const mockSearch = (client.search as unknown) as jest.Mock;
-    mockSearch.mockResolvedValue({
-      hits: { hits: [] },
-    });
-
-    req = { query: {} };
+  it('returns empty results on empty query string', async () => {
+    req = { 
+      query: { q: '' },
+      method: 'GET',
+      headers: { 'user-agent': 'test-agent' },
+      url: '/api/search'
+    };
     await handler(req as NextApiRequest, res as NextApiResponse);
 
-    expect(mockSearch).toHaveBeenCalled();
     expect(statusMock).toHaveBeenCalledWith(200);
+    expect(jsonMock).toHaveBeenCalledWith({ 
+      data: [],
+      success: true,
+      meta: {
+        fallback: false,
+        parsed: {
+          hasAdvancedSyntax: false,
+          parseSuccess: true
+        }
+      }
+    });
   });
 
-  it('prioritizes ai_transcript over ly_transcript in ES results', async () => {
+  it('returns empty results on missing query parameter', async () => {
+    req = { 
+      query: {},
+      method: 'GET',
+      headers: { 'user-agent': 'test-agent' },
+      url: '/api/search'
+    };
+    await handler(req as NextApiRequest, res as NextApiResponse);
+
+    expect(statusMock).toHaveBeenCalledWith(200);
+    expect(jsonMock).toHaveBeenCalledWith({ 
+      data: [],
+      success: true,
+      meta: {
+        fallback: false,
+        parsed: {
+          hasAdvancedSyntax: false,
+          parseSuccess: true
+        }
+      }
+    });
+  });
+
+  it('prioritizes ly_transcript over ai_transcript in ES results', async () => {
     const mockSearch = (client.search as unknown) as jest.Mock;
     mockSearch.mockResolvedValue({
       hits: {
@@ -140,11 +238,15 @@ describe('GET /api/search', () => {
 
     expect(jsonMock).toHaveBeenCalledWith({
       data: [
-        { id: 1, transcript: 'ai content' },
-        { id: 2, transcript: 'ly only' },
-        { id: 3, transcript: 'ly null ai' },
+        { id: 1, transcript: 'ly content', excerpt: undefined },
+        { id: 2, transcript: 'ly only', excerpt: undefined },
+        { id: 3, transcript: 'ly null ai', excerpt: undefined },
       ],
-      fallback: false,
+      success: true,
+      meta: {
+        fallback: false,
+        parsed: expect.any(Object)
+      }
     });
   });
 
@@ -168,15 +270,20 @@ describe('GET /api/search', () => {
         ],
       },
       select: { ivod_id: true, ai_transcript: true, ly_transcript: true },
+      take: 100
     });
     expect(statusMock).toHaveBeenCalledWith(200);
     expect(jsonMock).toHaveBeenCalledWith({
       data: [{ id: 3, transcript: 'fallback' }],
-      fallback: true,
+      success: true,
+      meta: {
+        fallback: true,
+        parsed: expect.any(Object)
+      }
     });
   });
 
-  it('prioritizes ai_transcript over ly_transcript in DB fallback', async () => {
+  it('prioritizes ly_transcript over ai_transcript in DB fallback', async () => {
     (getDbBackend as jest.Mock).mockReturnValue('postgresql');
     const mockSearch = (client.search as unknown) as jest.Mock;
     mockSearch.mockRejectedValue(new Error('ES unavailable'));
@@ -191,11 +298,15 @@ describe('GET /api/search', () => {
 
     expect(jsonMock).toHaveBeenCalledWith({
       data: [
-        { id: 1, transcript: 'ai content' },
-        { id: 2, transcript: 'ly only' },
-        { id: 3, transcript: 'ly null ai' },
+        { id: 1, transcript: 'ly content', excerpt: undefined },
+        { id: 2, transcript: 'ly only', excerpt: undefined },
+        { id: 3, transcript: 'ly null ai', excerpt: undefined },
       ],
-      fallback: true,
+      success: true,
+      meta: {
+        fallback: true,
+        parsed: expect.any(Object)
+      }
     });
   });
 
@@ -212,7 +323,11 @@ describe('GET /api/search', () => {
     expect(statusMock).toHaveBeenCalledWith(200);
     expect(jsonMock).toHaveBeenCalledWith({
       data: [],
-      fallback: true,
+      success: true,
+      meta: {
+        fallback: true,
+        parsed: expect.any(Object)
+      }
     });
   });
 
@@ -223,8 +338,13 @@ describe('GET /api/search', () => {
     const mockFind = (prisma.iVODTranscript.findMany as unknown) as jest.Mock;
     mockFind.mockRejectedValue(new Error('Database error'));
 
-    await expect(handler(req as NextApiRequest, res as NextApiResponse))
-      .rejects.toThrow('Database error');
+    await handler(req as NextApiRequest, res as NextApiResponse);
+    
+    expect(statusMock).toHaveBeenCalledWith(500);
+    expect(jsonMock).toHaveBeenCalledWith({ 
+      success: false, 
+      error: 'Internal server error'
+    });
   });
 
   it('handles empty results from Elasticsearch', async () => {
@@ -238,7 +358,11 @@ describe('GET /api/search', () => {
     expect(statusMock).toHaveBeenCalledWith(200);
     expect(jsonMock).toHaveBeenCalledWith({
       data: [],
-      fallback: false,
+      success: true,
+      meta: {
+        fallback: false,
+        parsed: expect.any(Object)
+      }
     });
   });
 
@@ -254,28 +378,34 @@ describe('GET /api/search', () => {
     expect(statusMock).toHaveBeenCalledWith(200);
     expect(jsonMock).toHaveBeenCalledWith({
       data: [],
-      fallback: true,
+      success: true,
+      meta: {
+        fallback: true,
+        parsed: expect.any(Object)
+      }
     });
   });
 
-  it('uses bodybuilder to construct proper ES query', async () => {
+  it('constructs proper ES query', async () => {
     const mockSearch = (client.search as unknown) as jest.Mock;
     mockSearch.mockResolvedValue({
       hits: { hits: [] },
     });
 
-    req = { query: { q: 'search term' } };
+    req = { 
+      query: { q: 'search term' },
+      method: 'GET',
+      headers: { 'user-agent': 'test-agent' },
+      url: '/api/search'
+    };
     await handler(req as NextApiRequest, res as NextApiResponse);
 
     expect(mockSearch).toHaveBeenCalledWith({
-      index: process.env.NEXT_PUBLIC_ES_INDEX,
+      index: expect.any(String),
       body: expect.objectContaining({
-        query: expect.objectContaining({
-          multi_match: expect.objectContaining({
-            query: 'search term',
-            fields: ['ai_transcript', 'ly_transcript']
-          })
-        })
+        query: expect.any(Object),
+        _source: ['ivod_id', 'ai_transcript', 'ly_transcript'],
+        size: 100
       }),
     });
   });

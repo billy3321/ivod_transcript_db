@@ -8,7 +8,7 @@ from datetime import datetime
 from .crawler import (
     HEADERS,
     make_browser,
-    fetch_lastest_date,
+    fetch_latest_date,
     fetch_ivod_list,
     fetch_ivod_info,
     fetch_ai,

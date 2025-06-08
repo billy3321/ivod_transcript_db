@@ -2,46 +2,49 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import client, { esConfig } from '@/lib/elastic';
 import prisma from '@/lib/prisma';
 import { getDbBackend } from '@/lib/utils';
-import { logger } from '@/lib/logger';
 import { parseAdvancedSearchQuery, buildElasticsearchQuery, buildDatabaseQuery } from '@/lib/searchParser';
 import { extractSearchExcerpt, isTranscriptSearch } from '@/lib/searchHighlight';
+import { logger } from '@/lib/logger';
+import { 
+  withErrorHandler, 
+  validateMethod, 
+  parseStringParam, 
+  createSuccessResponse,
+  createErrorResponse,
+  APIResponse 
+} from '@/lib/api-middleware';
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const { q = '' } = req.query;
+interface SearchResult {
+  id: number;
+  transcript: string | null;
+  excerpt?: {
+    text: string;
+    plainText: string;
+    hasMatch: boolean;
+    matchPosition: number;
+  };
+}
+
+async function searchHandler(req: NextApiRequest, res: NextApiResponse): Promise<APIResponse<SearchResult[]>> {
+  validateMethod(req, ['GET']);
   
-  if (Array.isArray(q)) {
-    logger.warn('Invalid query parameter received', {
-      method: req.method,
-      url: req.url,
-      metadata: {
-        query: q
+  const q = parseStringParam(req.query.q, 'q', '');
+  
+  // If query is empty, return empty results
+  if (!q.trim()) {
+    return createSuccessResponse([], {
+      fallback: false,
+      parsed: {
+        hasAdvancedSyntax: false,
+        parseSuccess: true
       }
-    });
-    res.status(400).json({ error: 'Invalid query' });
-    return;
+    } as any);
   }
 
   // Parse the advanced search query
-  const parsedQuery = parseAdvancedSearchQuery(q as string);
+  const parsedQuery = parseAdvancedSearchQuery(q);
   
-  // Log the search request with parsed information
-  logger.logApiRequest(req, { 
-    query: q,
-    searchType: 'transcript',
-    hasAdvancedSyntax: parsedQuery.hasAdvancedSyntax,
-    parseSuccess: parsedQuery.parseSuccess
-  });
-  
-  let hits: Array<{ 
-    id: number; 
-    transcript: string | null;
-    excerpt?: {
-      text: string;
-      plainText: string;
-      hasMatch: boolean;
-      matchPosition: number;
-    }
-  }> = [];
+  let hits: SearchResult[] = [];
   let usedES = true;
   
   // Check if Elasticsearch is enabled
@@ -154,31 +157,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         });
         hits = [];
       } else {
-        logger.logDatabaseError(dbError, 'search', {
-          query: q,
-          parsedQuery: parsedQuery
-        });
-        res.status(500).json({ error: 'Search failed' });
-        return;
+        throw createErrorResponse('Database search failed', 500);
       }
     }
   }
   
-  logger.info('Search completed successfully', {
-    metadata: {
-      query: q,
-      resultsCount: hits.length,
-      usedElasticsearch: usedES,
-      hasAdvancedSyntax: parsedQuery.hasAdvancedSyntax
-    }
-  });
-  
-  res.status(200).json({ 
-    data: hits, 
+  return createSuccessResponse(hits, {
     fallback: !usedES,
     parsed: {
       hasAdvancedSyntax: parsedQuery.hasAdvancedSyntax,
       parseSuccess: parsedQuery.parseSuccess
     }
-  });
+  } as any);
 }
+
+export default withErrorHandler(searchHandler);

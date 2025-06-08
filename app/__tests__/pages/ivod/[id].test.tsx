@@ -65,12 +65,12 @@ describe('IVOD Detail Page', () => {
         ivod_url: 'https://example.com/ivod',
         category: '質詢',
         meeting_code: 'TEST001',
-        meeting_time: '2022-01-01 09:00:00+08:00',
+        meeting_time: '2022-01-01T09:00:00+08:00',
         ai_transcript: 'AI generated transcript content',
         ly_transcript: 'Legislative Yuan transcript content',
         ai_status: 'success',
         ly_status: 'success',
-        last_updated: '2022-01-01 10:00:00+08:00'
+        last_updated: '2022-01-01T10:00:00+08:00'
       },
     };
 
@@ -83,7 +83,7 @@ describe('IVOD Detail Page', () => {
     await waitFor(() => {
       expect(screen.getByText('Test Title（Test Speaker 發言）')).toBeInTheDocument();
       expect(screen.getByText('Test Meeting')).toBeInTheDocument();
-      expect(screen.getByText('2022-01-01')).toBeInTheDocument();
+      expect(screen.getByText('2022/1/1 上午8:00:00')).toBeInTheDocument();
       expect(screen.getByText('委員會A, 委員會B')).toBeInTheDocument();
       expect(screen.getByText('10:00')).toBeInTheDocument();
       expect(screen.getByText('發言')).toBeInTheDocument();
@@ -272,7 +272,7 @@ describe('IVOD Detail Page', () => {
         ai_transcript: 'Complete meeting transcript',
         ai_status: 'success',
         ly_status: 'success',
-        last_updated: '2022-01-02 10:00:00+08:00'
+        last_updated: '2022-01-02T10:00:00+08:00'
       },
     };
 
@@ -354,7 +354,7 @@ describe('IVOD Detail Page', () => {
         ai_transcript: 'Test transcript',
         ai_status: 'success',
         ly_status: 'pending',
-        last_updated: '2022-01-01 10:00:00+08:00'
+        last_updated: '2022-01-01T10:00:00+08:00'
       },
     };
 

@@ -15,8 +15,10 @@ import time, random
 import urllib3
 from urllib3.exceptions import InsecureRequestWarning
 
-# 關閉 InsecureRequestWarning
-urllib3.disable_warnings(InsecureRequestWarning)
+# Only disable warnings if explicitly configured to skip SSL
+import os
+if os.getenv('SKIP_SSL', 'false').lower() == 'true':
+    urllib3.disable_warnings(InsecureRequestWarning)
 
 HEADERS = [
     ("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -48,10 +50,14 @@ def date_range(start_date: str, end_date: str):
         yield dt.strftime("%Y-%m-%d")
 
 
-def make_browser(skip_ssl: bool = False) -> mechanize.Browser:
+def make_browser(skip_ssl: bool = None) -> mechanize.Browser:
     """
     建立 mechanize.Browser()，可選擇是否跳過 SSL 驗證，並設定 headers + cookie。
+    如果 skip_ssl 為 None，會從環境變數 SKIP_SSL 讀取設定。
     """
+    if skip_ssl is None:
+        skip_ssl = os.getenv('SKIP_SSL', 'false').lower() == 'true'
+    
     cj = cookiejar.LWPCookieJar()
     br = mechanize.Browser()
     br.set_cookiejar(cj)
@@ -66,20 +72,23 @@ def make_browser(skip_ssl: bool = False) -> mechanize.Browser:
 
     if skip_ssl:
         import urllib.request
+        import logging
+        logging.warning("SSL verification is disabled. This is not recommended for production use.")
         ctx = ssl._create_unverified_context(cert_reqs=ssl.CERT_NONE)
         br.add_handler(urllib.request.HTTPSHandler(context=ctx))
 
     return br
 
 
-def fetch_lastest_date(br: mechanize.Browser):
+def fetch_latest_date(br: mechanize.Browser):
     url = 'https://ly.govapi.tw/v2/ivods?limit=1'
     try:
         resp = br.open(url)
         raw = resp.read().decode('utf-8')
     except Exception:
         # Fallback to requests for JSON endpoints to avoid mechanize gzip issues
-        raw = requests.get(url, verify=False).text
+        verify_ssl = not (os.getenv('SKIP_SSL', 'false').lower() == 'true')
+        raw = requests.get(url, verify=verify_ssl).text
     js = json.loads(raw)
     date = datetime.fromisoformat(js.get('ivods')[0]['日期']).date()
     return date
@@ -91,7 +100,8 @@ def fetch_available_dates(br: mechanize.Browser, session=3):
         raw = resp.read().decode('utf-8')
     except Exception:
         # Fallback to requests for JSON endpoints to avoid mechanize gzip issues
-        raw = requests.get(url, verify=False).text
+        verify_ssl = not (os.getenv('SKIP_SSL', 'false').lower() == 'true')
+        raw = requests.get(url, verify=verify_ssl).text
     js = json.loads(raw)
     aggs = js.get('aggs', [])
     dates = []
@@ -109,7 +119,8 @@ def fetch_ivod_info(br: mechanize.Browser, ivod_id: int):
         resp = br.open(url)
         raw = resp.read().decode('utf-8')
     except Exception:
-        raw = requests.get(url, verify=False).text
+        verify_ssl = not (os.getenv('SKIP_SSL', 'false').lower() == 'true')
+        raw = requests.get(url, verify=verify_ssl).text
     
     try:
         js = json.loads(raw)

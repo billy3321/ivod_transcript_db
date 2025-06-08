@@ -12,13 +12,23 @@ export default function IvodDetail() {
   const router = useRouter();
   const { id } = router.query;
   const [data, setData] = useState<IVODDetail | null>(null);
-  const [activeTab, setActiveTab] = useState<'ai' | 'ly'>('ai');
+  const [activeTab, setActiveTab] = useState<'ai' | 'ly'>('ly');
 
   useEffect(() => {
     if (!id) return;
     fetch(`/api/ivods/${id}`)
       .then(res => res.json())
-      .then(json => setData(json.data));
+      .then(json => {
+        setData(json.data);
+        // Set default tab based on available transcripts - prioritize ly_transcript
+        if (json.data) {
+          if (json.data.ly_transcript) {
+            setActiveTab('ly');
+          } else if (json.data.ai_transcript) {
+            setActiveTab('ai');
+          }
+        }
+      });
   }, [id]);
 
   const generateMetaTags = () => {
@@ -26,9 +36,21 @@ export default function IvodDetail() {
     
     const formattedTitle = formatIVODTitle(data.title, data.meeting_name, data.speaker_name);
     const title = `${formattedTitle} - ${formatTimestamp(data.date)} - IVOD 逐字稿檢索系統`;
-    const description = `${formattedTitle}，${formatTimestamp(data.date)}${data.video_type ? `，${formatVideoType(data.video_type)}` : ''}。台灣立法院IVOD影片與逐字稿檢索，提供完整會議記錄。${data.meeting_name ? ` 會議：${data.meeting_name}` : ''}${data.committee_names ? `，委員會：${formatCommitteeNames(data.committee_names)}` : ''}`;
-    const keywords = `立法院,IVOD,逐字稿,${data.title || ''},${data.meeting_name || ''},${data.speaker_name || ''},台灣政治,會議紀錄,${data.committee_names ? formatCommitteeNames(data.committee_names) : ''},${data.video_type || ''}`;
+    
+    // Create rich description with transcript excerpt
+    const transcriptContent = data.ly_transcript || data.ai_transcript || '';
+    const transcriptExcerpt = transcriptContent ? transcriptContent.slice(0, 150).replace(/\s+/g, ' ').trim() + '...' : '';
+    
+    const description = `${formattedTitle}，${formatTimestamp(data.date)}${data.video_type ? `，${formatVideoType(data.video_type)}` : ''}。台灣立法院IVOD影片與逐字稿檢索，提供完整會議記錄。${data.meeting_name ? ` 會議：${data.meeting_name}` : ''}${data.committee_names ? `，委員會：${formatCommitteeNames(data.committee_names)}` : ''}${transcriptExcerpt ? ` 內容摘要：${transcriptExcerpt}` : ''}`;
+    
+    const keywords = `立法院,IVOD,逐字稿,會議記錄,${data.title || ''},${data.meeting_name || ''},${data.speaker_name || ''},台灣政治,立法委員,國會監督,${data.committee_names ? formatCommitteeNames(data.committee_names) : ''},${data.video_type || ''},${data.category || ''}`;
     const canonicalUrl = `${process.env.NEXT_PUBLIC_SITE_URL || 'https://ivod-search.g0v.tw'}/ivod/${data.ivod_id}`;
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://ivod-search.g0v.tw';
+    const imageUrl = `${siteUrl}/og-image.jpg`;
+    
+    // Format date for structured data
+    const isoDate = new Date(data.date).toISOString();
+    const publishedTime = data.meeting_time ? new Date(data.meeting_time).toISOString() : isoDate;
     
     return (
       <Head>
@@ -36,32 +58,75 @@ export default function IvodDetail() {
         <meta name="description" content={description} />
         <meta name="keywords" content={keywords} />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" />
+        <meta name="googlebot" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" />
         
         {/* Open Graph */}
+        <meta property="og:locale" content="zh_TW" />
+        <meta property="og:site_name" content="IVOD 逐字稿檢索系統" />
         <meta property="og:title" content={title} />
         <meta property="og:description" content={description} />
         <meta property="og:url" content={canonicalUrl} />
         <meta property="og:type" content="article" />
-        <meta property="og:article:published_time" content={formatTimestamp(data.date)} />
-        <meta property="og:article:author" content={data.speaker_name || '立法院'} />
-        <meta property="og:article:section" content="政治" />
-        <meta property="og:article:tag" content="立法院" />
+        <meta property="og:image" content={imageUrl} />
+        <meta property="og:image:width" content="1200" />
+        <meta property="og:image:height" content="630" />
+        <meta property="og:image:alt" content={`${formattedTitle} - 立法院IVOD逐字稿`} />
+        <meta property="article:published_time" content={publishedTime} />
+        <meta property="article:modified_time" content={new Date(data.last_updated).toISOString()} />
+        <meta property="article:author" content={data.speaker_name || '立法院'} />
+        <meta property="article:section" content="台灣政治" />
+        <meta property="article:tag" content="立法院" />
+        <meta property="article:tag" content="IVOD" />
+        <meta property="article:tag" content="逐字稿" />
+        {data.committee_names && <meta property="article:tag" content={formatCommitteeNames(data.committee_names)} />}
+        {data.video_type && <meta property="article:tag" content={formatVideoType(data.video_type)} />}
         
         {/* Twitter Card */}
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:site" content="@g0vtw" />
+        <meta name="twitter:creator" content="@g0vtw" />
         <meta name="twitter:title" content={title} />
         <meta name="twitter:description" content={description} />
+        <meta name="twitter:image" content={imageUrl} />
+        <meta name="twitter:image:alt" content={`${formattedTitle} - 立法院IVOD逐字稿`} />
         
-        {/* Legislative specific metadata */}
-        <meta name="DC.date" content={formatTimestamp(data.date)} />
-        <meta name="DC.subject" content={formattedTitle} />
-        <meta name="DC.description" content={data.meeting_name || ''} />
-        <meta name="DC.contributor" content={data.speaker_name || ''} />
-        <meta name="DC.identifier" content={data.ivod_id.toString()} />
-        <meta name="DC.type" content={data.video_type || 'Video'} />
-        <meta name="DC.coverage" content={data.committee_names ? formatCommitteeNames(data.committee_names) : ''} />
+        {/* Dublin Core metadata for academic/legislative content */}
+        <meta name="DC.title" content={formattedTitle} />
+        <meta name="DC.creator" content={data.speaker_name || '立法院'} />
+        <meta name="DC.subject" content={`立法院會議記錄,${data.meeting_name || ''},${data.committee_names ? formatCommitteeNames(data.committee_names) : ''}`} />
+        <meta name="DC.description" content={description} />
+        <meta name="DC.publisher" content="立法院" />
+        <meta name="DC.contributor" content="g0v 零時政府" />
+        <meta name="DC.date" content={isoDate} />
+        <meta name="DC.type" content="MovingImage" />
+        <meta name="DC.format" content="text/html" />
+        <meta name="DC.identifier" content={`ivod:${data.ivod_id}`} />
+        <meta name="DC.source" content={data.ivod_url} />
+        <meta name="DC.language" content="zh-TW" />
+        <meta name="DC.coverage" content={`台灣立法院${data.committee_names ? `,${formatCommitteeNames(data.committee_names)}` : ''}`} />
+        <meta name="DC.rights" content="立法院著作權所有" />
+        
+        {/* Additional metadata for government/legislative content */}
+        <meta name="government.type" content="立法院" />
+        <meta name="government.country" content="台灣" />
+        <meta name="parliament.session" content="第11屆" />
+        <meta name="meeting.type" content={data.video_type || ''} />
+        <meta name="meeting.date" content={formatTimestamp(data.date)} />
+        {data.committee_names && <meta name="committee" content={formatCommitteeNames(data.committee_names)} />}
+        
+        {/* Schema.org structured data will be handled by StructuredData component */}
         
         {/* Canonical URL */}
         <link rel="canonical" href={canonicalUrl} />
+        
+        {/* Preconnect to external domains for performance */}
+        <link rel="preconnect" href="https://ivod-search.g0v.tw" />
+        <link rel="preconnect" href="https://dataly.openfun.app" />
+        
+        {/* Additional language/locale hints */}
+        <link rel="alternate" hrefLang="zh-TW" href={canonicalUrl} />
+        <link rel="alternate" hrefLang="zh" href={canonicalUrl} />
       </Head>
     );
   };
@@ -297,16 +362,6 @@ export default function IvodDetail() {
               <h2 className="text-lg font-semibold text-gray-900">逐字稿</h2>
               <div className="flex bg-gray-100 rounded-lg p-1">
                 <button
-                  onClick={() => setActiveTab('ai')}
-                  className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${
-                    activeTab === 'ai'
-                      ? 'bg-white text-blue-700 shadow-sm'
-                      : 'text-gray-600 hover:text-gray-800'
-                  }`}
-                >
-                  AI 逐字稿
-                </button>
-                <button
                   onClick={() => setActiveTab('ly')}
                   className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${
                     activeTab === 'ly'
@@ -316,24 +371,21 @@ export default function IvodDetail() {
                 >
                   立院逐字稿
                 </button>
+                <button
+                  onClick={() => setActiveTab('ai')}
+                  className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${
+                    activeTab === 'ai'
+                      ? 'bg-white text-blue-700 shadow-sm'
+                      : 'text-gray-600 hover:text-gray-800'
+                  }`}
+                >
+                  AI 逐字稿
+                </button>
               </div>
             </div>
             
             <div className="min-h-[400px] max-h-[600px] overflow-y-auto">
-              {activeTab === 'ai' ? (
-                data.ai_transcript ? (
-                  <TranscriptViewer transcript={data.ai_transcript} />
-                ) : (
-                  <div className="flex items-center justify-center h-64 text-gray-500">
-                    <div className="text-center">
-                      <svg className="w-12 h-12 mx-auto mb-2" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                      </svg>
-                      <p>AI 逐字稿尚未提供</p>
-                    </div>
-                  </div>
-                )
-              ) : (
+              {activeTab === 'ly' ? (
                 data.ly_transcript ? (
                   <TranscriptViewer transcript={data.ly_transcript} />
                 ) : (
@@ -343,6 +395,19 @@ export default function IvodDetail() {
                         <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
                       </svg>
                       <p>立院逐字稿尚未提供</p>
+                    </div>
+                  </div>
+                )
+              ) : (
+                data.ai_transcript ? (
+                  <TranscriptViewer transcript={data.ai_transcript} />
+                ) : (
+                  <div className="flex items-center justify-center h-64 text-gray-500">
+                    <div className="text-center">
+                      <svg className="w-12 h-12 mx-auto mb-2" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                      </svg>
+                      <p>AI 逐字稿尚未提供</p>
                     </div>
                   </div>
                 )

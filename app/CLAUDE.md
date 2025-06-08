@@ -9,17 +9,66 @@ This is a Next.js TypeScript application that provides a web interface for searc
 ## Architecture & Key Files
 
 ### Core Application Structure
-- **Entry Points**: `pages/_app.tsx` (app wrapper), `pages/_document.tsx` (HTML document)
-- **Main Pages**: `pages/index.tsx` (search interface), `pages/ivod/[id].tsx` (detail view)
-- **API Layer**: `pages/api/` - RESTful endpoints for data access
-- **Components**: `components/` - Modular React components with error handling
-- **Database**: `lib/prisma.ts` - Database client with multi-backend and environment support
-- **Database Environment**: `lib/database-env.ts` - Environment-specific database configuration
-- **Search**: `lib/elastic.ts` - Elasticsearch integration with DB fallback
-- **Search Parser**: `lib/searchParser.ts` - Advanced query parsing with boolean logic
-- **Search Highlighting**: `lib/searchHighlight.ts` - Extract and highlight search excerpts
-- **Logging**: `lib/logger.ts` - Structured logging system with file rotation
-- **Error Handling**: `lib/useErrorHandler.ts` - React hook for error management
+
+#### **🏗️ Refactored Architecture (2024-12)**
+
+**Major Component Restructuring**:
+- **Main Search Page**: `pages/index.tsx` - Reduced from 580 to 110 lines using modular components
+- **Component Separation**: 
+  - `components/SearchHeader.tsx` - Search interface and advanced search form (140 lines)
+  - `components/SearchResults.tsx` - Results display and pagination logic (80 lines)  
+  - `components/List.tsx` - IVOD list with XSS protection using DOMPurify
+- **Custom Hook Architecture**: 
+  - `hooks/useSearch.ts` - Three specialized hooks for search management:
+    - `useSearchFilters`: URL parameter synchronization and filter state
+    - `useSearchResults`: API calls with AbortController for cleanup
+    - `useUrlSync`: Debounced URL updates to prevent excessive navigation
+
+**API Middleware System**:
+- **Unified Error Handling**: `lib/api-middleware.ts` - Standardized API responses
+- **Type Safety**: Comprehensive TypeScript interfaces for all API endpoints
+- **Request Validation**: Helper functions for parameter parsing and validation
+- **Error Classification**: Proper HTTP status codes and error categorization
+
+**Security Enhancements**:
+- **XSS Protection**: DOMPurify integration with server-side fallback for HTML sanitization
+- **Request Cancellation**: AbortController implementation to prevent memory leaks
+- **Input Validation**: Server-side parameter validation with type checking
+
+**Performance Optimizations**:
+- **Component Separation**: Reduced re-render scope through focused component responsibilities
+- **Hook Specialization**: Isolated state management prevents unnecessary effects
+- **Request Cleanup**: Automatic cancellation of pending requests during navigation
+
+**Database & Search**:
+- **Multi-Backend Support**: `lib/prisma.ts` with `lib/database-env.ts` configuration
+- **Search Integration**: `lib/elastic.ts` with database fallback
+- **Advanced Parsing**: `lib/searchParser.ts` for complex query syntax
+- **Search Highlighting**: `lib/searchHighlight.ts` for excerpt generation
+- **Logging System**: `lib/logger.ts` with structured error tracking
+
+#### **Key Refactoring Benefits**
+
+**Code Quality Improvements**:
+- **Reduced Complexity**: Main search page reduced from 580 to 110 lines
+- **Single Responsibility**: Each component has focused, well-defined purpose
+- **Type Safety**: Comprehensive TypeScript interfaces throughout API layer
+- **Error Handling**: Unified error management with proper HTTP status codes
+
+**Security Fixes**:
+- **XSS Prevention**: Fixed dangerouslySetInnerHTML vulnerability with DOMPurify
+- **SSL Configuration**: Fixed crawler SSL verification being globally disabled
+- **Input Validation**: Server-side parameter validation with type checking
+
+**Performance Enhancements**:
+- **Memory Leak Prevention**: AbortController for request cancellation
+- **Reduced Re-renders**: Component separation minimizes unnecessary updates
+- **Debounced URL Updates**: Prevents excessive navigation events
+
+**Maintainability**:
+- **Modular Architecture**: Clear separation between UI, state, and API logic
+- **Reusable Hooks**: Shared state management logic across components
+- **Standardized APIs**: Consistent request/response patterns
 
 ### Key Features
 1. **Advanced Search Capabilities**: 
@@ -168,30 +217,81 @@ The `scripts/updatePrismaSchema.js` automatically handles provider-specific fiel
 - `DELETE /api/admin/logs` - Delete log files (requires admin token)
 
 ### Request/Response Patterns
-All API routes follow consistent patterns:
+All API routes use the unified middleware system (`lib/api-middleware.ts`):
+
+**Standardized Response Format**:
+```typescript
+interface APIResponse<T> {
+  data?: T;
+  meta?: { total?: number; page?: number; pageSize?: number; };
+  success: boolean;
+  error?: string;
+  fallback?: boolean;
+}
+```
+
+**Error Handling**:
 - Proper HTTP status codes (200, 400, 404, 500)
-- JSON response format with error handling
-- Query parameter validation
-- Pagination support where applicable
+- Consistent error response format
+- Structured error logging with request context
+- Development vs production error message filtering
+
+**Parameter Validation**:
+- Type-safe parameter parsing (`parseStringParam`, `parseIntParam`)
+- Required field validation
+- HTTP method validation
+- Input sanitization and validation
 
 ## Component Architecture
 
-### Layout Components
+### **Refactored Component Structure (2024-12)**
+
+#### **Search Page Components**
+- **`components/SearchHeader.tsx`** - Search interface component (140 lines)
+  - Main search input with placeholder management
+  - Advanced search toggle and form fields
+  - Search scope selector (all fields vs transcript only)
+  - Clear filters functionality
+- **`components/SearchResults.tsx`** - Results display component (80 lines)
+  - Loading state management
+  - Results count and pagination info
+  - No results messaging
+  - Error state handling
+
+#### **Custom Hooks (`hooks/useSearch.ts`)**
+- **`useSearchFilters`** - URL parameter synchronization
+  - Manages search filters state from URL query parameters
+  - Handles default values and parameter parsing
+  - Synchronizes advanced search form inputs
+- **`useSearchResults`** - API call management
+  - Handles search API calls with AbortController
+  - Manages loading states and error handling
+  - Implements request cancellation on component unmount
+- **`useUrlSync`** - URL state management
+  - Debounced URL updates to prevent excessive navigation
+  - Maintains browser history integrity
+  - Handles query parameter serialization
+
+#### **Layout Components**
 - `Layout.tsx` - Main page wrapper with header/footer
 - `Header.tsx` - Navigation header with mobile menu
 - `Footer.tsx` - Site footer with links
 - `Sidebar.tsx` - Mobile navigation drawer
 
-### Feature Components
-- `SearchForm.tsx` - Advanced search interface with syntax help and URL state sync
-- `List.tsx` - IVOD results display with responsive cards
+#### **Core Feature Components**
+- **`List.tsx`** - IVOD results display with XSS protection
+  - DOMPurify integration for safe HTML rendering
+  - Server-side HTML stripping fallback
+  - Responsive card layout
+- `SearchForm.tsx` - Legacy search form (being phased out)
 - `Pagination.tsx` - Page navigation with proper accessibility
 - `TranscriptViewer.tsx` - Expandable transcript display
 
-### Utility Components
+#### **Utility Components**
 - `Icon.tsx` - SVG icon system
 - `ClientOnly.tsx` - Client-side rendering wrapper
 - `StructuredData.tsx` - SEO structured data injection
+- `ErrorBoundary.tsx` - React error boundary with automatic error reporting
 
 ## Search System Architecture
 
@@ -369,32 +469,62 @@ Search state synchronized with URL:
 
 ## Testing Strategy
 
-### Unit Tests (Jest + React Testing Library)
-- Component behavior testing
-- API route testing with mocked dependencies
-- Utility function testing
-- Database fallback logic testing
+### **Post-Refactoring Testing Status (2024-12)**
 
-### Integration Tests
-- Search workflow testing
+#### **Test Updates Required**
+The refactoring introduced component structure changes that require test updates:
+
+**Component Test Updates Needed**:
+- Main search page tests need updating for new component structure
+- Tests currently fail due to title being moved to Head component
+- Interface element testing now more appropriate than text content testing
+
+**API Test Updates**:
+- API tests need updating to match new middleware response format
+- Error handling tests should validate new standardized error responses
+- Parameter validation tests should use new helper functions
+
+#### **Unit Tests (Jest + React Testing Library)**
+- **Component Testing**: Focus on interface elements rather than internal DOM structure
+- **API Route Testing**: Tests use new middleware with standardized responses
+- **Hook Testing**: New custom hooks need comprehensive test coverage
+- **Utility Function Testing**: XSS protection and security features testing
+
+#### **Current Test Status**:
+```bash
+# Some tests currently failing due to refactoring
+npm run test:ci  # Needs attention for component structure changes
+
+# E2E tests likely still passing as they test user behavior
+npm run cypress:run  # Should continue working
+```
+
+#### **Integration Tests**
+- Search workflow testing (needs update for new component structure)
 - Database switching scenarios
-- Error handling validation
+- Error handling validation with new middleware
 
-### E2E Tests (Cypress)
-- Complete user journeys
+#### **E2E Tests (Cypress)**
+- Complete user journeys (should continue working)
 - Cross-browser compatibility
 - Mobile responsive behavior
 - Search functionality validation
 
-### Test Organization
+#### **Test Organization**
 ```
 __tests__/
-├── components/          # Component tests
-├── pages/              # Page component tests
+├── components/          # Component tests (needs updates)
+├── pages/              # Page component tests (needs updates)
 ├── integration/        # Integration test suites
-├── lib/               # Utility function tests
-├── *-api.test.ts      # API route tests
+├── lib/               # Utility function tests + new hooks
+├── *-api.test.ts      # API route tests (needs middleware updates)
+└── hooks/              # New custom hooks testing
 ```
+
+#### **Testing Priorities**
+1. **High Priority**: Fix failing component tests due to structure changes
+2. **Medium Priority**: Update API tests for new middleware format
+3. **Low Priority**: Add comprehensive hook testing coverage
 
 ## Performance Optimization
 

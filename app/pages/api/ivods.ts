@@ -2,59 +2,69 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
 import { getDbBackend, createContainsCondition, convertToDate } from '@/lib/utils';
 import { universalSearch, shouldUseUniversalSearch } from '@/lib/universal-search';
-import { logger } from '@/lib/logger';
+import { 
+  withErrorHandler, 
+  validateMethod, 
+  parseStringParam, 
+  parseIntParam,
+  createSuccessResponse,
+  createErrorResponse,
+  APIResponse 
+} from '@/lib/api-middleware';
+import { IVOD } from '@/types';
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const { 
-    q, 
-    meeting_name,
-    speaker,
-    committee,
-    date_from,
-    date_to,
-    page = '1', 
-    pageSize = '20', 
-    sort = 'date_desc',
-    ids
-  } = req.query;
-  
-  // Log the API request with search parameters
-  logger.logApiRequest(req, {
-    searchParams: {
-      q, meeting_name, speaker, committee, date_from, date_to, page, pageSize, sort, ids
-    }
-  });
-  
-  const pageNum = parseInt(page as string, 10);
-  const size = parseInt(pageSize as string, 10);
+interface SearchParams {
+  q?: string;
+  meeting_name?: string;
+  speaker?: string;
+  committee?: string;
+  date_from?: string;
+  date_to?: string;
+  ids?: string;
+  page: number;
+  pageSize: number;
+  sort: 'date_desc' | 'date_asc';
+}
 
-  // Check if we should use universal search for better partial matching
-  const searchParams = {
-    q: q as string,
-    meeting_name: meeting_name as string,
-    speaker: speaker as string,
-    committee: committee as string,
-    date_from: date_from as string,
-    date_to: date_to as string,
-    ids: ids as string,
-    page: pageNum,
-    pageSize: size,
-    sort: sort as 'date_desc' | 'date_asc'
+async function ivodsHandler(req: NextApiRequest, res: NextApiResponse): Promise<APIResponse<IVOD[]>> {
+  validateMethod(req, ['GET']);
+  
+  // Parse and validate parameters
+  const searchParams: SearchParams = {
+    q: parseStringParam(req.query.q, 'q', ''),
+    meeting_name: parseStringParam(req.query.meeting_name, 'meeting_name', ''),
+    speaker: parseStringParam(req.query.speaker, 'speaker', ''),
+    committee: parseStringParam(req.query.committee, 'committee', ''),
+    date_from: parseStringParam(req.query.date_from, 'date_from', ''),
+    date_to: parseStringParam(req.query.date_to, 'date_to', ''),
+    ids: parseStringParam(req.query.ids, 'ids', ''),
+    page: parseIntParam(req.query.page, 'page', 1),
+    pageSize: parseIntParam(req.query.pageSize, 'pageSize', 20),
+    sort: (parseStringParam(req.query.sort, 'sort', 'date_desc') as 'date_desc' | 'date_asc'),
   };
+
+  // Validate page size
+  if (searchParams.pageSize > 100) {
+    throw createErrorResponse('Page size cannot exceed 100', 400);
+  }
 
   if (shouldUseUniversalSearch(searchParams)) {
     try {
       const result = await universalSearch(searchParams);
-      return res.status(200).json(result);
+      return createSuccessResponse(result.data, {
+        total: result.total,
+        page: searchParams.page,
+        pageSize: searchParams.pageSize
+      });
     } catch (error: any) {
-      logger.logDatabaseError(error, 'universal_search_fallback', searchParams);
       // Fall through to standard Prisma search
+      console.warn('Universal search failed, falling back to Prisma:', error.message);
     }
   }
 
   // Standard Prisma search (fallback or when universal search is not needed)
-  const skip = (pageNum - 1) * size;
-  const orderBy: any = sort === 'date_asc' ? { date: 'asc' } : { date: 'desc' };
+  const skip = (searchParams.page - 1) * searchParams.pageSize;
+  const orderBy: any = searchParams.sort === 'date_asc' ? { date: 'asc' } : { date: 'desc' };
 
   let where: any = {};
   const conditions: any[] = [];
@@ -64,15 +74,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const isInsensitiveSupported = dbBackend !== 'sqlite';
   
   // General search in multiple fields
-  if (q && typeof q === 'string') {
+  if (searchParams.q) {
     const searchFields = [
-      createContainsCondition('title', q, dbBackend),
-      createContainsCondition('meeting_name', q, dbBackend),
-      createContainsCondition('speaker_name', q, dbBackend),
-      createContainsCondition('committee_names', q, dbBackend),
-      createContainsCondition('meeting_code_str', q, dbBackend),
-      createContainsCondition('ai_transcript', q, dbBackend),
-      createContainsCondition('ly_transcript', q, dbBackend),
+      createContainsCondition('title', searchParams.q, dbBackend),
+      createContainsCondition('meeting_name', searchParams.q, dbBackend),
+      createContainsCondition('speaker_name', searchParams.q, dbBackend),
+      createContainsCondition('committee_names', searchParams.q, dbBackend),
+      createContainsCondition('meeting_code_str', searchParams.q, dbBackend),
+      createContainsCondition('ai_transcript', searchParams.q, dbBackend),
+      createContainsCondition('ly_transcript', searchParams.q, dbBackend),
     ];
     
     conditions.push({
@@ -81,24 +91,24 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   // Specific field searches
-  if (meeting_name && typeof meeting_name === 'string') {
-    const meetingCondition = createContainsCondition('meeting_name', meeting_name, dbBackend);
+  if (searchParams.meeting_name) {
+    const meetingCondition = createContainsCondition('meeting_name', searchParams.meeting_name, dbBackend);
     conditions.push(meetingCondition);
   }
 
-  if (speaker && typeof speaker === 'string') {
-    const speakerCondition = createContainsCondition('speaker_name', speaker, dbBackend);
+  if (searchParams.speaker) {
+    const speakerCondition = createContainsCondition('speaker_name', searchParams.speaker, dbBackend);
     conditions.push(speakerCondition);
   }
 
-  if (committee && typeof committee === 'string') {
-    const committeeCondition = createContainsCondition('committee_names', committee, dbBackend);
+  if (searchParams.committee) {
+    const committeeCondition = createContainsCondition('committee_names', searchParams.committee, dbBackend);
     conditions.push(committeeCondition);
   }
 
   // Date range filters
-  if (date_from && typeof date_from === 'string') {
-    const fromDate = convertToDate(date_from);
+  if (searchParams.date_from) {
+    const fromDate = convertToDate(searchParams.date_from);
     if (fromDate) {
       conditions.push({
         date: { gte: fromDate }
@@ -106,8 +116,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
   }
 
-  if (date_to && typeof date_to === 'string') {
-    const toDate = convertToDate(date_to);
+  if (searchParams.date_to) {
+    const toDate = convertToDate(searchParams.date_to);
     if (toDate) {
       conditions.push({
         date: { lte: toDate }
@@ -116,8 +126,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   // Filter by specific IVOD IDs (for transcript search results)
-  if (ids && typeof ids === 'string') {
-    const ivodIds = ids.split(',').map(id => parseInt(id.trim(), 10)).filter(id => !isNaN(id));
+  if (searchParams.ids) {
+    const ivodIds = searchParams.ids.split(',').map(id => parseInt(id.trim(), 10)).filter(id => !isNaN(id));
     if (ivodIds.length > 0) {
       conditions.push({
         ivod_id: { in: ivodIds }
@@ -136,7 +146,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         where,
         orderBy,
         skip,
-        take: size,
+        take: searchParams.pageSize,
         select: {
           ivod_id: true,
           date: true,
@@ -157,31 +167,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       prisma.iVODTranscript.count({ where }),
     ]);
     
-    logger.info('IVOD list query completed successfully', {
-      metadata: {
-        resultsCount: data.length,
-        totalCount: total,
-        page: pageNum,
-        pageSize: size
-      }
+    return createSuccessResponse(data, {
+      total,
+      page: searchParams.page,
+      pageSize: searchParams.pageSize
     });
-    
-    res.status(200).json({ data, total });
   } catch (error: any) {
     // 檢查是否為表格不存在的錯誤
     if (error.message && error.message.includes('does not exist')) {
-      logger.warn('Database table does not exist, returning empty result', {
-        metadata: { tableName: 'ivod_transcripts', query: where }
+      return createSuccessResponse([], {
+        total: 0,
+        page: searchParams.page,
+        pageSize: searchParams.pageSize
       });
-      return res.status(200).json({ data: [], total: 0 });
     }
     
-    logger.logDatabaseError(error, 'ivods_list', {
-      where,
-      orderBy,
-      skip,
-      take: size
-    });
-    res.status(500).json({ error: error.message });
+    throw createErrorResponse('Database query failed', 500);
   }
 }
+
+export default withErrorHandler(ivodsHandler);
