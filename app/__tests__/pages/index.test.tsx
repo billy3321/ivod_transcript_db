@@ -436,7 +436,7 @@ describe('Home Page', () => {
   it('shows fallback indicator when search uses database fallback', async () => {
     const mockRouter = {
       push: mockPush,
-      query: { q: '測試' },
+      query: { q: '測試', scope: 'transcript' },
       isReady: true,
     };
     (useRouter as jest.Mock).mockReturnValue(mockRouter);
@@ -457,7 +457,7 @@ describe('Home Page', () => {
     render(<Home />);
 
     await waitFor(() => {
-      // Check for interface elements instead of page title
+      // Check for interface elements - scope is transcript so expect transcript placeholder
       expect(screen.getByPlaceholderText('搜尋逐字稿內容...')).toBeInTheDocument();
     });
   });

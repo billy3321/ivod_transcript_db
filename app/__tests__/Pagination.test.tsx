@@ -67,12 +67,15 @@ describe('Pagination', () => {
     render(<Pagination currentPage={1} total={23} pageSize={5} onPageChange={mockOnPageChange} />);
 
     // Should have 5 pages (Math.ceil(23/5) = 5)
+    // When current page is 1, it shows 1, 2, 3, ..., 5 (with ellipsis hiding page 4)
     expect(screen.getByRole('button', { name: '第 1 頁' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '第 2 頁' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '第 3 頁' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '第 4 頁' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '第 5 頁' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '第 6 頁' })).not.toBeInTheDocument();
+    
+    // Check that ellipsis is shown
+    expect(screen.getByText('...')).toBeInTheDocument();
   });
 
   it('does not render when total pages is 1 or less', () => {
