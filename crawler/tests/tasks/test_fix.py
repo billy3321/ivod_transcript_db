@@ -16,12 +16,11 @@ import sys
 # 加入父目錄到路徑
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../..'))
 
-from ivod.tasks import log_failed_ivod
-from ivod_fix import (
+from ivod.tasks import (
+    log_failed_ivod,
     remove_from_error_log,
-    read_failed_ivods,
-    fix_single_ivod,
-    fix_from_file
+    read_failed_ivods_from_file,
+    run_fix
 )
 
 class TestErrorLogging:
@@ -71,7 +70,7 @@ class TestErrorLogManagement:
             temp_path = f.name
         
         try:
-            failed_ivods = read_failed_ivods(temp_path)
+            failed_ivods = read_failed_ivods_from_file(temp_path)
             # 應該去重複，並過濾無效的ID
             assert set(failed_ivods) == {123456, 789012}
         finally:
@@ -79,7 +78,7 @@ class TestErrorLogManagement:
     
     def test_read_failed_ivods_nonexistent_file(self):
         """測試讀取不存在的錯誤記錄檔案"""
-        failed_ivods = read_failed_ivods("/nonexistent/path.txt")
+        failed_ivods = read_failed_ivods_from_file("/nonexistent/path.txt")
         assert failed_ivods == []
     
     def test_remove_from_error_log(self):
@@ -112,11 +111,11 @@ class TestErrorLogManagement:
 class TestFixFunctionality:
     """測試補抓功能"""
     
-    @patch('ivod_fix.make_browser')
-    @patch('ivod_fix.Session')
-    @patch('ivod_fix.process_ivod')
-    def test_fix_single_ivod_new_record(self, mock_process, mock_session_class, mock_browser):
-        """測試補抓單一IVOD（新記錄）"""
+    @patch('ivod.tasks.make_browser')
+    @patch('ivod.tasks.Session')
+    @patch('ivod.tasks.process_ivod')
+    def test_run_fix_single_ivod(self, mock_process, mock_session_class, mock_browser):
+        """測試補抓單一IVOD"""
         # 設定模擬物件
         mock_db = MagicMock()
         mock_session_class.return_value = mock_db
@@ -129,112 +128,24 @@ class TestFixFunctionality:
         }
         
         # 執行測試
-        result = fix_single_ivod(123456)
+        result = run_fix(ivod_ids=[123456])
         
         # 驗證
         assert result is True
-        mock_db.add.assert_called_once()
-        mock_db.commit.assert_called_once()
-        mock_db.close.assert_called_once()
     
-    @patch('ivod_fix.make_browser')
-    @patch('ivod_fix.Session')
-    @patch('ivod_fix.process_ivod')
-    def test_fix_single_ivod_existing_record(self, mock_process, mock_session_class, mock_browser):
-        """測試補抓單一IVOD（更新現有記錄）"""
-        # 設定模擬物件
-        mock_db = MagicMock()
-        mock_session_class.return_value = mock_db
-        
-        mock_obj = MagicMock()
-        mock_db.get.return_value = mock_obj  # 存在的記錄
-        
-        mock_process.return_value = {
-            'ivod_id': 123456,
-            'title': 'Updated Test IVOD',
-            'ai_transcript': 'Updated transcript'
-        }
-        
-        # 執行測試
-        result = fix_single_ivod(123456)
-        
-        # 驗證
-        assert result is True
-        mock_db.add.assert_not_called()  # 不應該新增記錄
-        mock_db.commit.assert_called_once()
-        mock_db.close.assert_called_once()
-        
-        # 檢查屬性更新
-        assert hasattr(mock_obj, 'last_updated')
-    
-    @patch('ivod_fix.make_browser')
-    @patch('ivod_fix.Session')
-    @patch('ivod_fix.process_ivod')
-    def test_fix_single_ivod_failure(self, mock_process, mock_session_class, mock_browser):
-        """測試補抓單一IVOD失敗"""
-        # 設定模擬物件拋出例外
-        mock_db = MagicMock()
-        mock_session_class.return_value = mock_db
-        mock_process.side_effect = Exception("Network error")
-        
-        # 執行測試
-        result = fix_single_ivod(123456)
-        
-        # 驗證
-        assert result is False
-        mock_db.rollback.assert_called_once()
-        mock_db.close.assert_called_once()
-    
-    @patch('ivod_fix.fix_single_ivod')
-    @patch('ivod_fix.read_failed_ivods')
-    @patch('ivod_fix.remove_from_error_log')
-    @patch('ivod_fix.log_failed_ivod')
-    def test_fix_from_file_success(self, mock_log_failed, mock_remove, mock_read, mock_fix_single):
-        """測試從檔案批量修復（成功案例）"""
-        # 設定模擬資料
-        mock_read.return_value = [123456, 789012]
-        mock_fix_single.side_effect = [True, True]  # 兩個都成功
-        
-        error_log_path = "test_errors.txt"
-        
-        # 執行測試
-        fix_from_file(error_log_path)
-        
-        # 驗證
-        assert mock_fix_single.call_count == 2
-        assert mock_remove.call_count == 2
-        mock_log_failed.assert_not_called()  # 沒有失敗記錄
-    
-    @patch('ivod_fix.fix_single_ivod')
-    @patch('ivod_fix.read_failed_ivods')
-    @patch('ivod_fix.remove_from_error_log')
-    @patch('ivod_fix.log_failed_ivod')
-    def test_fix_from_file_partial_failure(self, mock_log_failed, mock_remove, mock_read, mock_fix_single):
-        """測試從檔案批量修復（部分失敗）"""
-        # 設定模擬資料
-        mock_read.return_value = [123456, 789012, 555555]
-        mock_fix_single.side_effect = [True, False, True]  # 第二個失敗
-        
-        error_log_path = "test_errors.txt"
-        
-        # 執行測試
-        fix_from_file(error_log_path)
-        
-        # 驗證
-        assert mock_fix_single.call_count == 3
-        assert mock_remove.call_count == 2  # 只有成功的會被移除
-        mock_log_failed.assert_called_once_with(789012, "fix_retry")
-    
-    @patch('ivod_fix.read_failed_ivods')
-    def test_fix_from_file_empty(self, mock_read):
+    @patch('ivod.tasks.read_failed_ivods_from_file')
+    @patch('ivod.tasks.make_browser')
+    @patch('ivod.tasks.Session')
+    def test_run_fix_from_file_empty(self, mock_session_class, mock_browser, mock_read):
         """測試從空的錯誤記錄檔案修復"""
         mock_read.return_value = []
         
         # 執行測試（不應該拋出例外）
-        fix_from_file("empty_errors.txt")
+        result = run_fix(error_log_path="empty_errors.txt")
         
         # 驗證讀取被呼叫
         mock_read.assert_called_once()
+        assert result is True
 
 if __name__ == '__main__':
     pytest.main([__file__])

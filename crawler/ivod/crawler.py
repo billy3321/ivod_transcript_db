@@ -15,10 +15,16 @@ import time, random
 import urllib3
 from urllib3.exceptions import InsecureRequestWarning
 
-# Only disable warnings if explicitly configured to skip SSL
+# SSL warnings are now handled per-session instead of globally
 import os
-if os.getenv('SKIP_SSL', 'false').lower() == 'true':
-    urllib3.disable_warnings(InsecureRequestWarning)
+
+from .exceptions import (
+    IVODNetworkError,
+    IVODSSLError,
+    IVODTimeoutError,
+    IVODParsingError,
+    IVODTranscriptError,
+)
 
 HEADERS = [
     ("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -50,6 +56,23 @@ def date_range(start_date: str, end_date: str):
         yield dt.strftime("%Y-%m-%d")
 
 
+def create_ssl_context(skip_ssl: bool = False) -> ssl.SSLContext:
+    """
+    Create a properly configured SSL context.
+    """
+    if skip_ssl:
+        import logging
+        logging.warning("SSL verification is disabled. This is not recommended for production use.")
+        ctx = ssl._create_unverified_context(cert_reqs=ssl.CERT_NONE)
+    else:
+        ctx = ssl.create_default_context()
+        # Configure additional security options
+        ctx.check_hostname = True
+        ctx.verify_mode = ssl.CERT_REQUIRED
+        
+    return ctx
+
+
 def make_browser(skip_ssl: bool = None) -> mechanize.Browser:
     """
     建立 mechanize.Browser()，可選擇是否跳過 SSL 驗證，並設定 headers + cookie。
@@ -70,14 +93,33 @@ def make_browser(skip_ssl: bool = None) -> mechanize.Browser:
 
     br.addheaders = HEADERS
 
-    if skip_ssl:
-        import urllib.request
-        import logging
-        logging.warning("SSL verification is disabled. This is not recommended for production use.")
-        ctx = ssl._create_unverified_context(cert_reqs=ssl.CERT_NONE)
-        br.add_handler(urllib.request.HTTPSHandler(context=ctx))
+    # Use proper SSL context management
+    import urllib.request
+    ssl_context = create_ssl_context(skip_ssl)
+    br.add_handler(urllib.request.HTTPSHandler(context=ssl_context))
 
     return br
+
+
+def get_requests_session(skip_ssl: bool = None) -> requests.Session:
+    """
+    Create a requests session with proper SSL configuration.
+    """
+    if skip_ssl is None:
+        skip_ssl = os.getenv('SKIP_SSL', 'false').lower() == 'true'
+    
+    session = requests.Session()
+    session.verify = not skip_ssl
+    session.headers.update(dict(HEADERS))
+    
+    if skip_ssl:
+        import logging
+        logging.warning("SSL verification is disabled for requests session. This is not recommended for production use.")
+        # Disable SSL warnings only for this session
+        import urllib3
+        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+    
+    return session
 
 
 def fetch_latest_date(br: mechanize.Browser):
@@ -87,11 +129,17 @@ def fetch_latest_date(br: mechanize.Browser):
         raw = resp.read().decode('utf-8')
     except Exception:
         # Fallback to requests for JSON endpoints to avoid mechanize gzip issues
-        verify_ssl = not (os.getenv('SKIP_SSL', 'false').lower() == 'true')
-        raw = requests.get(url, verify=verify_ssl).text
+        session = get_requests_session()
+        raw = session.get(url).text
     js = json.loads(raw)
     date = datetime.fromisoformat(js.get('ivods')[0]['日期']).date()
     return date
+
+
+def fetch_lastest_date(br: mechanize.Browser):
+    """Alias for backward compatibility with typo in function name."""
+    return fetch_latest_date(br)
+
 
 def fetch_available_dates(br: mechanize.Browser, session=3):
     url = f"https://ly.govapi.tw/v2/ivods?%E5%B1%86=11&%E6%9C%83%E6%9C%9F={session}&agg=%E6%97%A5%E6%9C%9F&limit=0"
@@ -100,8 +148,8 @@ def fetch_available_dates(br: mechanize.Browser, session=3):
         raw = resp.read().decode('utf-8')
     except Exception:
         # Fallback to requests for JSON endpoints to avoid mechanize gzip issues
-        verify_ssl = not (os.getenv('SKIP_SSL', 'false').lower() == 'true')
-        raw = requests.get(url, verify=verify_ssl).text
+        req_session = get_requests_session()
+        raw = req_session.get(url).text
     js = json.loads(raw)
     aggs = js.get('aggs', [])
     dates = []
@@ -115,26 +163,47 @@ def fetch_ivod_info(br: mechanize.Browser, ivod_id: int):
     fallback to requests on failure.
     """
     url = f"https://ly.govapi.tw/v2/ivods/{ivod_id}"
+    raw = None
+    
     try:
         resp = br.open(url)
         raw = resp.read().decode('utf-8')
-    except Exception:
-        verify_ssl = not (os.getenv('SKIP_SSL', 'false').lower() == 'true')
-        raw = requests.get(url, verify=verify_ssl).text
+    except ssl.SSLError as e:
+        raise IVODSSLError(f"SSL error fetching IVOD_ID {ivod_id}: {e}", url=url)
+    except Exception as e:
+        # Fallback to requests session
+        try:
+            req_session = get_requests_session()
+            response = req_session.get(url, timeout=30)
+            response.raise_for_status()
+            raw = response.text
+        except requests.exceptions.SSLError as e:
+            raise IVODSSLError(f"SSL error fetching IVOD_ID {ivod_id}: {e}", url=url)
+        except requests.exceptions.Timeout as e:
+            raise IVODTimeoutError(f"Timeout fetching IVOD_ID {ivod_id}: {e}", url=url, timeout_duration=30)
+        except requests.exceptions.RequestException as e:
+            raise IVODNetworkError(f"Network error fetching IVOD_ID {ivod_id}: {e}", url=url)
+    
+    if not raw:
+        raise IVODNetworkError(f"Empty response for IVOD_ID {ivod_id}", url=url)
     
     try:
         js = json.loads(raw)
     except json.JSONDecodeError as e:
-        raise ValueError(f"Invalid JSON response for IVOD_ID {ivod_id} from URL {url}: {e}")
+        raise IVODParsingError(
+            f"Invalid JSON response for IVOD_ID {ivod_id} from URL {url}: {e}",
+            content_type="json",
+            raw_content=raw[:500]  # Limit raw content for logging
+        )
     
     # Check if API returned an error
     if js.get("error", False):
         error_msg = js.get("message", "Unknown error")
-        raise ValueError(f"API error for IVOD_ID {ivod_id}: {error_msg}")
+        raise IVODNetworkError(f"API error for IVOD_ID {ivod_id}: {error_msg}", url=url)
     
     data = js.get("data", {})
     if not data:
-        raise ValueError(f"No data found for IVOD_ID {ivod_id}")
+        raise IVODParsingError(f"No data found for IVOD_ID {ivod_id}", content_type="api_response")
     
     return data
 
@@ -144,19 +213,39 @@ def fetch_ivod_list(br: mechanize.Browser, date_str: str):
         resp = br.open(url)
         raw = resp.read().decode('utf-8')
     except Exception:
-        raw = requests.get(url, verify=False).text
+        req_session = get_requests_session()
+        raw = req_session.get(url).text
     js = json.loads(raw)
     return [int(i['IVOD_ID']) for i in js.get("ivods", [])]
 
 def fetch_ai(js, rec, obj, db):
+    """Extract AI transcript from IVOD JSON data with proper error handling."""
     try:
-        ai_items = js.get("transcript", {}).get("whisperx", [])
+        transcript_data = js.get("transcript", {})
+        if not transcript_data:
+            raise IVODTranscriptError("No transcript data found", transcript_type="ai", ivod_id=rec.get("ivod_id"))
+        
+        ai_items = transcript_data.get("whisperx", [])
+        if not ai_items:
+            raise IVODTranscriptError("No whisperx data found", transcript_type="ai", ivod_id=rec.get("ivod_id"))
+        
         rec["ai_transcript"] = "".join(i.get("text","") for i in ai_items)
         rec["ai_status"] = "success"
-    except Exception:
+        rec["ai_retries"] = 0  # Reset retries on success
+        
+    except IVODTranscriptError:
+        # Expected transcript errors
         rec["ai_transcript"] = ""
         rec["ai_status"] = "failed"
-        # 如果已經有這筆，就累加 retries
+        if obj:
+            obj.ai_retries += 1
+        else:
+            rec["ai_retries"] = 1
+            
+    except Exception as e:
+        # Unexpected errors
+        rec["ai_transcript"] = ""
+        rec["ai_status"] = "failed"
         if obj:
             obj.ai_retries += 1
         else:
@@ -184,27 +273,47 @@ def fetch_ly_speech(ivod_id):
 
 def fetch_ly(js, rec, obj, br):
     """
-    Fetch LY transcript for a given ivod.
+    Fetch LY transcript for a given ivod with proper error handling.
     Use gazette JSON blocks if available, otherwise fetch HTML page and extract text.
-    Fallback to requests with headers to avoid mechanize gzip issues or access denial.
     """
     try:
         if "gazette" in js:
-            blocks = js["gazette"]["blocks"]
+            gazette_data = js["gazette"]
+            if not gazette_data or "blocks" not in gazette_data:
+                raise IVODTranscriptError("Invalid gazette data structure", transcript_type="ly", ivod_id=rec.get("ivod_id"))
+            
+            blocks = gazette_data["blocks"]
+            if not blocks:
+                raise IVODTranscriptError("Empty gazette blocks", transcript_type="ly", ivod_id=rec.get("ivod_id"))
+            
             rec["ly_transcript"] = "\n\n".join("\n".join(b) for b in blocks)
             rec["ly_status"] = "success"
+            rec["ly_retries"] = 0  # Reset retries on success
+            
         else:
-            rec["ly_transcript"] = fetch_ly_speech(rec['ivod_id'])
-            if rec["ly_transcript"]:
-                rec["ly_status"] = "success"
-            else:
-                rec["ly_status"] = "failed"
-                if obj:
-                    obj.ly_retries += 1
+            # Try to fetch from speech page
+            try:
+                speech_transcript = fetch_ly_speech(rec['ivod_id'])
+                if speech_transcript and speech_transcript.strip():
+                    rec["ly_transcript"] = speech_transcript
+                    rec["ly_status"] = "success"
+                    rec["ly_retries"] = 0  # Reset retries on success
                 else:
-                    rec["ly_retries"] = 1
+                    raise IVODTranscriptError("Empty speech transcript", transcript_type="ly", ivod_id=rec.get("ivod_id"))
+            except Exception as e:
+                raise IVODTranscriptError(f"Failed to fetch speech transcript: {e}", transcript_type="ly", ivod_id=rec.get("ivod_id"))
 
-    except Exception:
+    except IVODTranscriptError:
+        # Expected transcript errors
+        rec["ly_transcript"] = ""
+        rec["ly_status"] = "failed"
+        if obj:
+            obj.ly_retries += 1
+        else:
+            rec["ly_retries"] = 1
+            
+    except Exception as e:
+        # Unexpected errors
         rec["ly_transcript"] = ""
         rec["ly_status"] = "failed"
         if obj:

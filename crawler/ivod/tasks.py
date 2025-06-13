@@ -28,6 +28,89 @@ logger = logging.getLogger(__name__)
 
 # check_and_create_database_tables 函數已移至 db.py 中
 
+# Batch processing configuration
+DEFAULT_BATCH_SIZE = 100  # Records per batch
+DEFAULT_COMMIT_INTERVAL = 10  # Batches per commit
+
+
+class BatchProcessor:
+    """Handles batch processing of IVOD records for better performance."""
+    
+    def __init__(self, db_session, batch_size=DEFAULT_BATCH_SIZE, commit_interval=DEFAULT_COMMIT_INTERVAL):
+        self.db = db_session
+        self.batch_size = batch_size
+        self.commit_interval = commit_interval
+        self.batch_buffer = []
+        self.batch_count = 0
+        self.total_processed = 0
+        self.total_errors = 0
+    
+    def add_record(self, record_data, ivod_id=None):
+        """Add a record to the batch buffer."""
+        self.batch_buffer.append((record_data, ivod_id))
+        
+        if len(self.batch_buffer) >= self.batch_size:
+            self._process_batch()
+    
+    def _process_batch(self):
+        """Process the current batch of records."""
+        if not self.batch_buffer:
+            return
+        
+        try:
+            for record_data, ivod_id in self.batch_buffer:
+                try:
+                    if ivod_id:
+                        # Update existing record
+                        obj = self.db.get(IVODTranscript, ivod_id)
+                        if obj:
+                            for k, v in record_data.items():
+                                setattr(obj, k, v)
+                            obj.last_updated = datetime.now()
+                        else:
+                            # Record doesn't exist, create new one
+                            record_data["last_updated"] = datetime.now()
+                            self.db.add(IVODTranscript(**record_data))
+                    else:
+                        # New record
+                        record_data["last_updated"] = datetime.now()
+                        self.db.add(IVODTranscript(**record_data))
+                    
+                    self.total_processed += 1
+                    
+                except Exception as e:
+                    logger.error(f"Error processing record {ivod_id or 'new'}: {e}")
+                    self.total_errors += 1
+                    continue
+            
+            self.batch_count += 1
+            
+            # Commit every N batches to balance performance and data safety
+            if self.batch_count % self.commit_interval == 0:
+                self.db.commit()
+                logger.info(f"Committed batch {self.batch_count} ({self.total_processed} records processed, {self.total_errors} errors)")
+            
+            # Clear buffer
+            self.batch_buffer = []
+            
+        except Exception as e:
+            logger.error(f"Batch processing error: {e}")
+            self.db.rollback()
+            raise
+    
+    def flush(self):
+        """Process any remaining records in the buffer and commit."""
+        if self.batch_buffer:
+            self._process_batch()
+        
+        try:
+            self.db.commit()
+            logger.info(f"Final commit - Total processed: {self.total_processed}, Total errors: {self.total_errors}")
+        except Exception as e:
+            logger.error(f"Final commit error: {e}")
+            self.db.rollback()
+            raise
+
 def log_failed_ivod(ivod_id, error_type="general"):
     """記錄失敗的IVOD_ID到錯誤日誌檔案"""
     error_log_path = os.getenv("ERROR_LOG_PATH", "logs/failed_ivods.txt")
@@ -104,41 +187,47 @@ def run_full(skip_ssl: bool = True, start_date: str = None, end_date: str = None
         logger.warning(f"⚠️  起始日期 {start_date} 早於預設起始日期，使用 {actual_start}")
     if end_date and end_date != actual_end:
         logger.warning(f"⚠️  結束日期 {end_date} 晚於今天，使用 {actual_end}")
-    for date_str in tqdm(date_range(start, end), desc="日期"):
-        try:
-            ids = fetch_ivod_list(br, date_str)
-        except Exception as e:
-            logger.error(f"{date_str} 列表失敗: {e}")
-            continue
-
-        for ivod_id in tqdm(ids, desc=f"{date_str} 影片", leave=False):
+    
+    # Initialize batch processor for better performance
+    batch_processor = BatchProcessor(db)
+    
+    try:
+        for date_str in tqdm(date_range(start, end), desc="日期"):
             try:
-                logger.info(f"處理影片 {ivod_id}")
-                rec = process_ivod(br, ivod_id)
-                
-                # Check if record exists
-                obj = db.query(IVODTranscript).filter_by(ivod_id=ivod_id).first()
-                if obj:
-                    # Update existing record
-                    for k, v in rec.items():
-                        setattr(obj, k, v)
-                    obj.last_updated = datetime.now()
-                else:
-                    # Create new record
-                    rec["last_updated"] = datetime.now()
-                    db.add(IVODTranscript(**rec))
-                
-                # Commit this single record
-                db.commit()
-                logger.info(f"影片 {ivod_id} 處理完成")
-                
+                ids = fetch_ivod_list(br, date_str)
             except Exception as e:
-                logger.error(f"處理影片 {ivod_id} 時發生錯誤: {e}", exc_info=True)
-                # Rollback any pending changes for this record
-                db.rollback()
-                log_failed_ivod(ivod_id, "processing")
+                logger.error(f"{date_str} 列表失敗: {e}")
                 continue
-    db.close()
+
+            for ivod_id in tqdm(ids, desc=f"{date_str} 影片", leave=False):
+                try:
+                    logger.info(f"處理影片 {ivod_id}")
+                    rec = process_ivod(br, ivod_id)
+                    
+                    # Check if record exists for batch processing
+                    existing_obj = db.query(IVODTranscript).filter_by(ivod_id=ivod_id).first()
+                    if existing_obj:
+                        # Add to batch for update
+                        batch_processor.add_record(rec, ivod_id)
+                    else:
+                        # Add to batch for insert
+                        batch_processor.add_record(rec)
+                    
+                    logger.info(f"影片 {ivod_id} 已加入批次處理")
+                    
+                except Exception as e:
+                    logger.error(f"處理影片 {ivod_id} 時發生錯誤: {e}", exc_info=True)
+                    log_failed_ivod(ivod_id, "processing")
+                    continue
+        
+        # Process any remaining records in the batch
+        batch_processor.flush()
+        
+    except Exception as e:
+        logger.error(f"批次處理過程中發生錯誤: {e}", exc_info=True)
+        raise
+    finally:
+        db.close()
     logger.info("全量拉取完成。")
     
     # 檢查 Elasticsearch 是否可用，如果可用就自動更新索引
@@ -180,33 +269,64 @@ def run_incremental(skip_ssl: bool = True):
         except Exception:
             continue
 
-    for ivod_id in tqdm(ids, desc="增量更新影片"):
-        try:
-            logger.info(f"增量更新影片 {ivod_id}")
-            obj = db.get(IVODTranscript, ivod_id)
-            if not obj:
-                rec = process_ivod(br, ivod_id)
-                rec["last_updated"] = datetime.now()
-                db.add(IVODTranscript(**rec))
-                logger.info(f"新增影片 {ivod_id}")
+    # Initialize batch processor for incremental updates
+    batch_processor = BatchProcessor(db, batch_size=50)  # Smaller batch for incremental
+    
+    try:
+        for ivod_id in tqdm(ids, desc="增量更新影片"):
+            try:
+                logger.info(f"增量更新影片 {ivod_id}")
+                obj = db.get(IVODTranscript, ivod_id)
+                
+                if not obj:
+                    # New record - process completely
+                    rec = process_ivod(br, ivod_id)
+                    batch_processor.add_record(rec)
+                    logger.info(f"新增影片 {ivod_id} 已加入批次")
+                    continue
+                
+                # Check what needs updating
+                needs_update = False
+                partial_rec = {}
+                
+                if not obj.ai_transcript:
+                    full_rec = process_ivod(br, ivod_id)
+                    partial_rec.update({
+                        "ai_transcript": full_rec["ai_transcript"],
+                        "ai_status": full_rec["ai_status"],
+                        "ai_retries": full_rec.get("ai_retries", 0)
+                    })
+                    needs_update = True
+                    logger.info(f"影片 {ivod_id} 需要更新 AI逐字稿")
+                
+                if not obj.ly_transcript:
+                    if not partial_rec:  # Only process if not already done above
+                        full_rec = process_ivod(br, ivod_id)
+                    partial_rec.update({
+                        "ly_transcript": full_rec["ly_transcript"],
+                        "ly_status": full_rec["ly_status"],
+                        "ly_retries": full_rec.get("ly_retries", 0)
+                    })
+                    needs_update = True
+                    logger.info(f"影片 {ivod_id} 需要更新 LY逐字稿")
+                
+                if needs_update:
+                    batch_processor.add_record(partial_rec, ivod_id)
+                    logger.info(f"影片 {ivod_id} 更新已加入批次")
+                    
+            except Exception as e:
+                logger.error(f"增量更新影片 {ivod_id} 時發生錯誤: {e}", exc_info=True)
+                log_failed_ivod(ivod_id, "incremental")
                 continue
-            if not obj.ai_transcript:
-                rec = process_ivod(br, ivod_id)
-                obj.ai_transcript = rec["ai_transcript"]
-                obj.last_updated = datetime.now()
-                logger.info(f"更新影片 {ivod_id} AI逐字稿")
-            if not obj.ly_transcript:
-                rec = process_ivod(br, ivod_id)
-                obj.ly_transcript = rec["ly_transcript"]
-                obj.last_updated = datetime.now()
-                logger.info(f"更新影片 {ivod_id} LY逐字稿")
-        except Exception as e:
-            logger.error(f"增量更新影片 {ivod_id} 時發生錯誤: {e}", exc_info=True)
-            log_failed_ivod(ivod_id, "incremental")
-            continue
 
-    db.commit()
-    db.close()
+        # Process any remaining records in the batch
+        batch_processor.flush()
+        
+    except Exception as e:
+        logger.error(f"增量更新批次處理過程中發生錯誤: {e}", exc_info=True)
+        raise
+    finally:
+        db.close()
     logger.info("增量更新完成。")
     
     # 檢查 Elasticsearch 是否可用，如果可用就自動更新索引（增量模式）
@@ -224,9 +344,62 @@ def run_incremental(skip_ssl: bool = True):
     return True
 
 
+def check_consecutive_failures(records, transcript_type, max_consecutive_days=3):
+    """
+    檢查是否有連續失敗的天數達到上限
+    
+    Args:
+        records: 按日期排序的記錄列表
+        transcript_type: 'ai' 或 'ly'
+        max_consecutive_days: 連續失敗的最大天數 (預設3天)
+        
+    Returns:
+        tuple: (should_stop, failed_dates) - 是否應該停止, 連續失敗的日期列表
+    """
+    if not records:
+        return False, []
+    
+    failed_dates = []
+    consecutive_count = 0
+    last_date = None
+    
+    for record in records:
+        current_date = record.date
+        
+        # 檢查是否為連續日期（相差1天）
+        if last_date is not None:
+            date_diff = (current_date - last_date).days
+            if date_diff > 1:
+                # 日期不連續，重置計數
+                consecutive_count = 1
+                failed_dates = [current_date]
+            elif date_diff == 1:
+                # 連續日期，增加計數
+                consecutive_count += 1
+                failed_dates.append(current_date)
+            else:
+                # 同一天，不增加計數
+                continue
+        else:
+            # 第一筆記錄
+            consecutive_count = 1
+            failed_dates = [current_date]
+        
+        # 如果連續失敗天數達到上限，返回停止信號
+        if consecutive_count >= max_consecutive_days:
+            logger.warning(f"⚠️  {transcript_type.upper()} transcript 連續 {consecutive_count} 天失敗，停止重試")
+            logger.warning(f"   失敗日期: {', '.join(str(d) for d in failed_dates[-max_consecutive_days:])}")
+            return True, failed_dates
+        
+        last_date = current_date
+    
+    return False, failed_dates
+
+
 def run_retry(skip_ssl: bool = True):
     """
     重新嘗試失敗的任務：AI 或 LY 逐字稿之前發生錯誤，且重試次數尚未超過上限。
+    按日期和IVOD_ID排序處理，如果連續3天失敗則停止該類型的重試。
     """
     setup_logging()
     
@@ -240,36 +413,148 @@ def run_retry(skip_ssl: bool = True):
     db = Session()
 
     MAX_RETRIES = 5
-    to_retry = db.query(IVODTranscript).filter(
-        IVODTranscript.ai_status == 'failed',
-        IVODTranscript.ai_retries < MAX_RETRIES
-    ).all()
-    to_retry += db.query(IVODTranscript).filter(
-        IVODTranscript.ly_status == 'failed',
-        IVODTranscript.ly_retries < MAX_RETRIES
-    ).all()
+    
+    # 分別查詢 AI 和 LY 失敗的記錄，按日期和 IVOD_ID 排序
+    ai_retry_records = db.query(IVODTranscript).filter(
+        IVODTranscript.ai_status == 'failed'
+    ).order_by(IVODTranscript.date.asc(), IVODTranscript.ivod_id.asc()).all()
+    
+    ly_retry_records = db.query(IVODTranscript).filter(
+        IVODTranscript.ly_status == 'failed'
+    ).order_by(IVODTranscript.date.asc(), IVODTranscript.ivod_id.asc()).all()
+
+    logger.info(f"📊 找到 {len(ai_retry_records)} 筆 AI transcript 需要重試")
+    logger.info(f"📊 找到 {len(ly_retry_records)} 筆 LY transcript 需要重試")
 
     # 記錄成功重試的 IVOD IDs
     successfully_retried_ids = []
 
-    for obj in to_retry:
-        try:
-            logger.info(f"重試影片 {obj.ivod_id}")
-            rec = process_ivod(br, obj.ivod_id)
-            # Update the existing object with new data
-            for k, v in rec.items():
-                setattr(obj, k, v)
-            obj.last_updated = datetime.now()
-            db.commit()
-            successfully_retried_ids.append(obj.ivod_id)
-            logger.info(f"重試影片 {obj.ivod_id} 完成")
-        except Exception as e:
-            logger.error(f"重試影片 {obj.ivod_id} 時發生錯誤: {e}", exc_info=True)
-            log_failed_ivod(obj.ivod_id, "retry")
-            continue
+    # Initialize batch processor for retry operations
+    batch_processor = BatchProcessor(db, batch_size=20)  # Smaller batch for retry operations
+    
+    # 追蹤連續失敗狀態
+    ai_should_stop = False
+    ly_should_stop = False
+    ai_consecutive_failures = 0
+    ly_consecutive_failures = 0
+    last_ai_date = None
+    last_ly_date = None
+    
+    try:
+        # 合併並按日期和IVOD_ID排序所有需要重試的記錄
+        all_retry_records = []
+        
+        # 為AI記錄添加類型標記
+        for record in ai_retry_records:
+            all_retry_records.append((record, 'ai'))
+        
+        # 為LY記錄添加類型標記 
+        for record in ly_retry_records:
+            all_retry_records.append((record, 'ly'))
+        
+        # 按日期和IVOD_ID排序
+        all_retry_records.sort(key=lambda x: (x[0].date, x[0].ivod_id))
+        
+        logger.info(f"🔄 開始重試 {len(all_retry_records)} 筆記錄...")
+        
+        for record, transcript_type in all_retry_records:
+            try:
+                # 檢查是否應該停止這種類型的重試
+                if transcript_type == 'ai' and ai_should_stop:
+                    logger.info(f"⏭️  跳過 AI transcript 重試 (IVOD {record.ivod_id})")
+                    continue
+                    
+                if transcript_type == 'ly' and ly_should_stop:
+                    logger.info(f"⏭️  跳過 LY transcript 重試 (IVOD {record.ivod_id})")
+                    continue
+                
+                logger.info(f"🔄 重試 {transcript_type.upper()} transcript - IVOD {record.ivod_id} ({record.date})")
+                
+                # 處理記錄
+                rec = process_ivod(br, record.ivod_id)
+                
+                # 檢查這次重試是否成功
+                success = False
+                if transcript_type == 'ai':
+                    success = rec.get('ai_status') == 'success'
+                    
+                    # 檢查連續失敗
+                    if not success:
+                        if last_ai_date is None or (record.date - last_ai_date).days <= 1:
+                            ai_consecutive_failures += 1
+                        else:
+                            ai_consecutive_failures = 1
+                        last_ai_date = record.date
+                        
+                        if ai_consecutive_failures >= 3:
+                            ai_should_stop = True
+                            logger.warning(f"⚠️  AI transcript 連續 {ai_consecutive_failures} 天失敗，停止後續重試")
+                    else:
+                        ai_consecutive_failures = 0
+                        
+                elif transcript_type == 'ly':
+                    success = rec.get('ly_status') == 'success'
+                    
+                    # 檢查連續失敗
+                    if not success:
+                        if last_ly_date is None or (record.date - last_ly_date).days <= 1:
+                            ly_consecutive_failures += 1
+                        else:
+                            ly_consecutive_failures = 1
+                        last_ly_date = record.date
+                        
+                        if ly_consecutive_failures >= 3:
+                            ly_should_stop = True
+                            logger.warning(f"⚠️  LY transcript 連續 {ly_consecutive_failures} 天失敗，停止後續重試")
+                    else:
+                        ly_consecutive_failures = 0
+                
+                # Add to batch for update
+                batch_processor.add_record(rec, record.ivod_id)
+                successfully_retried_ids.append(record.ivod_id)
+                
+                status_msg = "✅ 成功" if success else "❌ 失敗"
+                logger.info(f"   {status_msg} - IVOD {record.ivod_id} {transcript_type.upper()} transcript")
+                
+            except Exception as e:
+                logger.error(f"❌ 重試影片 {record.ivod_id} 時發生錯誤: {e}", exc_info=True)
+                log_failed_ivod(record.ivod_id, "retry")
+                
+                # 處理異常也算作失敗
+                if transcript_type == 'ai':
+                    if last_ai_date is None or (record.date - last_ai_date).days <= 1:
+                        ai_consecutive_failures += 1
+                    else:
+                        ai_consecutive_failures = 1
+                    last_ai_date = record.date
+                    
+                    if ai_consecutive_failures >= 3:
+                        ai_should_stop = True
+                        logger.warning(f"⚠️  AI transcript 連續 {ai_consecutive_failures} 天失敗，停止後續重試")
+                        
+                elif transcript_type == 'ly':
+                    if last_ly_date is None or (record.date - last_ly_date).days <= 1:
+                        ly_consecutive_failures += 1
+                    else:
+                        ly_consecutive_failures = 1
+                    last_ly_date = record.date
+                    
+                    if ly_consecutive_failures >= 3:
+                        ly_should_stop = True
+                        logger.warning(f"⚠️  LY transcript 連續 {ly_consecutive_failures} 天失敗，停止後續重試")
+                
+                continue
 
-    db.close()
-    logger.info("Retry 任務完成。")
+        # Process any remaining records in the batch
+        batch_processor.flush()
+        
+    except Exception as e:
+        logger.error(f"❌ 重試批次處理過程中發生錯誤: {e}", exc_info=True)
+        raise
+    finally:
+        db.close()
+    
+    logger.info(f"✅ Retry 任務完成，成功處理 {len(successfully_retried_ids)} 筆記錄")
     
     # 檢查 Elasticsearch 是否可用，如果可用且有成功重試的記錄就自動更新索引
     if successfully_retried_ids and check_elasticsearch_available():
@@ -372,6 +657,9 @@ def run_fix(ivod_ids=None, error_log_path=None, skip_ssl: bool = True):
     failed_count = 0
     successfully_fixed_ids = []
     
+    # Initialize batch processor for fix operations
+    batch_processor = BatchProcessor(db, batch_size=30)
+    
     try:
         for ivod_id in tqdm(target_ivods, desc="修復IVOD記錄"):
             try:
@@ -381,18 +669,14 @@ def run_fix(ivod_ids=None, error_log_path=None, skip_ssl: bool = True):
                 # 檢查是否已存在記錄
                 obj = db.get(IVODTranscript, ivod_id)
                 if obj:
-                    # 更新現有記錄
-                    for k, v in rec.items():
-                        setattr(obj, k, v)
-                    obj.last_updated = datetime.now()
-                    logger.info(f"更新IVOD {ivod_id} 成功")
+                    # Add to batch for update
+                    batch_processor.add_record(rec, ivod_id)
+                    logger.info(f"更新IVOD {ivod_id} 已加入批次")
                 else:
-                    # 新增記錄
-                    rec["last_updated"] = datetime.now()
-                    db.add(IVODTranscript(**rec))
-                    logger.info(f"新增IVOD {ivod_id} 成功")
+                    # Add to batch for insert
+                    batch_processor.add_record(rec)
+                    logger.info(f"新增IVOD {ivod_id} 已加入批次")
                 
-                db.commit()
                 success_count += 1
                 successfully_fixed_ids.append(ivod_id)
                 
@@ -402,12 +686,17 @@ def run_fix(ivod_ids=None, error_log_path=None, skip_ssl: bool = True):
                 
             except Exception as e:
                 logger.error(f"處理IVOD {ivod_id} 失敗: {e}", exc_info=True)
-                db.rollback()
                 failed_count += 1
                 # 重新記錄失敗
                 log_failed_ivod(ivod_id, "fix_retry")
                 continue
         
+        # Process any remaining records in the batch
+        batch_processor.flush()
+        
+    except Exception as e:
+        logger.error(f"修復批次處理過程中發生錯誤: {e}", exc_info=True)
+        raise
     finally:
         db.close()
     

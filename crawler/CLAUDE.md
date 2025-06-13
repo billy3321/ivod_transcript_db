@@ -9,11 +9,13 @@ This is a Python-based web scraper that extracts transcripts from Taiwan's Legis
 ## Architecture & Key Files
 
 ### Modular Python Package (`ivod/`)
-- **`core.py`** - Central processing module for assembling IVOD records from scraped data
-- **`crawler.py`** - HTTP scraping utilities with mechanize browser, SSL handling, and data fetching
+- **`core.py`** - Central processing module for assembling IVOD records from scraped data (refactored into 8 smaller functions)
+- **`crawler.py`** - HTTP scraping utilities with mechanize browser, SSL handling, and data fetching (enhanced SSL security)
 - **`db.py`** - Database abstraction supporting SQLite/PostgreSQL/MySQL with SQLAlchemy ORM
 - **`database_env.py`** - Environment-specific database configuration (development/production/testing)
-- **`tasks.py`** - Main workflow orchestration (full/incremental/retry/elasticsearch indexing)
+- **`tasks.py`** - Main workflow orchestration with batch processing (full/incremental/retry/elasticsearch indexing)
+- **`config.py`** - ⭐ **NEW**: Structured configuration management with validation and environment support
+- **`exceptions.py`** - ⭐ **NEW**: Comprehensive exception hierarchy for better error handling
 
 ### Main Execution Scripts
 - **`ivod_full.py`** - Full data capture from 2024-02-01 to present
@@ -25,6 +27,9 @@ This is a Python-based web scraper that extracts transcripts from Taiwan's Legis
 ### Testing Infrastructure
 - **`integration_test.py`** - Real API integration testing with database reset
 - **`tests/`** - Comprehensive test suite with unit and integration tests
+- **`test_exceptions.py`** - ⭐ **NEW**: Tests for exception hierarchy (13 tests)
+- **`test_config.py`** - ⭐ **NEW**: Tests for configuration validation (29 tests)
+- **`test_batch_processing.py`** - ⭐ **NEW**: Tests for batch processing functionality (10 tests)
 - **`test.py`** - SSL connection testing utility
 
 ## Development Environment Setup
@@ -84,6 +89,11 @@ TEST_SQLITE_PATH=../db/ivod_test.db python integration_test.py
 # Test specific modules
 pytest tests/core/test_core.py
 pytest tests/crawler/test_crawler.py
+
+# Test new modules (refactoring improvements)
+pytest tests/test_exceptions.py
+pytest tests/test_config.py  
+pytest tests/test_batch_processing.py
 ```
 
 ## Environment Configuration
@@ -146,6 +156,14 @@ MYSQL_TEST_DB=ivod_test_db
 # SSL configuration
 SKIP_SSL=False
 
+# === Batch Processing Settings (NEW) ===
+BATCH_SIZE=100              # Records per batch
+COMMIT_INTERVAL=10          # Batches per commit
+CRAWLER_TIMEOUT=30          # HTTP timeout in seconds
+MAX_RETRIES=5              # Maximum retry attempts
+MIN_SLEEP=0.5              # Minimum sleep between requests
+MAX_SLEEP=2.0              # Maximum sleep between requests
+
 # === Elasticsearch Settings ===
 ES_HOST=localhost
 ES_PORT=9200
@@ -167,6 +185,32 @@ ERROR_LOG_PATH=logs/failed_ivods.txt
 LOG_PATH=logs/
 ```
 
+## Recent Refactoring Improvements (2025-06)
+
+### ✅ Enhanced Security & Performance
+- **SSL Security**: Replaced global SSL bypass with proper per-session SSL context management
+- **Batch Processing**: Implemented `BatchProcessor` class for efficient database operations (~90% fewer commits)
+- **Error Handling**: Added 11 specific exception types with contextual information
+- **Function Decomposition**: Refactored monolithic `process_ivod()` into 8 smaller, testable functions
+- **Configuration Management**: Centralized configuration with validation and environment support
+
+### New Modules Added
+- **`ivod/config.py`**: Structured configuration management with dataclasses and validation
+- **`ivod/exceptions.py`**: Comprehensive exception hierarchy for better error diagnosis
+- **Enhanced `ivod/tasks.py`**: Added `BatchProcessor` class and batch operations across all workflows
+
+### Performance Improvements
+- **Database Operations**: Batch processing reduces commits from per-record to per-batch (100 records/batch, 10 batches/commit)
+- **SSL Handling**: Per-request SSL context instead of global bypass improves security
+- **Memory Efficiency**: Configurable batch sizes for different operation types
+
+### Backward Compatibility
+All changes maintain full backward compatibility:
+- Existing function signatures unchanged
+- Environment variable names preserved  
+- Database schema unmodified
+- API interfaces maintained
+
 ## Key Implementation Details
 
 ### Database Architecture
@@ -182,16 +226,20 @@ LOG_PATH=logs/
 2. **Incremental Updates** (`run_incremental()`):
    - Processes last 2 weeks to catch late-arriving transcripts
    - Efficient daily updates without full re-processing
-3. **Retry Mechanism** (`run_retry()`):
+3. **Enhanced Retry Mechanism** (`run_retry()`):
    - Retries failed records up to MAX_RETRIES=5
+   - **Smart Ordering**: Processes records by date (earliest first), then by IVOD_ID (lowest first)
+   - **Consecutive Failure Detection**: Stops retrying AI/LY transcripts if 3 consecutive days fail
+   - **Separate Tracking**: AI and LY transcript failures are tracked independently
    - Prevents infinite retry loops with counter tracking
 
 ### Error Handling Patterns
 - **HTTP Failures**: Caught and marked with status="failed", logged to error file
 - **Empty Content**: Results in failed status for retry, logged to error file
-- **SSL Issues**: Bypassable with `skip_ssl=True`
-- **Database Errors**: SQLAlchemy connection pooling and retry logic
+- **SSL Issues**: Proper SSL context management with per-request configuration
+- **Database Errors**: SQLAlchemy connection pooling and batch rollback logic
 - **Error Logging**: All failures automatically logged with IVOD_ID, error type, and timestamp
+- **Specific Exceptions**: 11 exception types for precise error diagnosis and handling
 
 ### Elasticsearch Integration
 - **Chinese Analysis**: Support for IK Analyzer or Smart Chinese
@@ -256,6 +304,56 @@ crontab -e
 
 ## Common Development Patterns
 
+### Batch Processing (NEW)
+```python
+from ivod.tasks import BatchProcessor
+
+# Initialize batch processor for efficient database operations
+batch_processor = BatchProcessor(db_session, batch_size=100, commit_interval=10)
+
+# Add records for processing
+for record_data in data_list:
+    if existing_record:
+        batch_processor.add_record(record_data, ivod_id)  # Update
+    else:
+        batch_processor.add_record(record_data)  # Insert
+
+# Process remaining records and commit
+batch_processor.flush()
+```
+
+### Configuration Management (NEW)
+```python
+from ivod.config import get_config
+
+# Get validated configuration
+config = get_config()
+print(f"Database backend: {config.database.backend}")
+print(f"Batch size: {config.crawler.batch_size}")
+print(f"Environment: {config.environment}")
+
+# Access specific settings
+timeout = config.crawler.timeout
+ssl_enabled = not config.crawler.skip_ssl
+```
+
+### Enhanced Error Handling (NEW)
+```python
+from ivod.exceptions import IVODNetworkError, IVODParsingError
+
+try:
+    result = process_ivod(br, ivod_id)
+except IVODNetworkError as e:
+    logger.error(f"Network error for IVOD {e.ivod_id}: {e}")
+    if e.status_code == 404:
+        # Handle missing IVOD
+        pass
+except IVODParsingError as e:
+    logger.error(f"Parsing error: {e.content_type} - {e}")
+except Exception as e:
+    logger.error(f"Unexpected error: {e}")
+```
+
 ### Database Operations
 ```python
 # Multi-backend compatible field handling
@@ -267,19 +365,32 @@ else:  # sqlite
     ai_transcript_field = Text
 ```
 
-### Error Handling
+### Enhanced Retry Logic (NEW)
 ```python
-try:
-    result = process_ivod(ivod_data)
-    session.merge(result)
-    session.commit()
-except Exception as e:
-    logger.error(f"Processing failed: {e}")
-    ivod_record.status = 'failed'
-    session.commit()
+# Smart retry with ordering and consecutive failure detection
+def run_retry():
+    # Query failed records ordered by date and IVOD_ID
+    ai_retry_records = db.query(IVODTranscript).filter(
+        IVODTranscript.ai_status == 'failed',
+        IVODTranscript.ai_retries < MAX_RETRIES
+    ).order_by(IVODTranscript.date.asc(), IVODTranscript.ivod_id.asc()).all()
+    
+    # Track consecutive failures
+    ai_consecutive_failures = 0
+    ai_should_stop = False
+    
+    for record in ai_retry_records:
+        if ai_should_stop:
+            logger.info(f"跳過 AI transcript 重試 (連續失敗)")
+            continue
+            
+        # Process and check for consecutive failures
+        if not success and ai_consecutive_failures >= 3:
+            ai_should_stop = True
+            logger.warning("AI transcript 連續 3 天失敗，停止重試")
 ```
 
-### Retry Logic
+### Traditional Retry Logic
 ```python
 failed_records = session.query(IVODTranscript).filter(
     IVODTranscript.status == 'failed',
@@ -306,8 +417,17 @@ python test.py
 # Check environment variables
 python -c "import os; print(os.getenv('DB_BACKEND'))"
 
+# Test configuration loading (NEW)
+python -c "from ivod.config import get_config; c=get_config(); print(f'Environment: {c.environment}, Backend: {c.database.backend}')"
+
+# Test exception handling (NEW)
+python -c "from ivod.exceptions import IVODNetworkError; raise IVODNetworkError('test', url='https://example.com')"
+
 # Manual workflow testing
 python -c "from ivod.tasks import run_incremental; run_incremental()"
+
+# Test batch processing (NEW)
+python -c "from ivod.tasks import BatchProcessor; from ivod.db import Session; db=Session(); bp=BatchProcessor(db); print('Batch processor initialized')"
 ```
 
 ### Monitoring & Logging

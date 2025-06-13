@@ -128,6 +128,9 @@ The application supports three separate database environments to prevent data in
 # Database backend selection
 DB_BACKEND=sqlite|postgresql|mysql
 
+# Google Analytics (optional)
+NEXT_PUBLIC_GA_MEASUREMENT_ID=G-XXXXXXXXXX  # Your Google Analytics 4 Measurement ID
+
 # === SQLite Settings (only if DB_BACKEND=sqlite) ===
 # Production database (existing configuration, names unchanged)
 SQLITE_PATH=../db/ivod_local.db
@@ -695,5 +698,38 @@ function MyComponent() {
 - `warn`: Warning conditions
 - `info`: General information messages
 - `debug`: Detailed debugging information
+
+## Google Analytics Integration
+
+### Overview
+The application includes optional Google Analytics 4 (GA4) integration for web analytics tracking:
+
+### Components
+- **GoogleAnalytics Component** (`components/GoogleAnalytics.tsx`): React component that conditionally loads GA4 scripts
+- **App Integration** (`pages/_app.tsx`): Conditionally renders GA component when measurement ID is provided
+
+### Configuration
+Add your Google Analytics 4 Measurement ID to your `.env` file:
+```bash
+NEXT_PUBLIC_GA_MEASUREMENT_ID=G-XXXXXXXXXX
+```
+
+### Features
+- **Conditional Loading**: GA scripts only load when `NEXT_PUBLIC_GA_MEASUREMENT_ID` is set
+- **Next.js Script Optimization**: Uses Next.js `Script` component with `afterInteractive` strategy
+- **Page Tracking**: Automatically tracks page views and navigation
+- **Type Safety**: Includes TypeScript declarations for gtag global functions
+
+### Usage
+1. **Get GA4 Measurement ID**: Create a GA4 property in Google Analytics and copy the Measurement ID (format: G-XXXXXXXXXX)
+2. **Set Environment Variable**: Add `NEXT_PUBLIC_GA_MEASUREMENT_ID=your-measurement-id` to `.env`
+3. **Deploy**: GA tracking will automatically start working after the next deployment
+4. **Disable**: Remove or comment out the environment variable to disable tracking
+
+### Security Considerations
+- Only loads GA scripts when explicitly configured
+- Uses secure HTTPS connections to Google services
+- Follows Google's recommended implementation patterns
+- No tracking occurs without explicit configuration
 
 This guidance should help Claude Code efficiently navigate and modify the web application component while maintaining code quality and following established patterns.
