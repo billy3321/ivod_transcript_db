@@ -37,6 +37,8 @@ def test_process_ivod_success(monkeypatch):
     monkeypatch.setattr(core, "fetch_ivod_info", lambda br, ivod_id: dummy_js)
     monkeypatch.setattr(core, "fetch_ai", lambda js, rec, obj, db: rec.setdefault("ai_status", "success"))
     monkeypatch.setattr(core, "fetch_ly", lambda js, rec, obj, br: rec.setdefault("ly_status", "success"))
+    # 確保使用 SQLite backend 來測試 JSON 序列化
+    monkeypatch.setattr(core, "DB_BACKEND", "sqlite")
 
     rec = core.process_ivod(DummyBrowser(), 123)
     assert rec["ivod_id"] == 123

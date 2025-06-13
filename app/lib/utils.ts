@@ -122,6 +122,7 @@ export function normalizeTimestamp(timestamp: string | Date | null): string | nu
 
 /**
  * Format timestamp for display
+ * Automatically converts to user's local timezone for display
  */
 export function formatTimestamp(timestamp: string | Date | null): string {
   if (!timestamp) return '';
@@ -131,7 +132,18 @@ export function formatTimestamp(timestamp: string | Date | null): string {
     if (isNaN(date.getTime())) {
       return timestamp.toString();
     }
-    return date.toLocaleString('zh-TW');
+    
+    // 顯示時間並自動根據用戶所在時區調整
+    return date.toLocaleString('zh-TW', {
+      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false
+    });
   } catch {
     return timestamp?.toString() || '';
   }

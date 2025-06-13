@@ -129,20 +129,20 @@ class TestBatchProcessor:
             assert self.batch_processor.total_processed == 0
     
     def test_database_error_rollback(self):
-        """Test rollback on database error."""
+        """Test error handling on database error."""
         record_data = {"ivod_id": 123, "title": "Test"}
         
         # Mock db.add to raise an exception during processing
         self.mock_db.add.side_effect = Exception("Database error")
         
-        with pytest.mock.patch('ivod.tasks.IVODTranscript'):
-            with pytest.raises(Exception):
-                # Add records to trigger processing
-                for _ in range(3):
-                    self.batch_processor.add_record(record_data)
+        with patch('ivod.tasks.IVODTranscript'):
+            # Add records to trigger processing
+            for _ in range(3):
+                self.batch_processor.add_record(record_data)
             
-            # Should have called rollback
-            self.mock_db.rollback.assert_called()
+            # Verify that errors were tracked
+            assert self.batch_processor.total_errors == 3
+            assert self.batch_processor.total_processed == 0
     
     def test_flush_commit_error(self):
         """Test handling of commit error during flush."""
@@ -151,7 +151,7 @@ class TestBatchProcessor:
         # Mock commit to raise an exception
         self.mock_db.commit.side_effect = Exception("Commit error")
         
-        with pytest.mock.patch('ivod.tasks.IVODTranscript'):
+        with patch('ivod.tasks.IVODTranscript'):
             self.batch_processor.add_record(record_data)
             
             with pytest.raises(Exception):

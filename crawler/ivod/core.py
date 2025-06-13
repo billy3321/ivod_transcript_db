@@ -2,7 +2,7 @@
 # ivod_core.py
 
 import json
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 
 from .crawler import (
     HEADERS,
@@ -110,7 +110,10 @@ def add_transcript_statuses(js, rec, br):
 
 def add_timestamp(rec):
     """Add last_updated timestamp to the record."""
-    now = datetime.now()
+    # 使用台灣時區 (UTC+8)
+    taiwan_tz = timezone(timedelta(hours=8))
+    now = datetime.now(taiwan_tz)
+    
     rec["last_updated"] = now if DB_BACKEND != "sqlite" else now.isoformat()
     return rec
 
