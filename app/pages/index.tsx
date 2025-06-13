@@ -3,6 +3,7 @@ import { useRouter } from 'next/router';
 import Pagination from '@/components/Pagination';
 import SearchHeader from '@/components/SearchHeader';
 import SearchResults from '@/components/SearchResults';
+import ClientOnly from '@/components/ClientOnly';
 import { useSearchFilters, useSearchResults, useUrlSync } from '@/hooks/useSearch';
 
 export default function Home() {
@@ -90,25 +91,32 @@ export default function Home() {
           />
 
           {/* Search Results */}
-          <SearchResults
-            data={data}
-            loading={loading}
-            searchScope={searchScope}
-            searchQuery={filters.q}
-            transcriptSearchResults={transcriptSearchResults}
-          />
-
-          {/* Pagination */}
-          {data && data.total > 0 && (
-            <div className="flex justify-center">
-              <Pagination
-                currentPage={page}
-                total={data.total}
-                pageSize={20}
-                onPageChange={setPage}
-              />
+          <ClientOnly fallback={
+            <div className="bg-white rounded-lg shadow-sm p-12 text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+              <p className="text-gray-500">載入中...</p>
             </div>
-          )}
+          }>
+            <SearchResults
+              data={data}
+              loading={loading}
+              searchScope={searchScope}
+              searchQuery={filters.q}
+              transcriptSearchResults={transcriptSearchResults}
+            />
+
+            {/* Pagination */}
+            {data && data.meta?.total > 0 && (
+              <div className="flex justify-center">
+                <Pagination
+                  currentPage={page}
+                  total={data.meta.total}
+                  pageSize={20}
+                  onPageChange={setPage}
+                />
+              </div>
+            )}
+          </ClientOnly>
         </div>
       </div>
     </>

@@ -4,7 +4,7 @@ import Icon from './Icon';
 import { SearchScope } from './SearchHeader';
 
 interface SearchResultsProps {
-  data: { data: IVOD[]; total: number } | null;
+  data: { data: IVOD[]; meta: { total: number; page: number; pageSize: number } } | null;
   loading: boolean;
   searchScope: SearchScope;
   searchQuery: string;
@@ -25,7 +25,7 @@ export default function SearchResults({
     return (
       <div className="mb-6 flex items-center justify-between">
         <p className="text-sm text-gray-700">
-          找到 <span className="font-semibold">{data.total}</span> 筆 IVOD 紀錄
+          找到 <span className="font-semibold">{data.meta?.total || 0}</span> 筆 IVOD 紀錄
           {searchScope === 'transcript' && transcriptSearchResults.length > 0 && (
             <span className="ml-2 text-blue-600">
               ・{transcriptSearchResults.length} 筆逐字稿符合關鍵字

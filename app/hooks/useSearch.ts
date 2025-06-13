@@ -168,13 +168,13 @@ export const useSearchResults = (
   searchScope: SearchScope,
   routerReady: boolean
 ) => {
-  const [data, setData] = useState<{ data: IVOD[]; total: number } | null>(null);
+  const [data, setData] = useState<{ data: IVOD[]; meta: { total: number; page: number; pageSize: number } } | null>(null);
   const [loading, setLoading] = useState(false);
   const [transcriptSearchResults, setTranscriptSearchResults] = useState<{ id: number; transcript: string }[]>([]);
   const mountedRef = useRef(true);
 
   // Safe state setters that check if component is still mounted
-  const safeSetData = useCallback((newData: { data: IVOD[]; total: number } | null) => {
+  const safeSetData = useCallback((newData: { data: IVOD[]; meta: { total: number; page: number; pageSize: number } } | null) => {
     if (mountedRef.current) {
       setData(newData);
     }
@@ -257,7 +257,7 @@ export const useSearchResults = (
             }
             safeSetData(ivodData);
           } else {
-            safeSetData({ data: [], total: 0 });
+            safeSetData({ data: [], meta: { total: 0, page: page, pageSize: 20 } });
           }
         } else if (filters.q && searchScope === 'all') {
           // For general search with query, also get search excerpts
@@ -291,10 +291,10 @@ export const useSearchResults = (
             }
             safeSetData(ivodData);
           } else {
-            safeSetData({ data: [], total: 0 });
+            safeSetData({ data: [], meta: { total: 0, page: page, pageSize: 20 } });
           }
         } else {
-          // No query, just get IVOD data
+          // No query or other search conditions, just get IVOD data
           const ivodResponse = await fetch(`/api/ivods?${searchParams}`, {
             signal: controller.signal
           });
@@ -305,7 +305,7 @@ export const useSearchResults = (
       } catch (error: any) {
         if (error.name !== 'AbortError') {
           console.error('Error fetching data:', error);
-          safeSetData({ data: [], total: 0 });
+          safeSetData({ data: [], meta: { total: 0, page: page, pageSize: 20 } });
           safeSetTranscriptSearchResults([]);
         }
       } finally {
@@ -323,8 +323,9 @@ export const useSearchResults = (
     };
   }, [searchParams, filters, sortOrder, page, searchScope, routerReady]);
 
-  // Cleanup effect
+  // Cleanup effect - set mounted to false only on unmount
   useEffect(() => {
+    mountedRef.current = true;
     return () => {
       mountedRef.current = false;
     };
