@@ -167,7 +167,13 @@ async function ivodsHandler(req: NextApiRequest, res: NextApiResponse): Promise<
       prisma.iVODTranscript.count({ where }),
     ]);
     
-    return createSuccessResponse(data, {
+    // Transform data to match IVOD interface
+    const transformedData = data.map(item => ({
+      ...item,
+      committee_names: item.committee_names as string | string[] | null
+    }));
+
+    return createSuccessResponse(transformedData, {
       total,
       page: searchParams.page,
       pageSize: searchParams.pageSize

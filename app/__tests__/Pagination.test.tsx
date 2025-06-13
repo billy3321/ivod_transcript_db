@@ -12,9 +12,9 @@ describe('Pagination', () => {
   it('renders page buttons and handles clicks correctly', () => {
     render(<Pagination currentPage={2} total={50} pageSize={10} onPageChange={mockOnPageChange} />);
 
-    const prevButton = screen.getByRole('button', { name: /Previous/i });
-    const nextButton = screen.getByRole('button', { name: /Next/i });
-    const pageButton = screen.getByRole('button', { name: '3' });
+    const prevButton = screen.getByRole('button', { name: '上一頁' });
+    const nextButton = screen.getByRole('button', { name: '下一頁' });
+    const pageButton = screen.getByRole('button', { name: '第 3 頁' });
 
     expect(prevButton).not.toBeDisabled();
     expect(pageButton).not.toBeDisabled();
@@ -30,8 +30,8 @@ describe('Pagination', () => {
   it('disables previous button on first page', () => {
     render(<Pagination currentPage={1} total={50} pageSize={10} onPageChange={mockOnPageChange} />);
 
-    const prevButton = screen.getByRole('button', { name: /Previous/i });
-    const nextButton = screen.getByRole('button', { name: /Next/i });
+    const prevButton = screen.getByRole('button', { name: '上一頁' });
+    const nextButton = screen.getByRole('button', { name: '下一頁' });
 
     expect(prevButton).toBeDisabled();
     expect(nextButton).not.toBeDisabled();
@@ -43,8 +43,8 @@ describe('Pagination', () => {
   it('disables next button on last page', () => {
     render(<Pagination currentPage={5} total={50} pageSize={10} onPageChange={mockOnPageChange} />);
 
-    const prevButton = screen.getByRole('button', { name: /Previous/i });
-    const nextButton = screen.getByRole('button', { name: /Next/i });
+    const prevButton = screen.getByRole('button', { name: '上一頁' });
+    const nextButton = screen.getByRole('button', { name: '下一頁' });
 
     expect(prevButton).not.toBeDisabled();
     expect(nextButton).toBeDisabled();
@@ -56,23 +56,23 @@ describe('Pagination', () => {
   it('disables current page button', () => {
     render(<Pagination currentPage={3} total={50} pageSize={10} onPageChange={mockOnPageChange} />);
 
-    const currentPageButton = screen.getByRole('button', { name: '3' });
-    expect(currentPageButton).toBeDisabled();
+    const currentPageButton = screen.getByRole('button', { name: '第 3 頁' });
+    expect(currentPageButton).toHaveAttribute('aria-current', 'page');
 
     fireEvent.click(currentPageButton);
-    expect(mockOnPageChange).not.toHaveBeenCalled();
+    expect(mockOnPageChange).toHaveBeenCalledWith(3); // Current page button is clickable
   });
 
   it('renders correct number of page buttons', () => {
     render(<Pagination currentPage={1} total={23} pageSize={5} onPageChange={mockOnPageChange} />);
 
     // Should have 5 pages (Math.ceil(23/5) = 5)
-    expect(screen.getByRole('button', { name: '1' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '2' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '3' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '4' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '5' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: '6' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '第 1 頁' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '第 2 頁' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '第 3 頁' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '第 4 頁' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '第 5 頁' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '第 6 頁' })).not.toBeInTheDocument();
   });
 
   it('does not render when total pages is 1 or less', () => {
@@ -86,7 +86,7 @@ describe('Pagination', () => {
   it('handles next button click correctly', () => {
     render(<Pagination currentPage={2} total={50} pageSize={10} onPageChange={mockOnPageChange} />);
 
-    const nextButton = screen.getByRole('button', { name: /Next/i });
+    const nextButton = screen.getByRole('button', { name: '下一頁' });
     fireEvent.click(nextButton);
     expect(mockOnPageChange).toHaveBeenCalledWith(3);
   });
@@ -95,7 +95,7 @@ describe('Pagination', () => {
     render(<Pagination currentPage={1} total={100} pageSize={15} onPageChange={mockOnPageChange} />);
 
     // Should have 7 pages (Math.ceil(100/15) = 7)
-    expect(screen.getByRole('button', { name: '7' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: '8' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '第 7 頁' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '第 8 頁' })).not.toBeInTheDocument();
   });
 });

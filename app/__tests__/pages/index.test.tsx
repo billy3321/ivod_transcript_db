@@ -394,15 +394,20 @@ describe('Home Page', () => {
       json: () => Promise.resolve(mockData),
     });
 
-    render(<Home />);
-
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: '1' })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: '2' })).toBeInTheDocument();
+    await act(async () => {
+      render(<Home />);
     });
 
-    const nextButton = screen.getByRole('button', { name: /Next/i });
-    fireEvent.click(nextButton);
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: '第 1 頁' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: '第 2 頁' })).toBeInTheDocument();
+    });
+
+    const nextButton = screen.getByRole('button', { name: '下一頁' });
+    
+    await act(async () => {
+      fireEvent.click(nextButton);
+    });
 
     await waitFor(() => {
       expect(mockPush).toHaveBeenCalledWith(
