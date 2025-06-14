@@ -272,8 +272,14 @@ export const useSearchResults = (
             // Get IVOD IDs from search results to ensure we only get matching records
             const ivodIds = searchData.data.map((item: any) => item.id);
             
-            // Create search params with the matching IDs
-            const matchingSearchParams = new URLSearchParams(searchParams);
+            // Create search params without q parameter, only including other filters
+            const matchingSearchParams = new URLSearchParams();
+            Object.entries(filters).forEach(([key, value]) => {
+              if (value && key !== 'q') matchingSearchParams.append(key, value);
+            });
+            matchingSearchParams.append('sort', sortOrder);
+            matchingSearchParams.append('page', page.toString());
+            matchingSearchParams.append('pageSize', '20');
             matchingSearchParams.append('ids', ivodIds.join(','));
             
             const ivodResponse = await fetch(`/api/ivods?${matchingSearchParams.toString()}`, {

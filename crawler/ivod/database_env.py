@@ -20,8 +20,7 @@ def get_database_environment() -> DatabaseEnvironment:
     # 檢查是否為測試環境
     if (os.getenv('PYTEST_RUNNING') == 'true' or 
         os.getenv('TESTING') == 'true' or
-        'pytest' in os.getenv('_', '') or
-        'integration_test.py' in ' '.join(os.sys.argv if hasattr(os, 'sys') else [])):
+        'pytest' in os.getenv('_', '')):
         return 'testing'
     
     # 檢查是否指定使用 production 環境

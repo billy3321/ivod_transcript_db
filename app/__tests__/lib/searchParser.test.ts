@@ -174,6 +174,90 @@ describe('searchParser', () => {
       expect(query.bool.must_not[1].multi_match.operator).toBe('and');
     });
 
+    it('should use best_fields with and operator for quoted phrases consistently', () => {
+      const parsedQuery = parseAdvancedSearchQuery('"議會" AND "委員會"');
+      const query = buildElasticsearchQuery(parsedQuery);
+      
+      // Should have must clauses for quoted phrases
+      expect(query.bool.must.length).toBeGreaterThan(0);
+      
+      // All should use best_fields type
+      query.bool.must.forEach(clause => {
+        expect(clause.multi_match.type).toBe('best_fields');
+      });
+      
+      // Check that quoted phrases use 'and' operator
+      const quotedClauses = query.bool.must.filter(clause => 
+        clause.multi_match.operator === 'and'
+      );
+      expect(quotedClauses.length).toBeGreaterThan(0);
+    });
+
+    it('should handle mixed quoted and unquoted terms with consistent field matching', () => {
+      const parsedQuery = parseAdvancedSearchQuery('"黃國昌" 立委 "預算審查"');
+      const query = buildElasticsearchQuery(parsedQuery);
+      
+      // Should have 3 must clauses: 2 quoted phrases + 1 general term
+      expect(query.bool.must).toHaveLength(3);
+      
+      // Find the quoted phrase clauses
+      const quotedClauses = query.bool.must.filter(clause => 
+        clause.multi_match.operator === 'and'
+      );
+      const generalClauses = query.bool.must.filter(clause => 
+        !clause.multi_match.operator || clause.multi_match.operator === 'or'
+      );
+      
+      expect(quotedClauses).toHaveLength(2);
+      expect(generalClauses).toHaveLength(1);
+      
+      // All should use best_fields type
+      query.bool.must.forEach(clause => {
+        expect(clause.multi_match.type).toBe('best_fields');
+      });
+    });
+
+    it('should build query with flexible phrase matching that works like unquoted search', () => {
+      const quotedQuery = parseAdvancedSearchQuery('"黃國昌"');
+      const unquotedQuery = parseAdvancedSearchQuery('黃國昌');
+      
+      const quotedESQuery = buildElasticsearchQuery(quotedQuery);
+      const unquotedESQuery = buildElasticsearchQuery(unquotedQuery);
+      
+      // Both should use best_fields type
+      expect(quotedESQuery.bool.must[0].multi_match.type).toBe('best_fields');
+      expect(unquotedESQuery.bool.must[0].multi_match.type).toBe('best_fields');
+      
+      // Quoted should use 'and' operator, unquoted should use 'or' operator
+      expect(quotedESQuery.bool.must[0].multi_match.operator).toBe('and');
+      expect(unquotedESQuery.bool.must[0].multi_match.operator).toBe('or');
+      
+      // Both should search the same fields
+      expect(quotedESQuery.bool.must[0].multi_match.fields).toEqual(
+        unquotedESQuery.bool.must[0].multi_match.fields
+      );
+    });
+
+    it('should handle boolean term queries in field searches with best_fields', () => {
+      // Test field search with quoted content
+      const parsedQuery = parseAdvancedSearchQuery('speaker:"國昌" speaker:立委 title:會議');
+      const query = buildElasticsearchQuery(parsedQuery);
+      
+      // Should have field search clauses
+      expect(query.bool.must.length).toBeGreaterThan(0);
+      
+      // All should use best_fields type
+      query.bool.must.forEach(clause => {
+        expect(clause.multi_match.type).toBe('best_fields');
+      });
+      
+      // Find a speaker search clause
+      const speakerClause = query.bool.must.find(clause => 
+        clause.multi_match.fields && clause.multi_match.fields.includes('speaker_name')
+      );
+      expect(speakerClause).toBeDefined();
+    });
+
     it('should return match_all for empty query', () => {
       const parsedQuery = {
         generalTerms: [],

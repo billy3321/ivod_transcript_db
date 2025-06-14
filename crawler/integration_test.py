@@ -211,7 +211,7 @@ if __name__ == "__main__":
     main()
 else:
     # 為了向後相容，當作模組導入時使用原有邏輯
-    setup_environment("testing")
+    setup_environment("development")
     
     from dotenv import load_dotenv
     load_dotenv()
