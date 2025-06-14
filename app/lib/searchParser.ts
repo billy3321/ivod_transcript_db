@@ -349,6 +349,11 @@ function extractQuotedPhrasesFromOriginal(query: string): string[] {
 
 /**
  * Build Elasticsearch query from parsed search terms
+ * 
+ * Note: Quoted phrases use 'best_fields' with 'and' operator instead of 'phrase' type
+ * to allow flexible word positioning while still requiring all words to be present.
+ * This fixes the issue where quoted searches (e.g., "黃國昌") would fail to find results
+ * that unquoted searches (e.g., 黃國昌) would find.
  */
 export function buildElasticsearchQuery(parsedQuery: AdvancedSearchQuery) {
   const mustClauses: any[] = [];
@@ -371,13 +376,15 @@ export function buildElasticsearchQuery(parsedQuery: AdvancedSearchQuery) {
     });
   }
 
-  // Add quoted phrases as exact matches
+  // Add quoted phrases - use flexible matching that works like general terms
+  // but still requires all words to be present
   parsedQuery.quotedPhrases.forEach(phrase => {
     mustClauses.push({
       multi_match: {
         query: phrase,
         fields: ['ai_transcript', 'ly_transcript', 'title', 'meeting_name', 'speaker_name'],
-        type: 'phrase'
+        type: 'best_fields',
+        operator: 'and'  // Require all words in the phrase to be present
       }
     });
   });
@@ -440,7 +447,8 @@ export function buildElasticsearchQuery(parsedQuery: AdvancedSearchQuery) {
       multi_match: {
         query: phrase,
         fields: ['ai_transcript', 'ly_transcript', 'title', 'meeting_name', 'speaker_name'],
-        type: 'phrase'
+        type: 'best_fields',
+        operator: 'and'  // Exclude documents that contain all words in the phrase
       }
     });
   });
@@ -768,7 +776,8 @@ function buildTermQuery(term: BooleanTerm) {
         multi_match: {
           query: term.value,
           fields: [targetField],
-          type: term.type === 'phrase' ? 'phrase' : 'best_fields'
+          type: 'best_fields',
+          operator: term.type === 'phrase' ? 'and' : 'or'
         }
       };
     }
@@ -779,7 +788,8 @@ function buildTermQuery(term: BooleanTerm) {
     multi_match: {
       query: term.value,
       fields,
-      type: term.type === 'phrase' ? 'phrase' : 'best_fields'
+      type: 'best_fields',
+      operator: term.type === 'phrase' ? 'and' : 'or'
     }
   };
 }

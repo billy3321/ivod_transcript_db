@@ -119,7 +119,8 @@ describe('searchParser', () => {
       const query = buildElasticsearchQuery(parsedQuery);
       
       expect(query.bool.must).toHaveLength(1);
-      expect(query.bool.must[0].multi_match.type).toBe('phrase');
+      expect(query.bool.must[0].multi_match.type).toBe('best_fields');
+      expect(query.bool.must[0].multi_match.operator).toBe('and');
       expect(query.bool.must[0].multi_match.query).toBe('exact phrase');
     });
 
@@ -169,7 +170,8 @@ describe('searchParser', () => {
       
       expect(query.bool.must_not[0].multi_match.query).toBe('world');
       expect(query.bool.must_not[1].multi_match.query).toBe('bad phrase');
-      expect(query.bool.must_not[1].multi_match.type).toBe('phrase');
+      expect(query.bool.must_not[1].multi_match.type).toBe('best_fields');
+      expect(query.bool.must_not[1].multi_match.operator).toBe('and');
     });
 
     it('should return match_all for empty query', () => {
