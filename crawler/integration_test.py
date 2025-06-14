@@ -56,8 +56,13 @@ def main():
         Session,
         IVODTranscript,
     )
+    from ivod.db import check_and_create_database_tables
 
-    # 初始化資料庫連線
+    # 初始化資料庫連線並確認表格存在
+    if not check_and_create_database_tables():
+        print("❌ 資料庫初始化失敗")
+        sys.exit(1)
+    
     db = Session()
     bind = db.get_bind()
     print(f"⚙️ 使用的 DB URL: {bind.engine.url}")
@@ -65,24 +70,40 @@ def main():
     
     # 檢查是否要重置資料庫
     if not args.no_reset:
-        print("🗑️ 重置資料庫（刪除所有現有記錄）...")
-        db.query(IVODTranscript).delete()
-        db.commit()
-        print("✅ 資料庫已重置")
+        existing_count = db.query(IVODTranscript).count()
+        if existing_count > 0:
+            print(f"⚠️ 發現資料庫中有 {existing_count} 筆現有記錄")
+            print(f"⚠️ 即將重置資料庫（刪除所有現有記錄）")
+            print(f"⚠️ 資料庫: {bind.engine.url}")
+            
+            # 要求用戶確認
+            while True:
+                confirm = input("確定要重置資料庫嗎？(y/N): ").strip().lower()
+                if confirm in ['y', 'yes']:
+                    print("🗑️ 重置資料庫中...")
+                    db.query(IVODTranscript).delete()
+                    db.commit()
+                    print("✅ 資料庫已重置")
+                    break
+                elif confirm in ['n', 'no', '']:
+                    print("❌ 取消重置資料庫")
+                    print("💡 如果想保留現有資料，請使用 --no-reset 參數")
+                    db.close()
+                    sys.exit(0)
+                else:
+                    print("請輸入 y 或 n")
+        else:
+            print("🗑️ 重置資料庫（目前沒有記錄）...")
+            print("✅ 資料庫已重置")
     else:
         existing_count = db.query(IVODTranscript).count()
         print(f"📊 保留現有資料，目前有 {existing_count} 筆記錄")
 
-    return args, db
-
-if __name__ == "__main__":
-    args, db = main()
-    
     # Prepare browser for HTTP requests
     br = make_browser(skip_ssl=True)
 
     # 1. Get the latest available IVOD date
-    latest_date = fetch_lastest_date(br)
+    latest_date = fetch_latest_date(br)
     print(f"Latest available date: {latest_date}")
 
     scenario1_date = None
@@ -183,6 +204,11 @@ if __name__ == "__main__":
             print(f"Test case for date {date_str} passed.")
 
     print("\nIntegration tests completed and database populated.")
+    
+    return args, db
+
+if __name__ == "__main__":
+    main()
 else:
     # 為了向後相容，當作模組導入時使用原有邏輯
     setup_environment("testing")
@@ -195,14 +221,19 @@ else:
     from ivod.core import (
         DB_BACKEND,
         make_browser,
-        fetch_lastest_date,
+        fetch_latest_date,
         fetch_ivod_list,
         process_ivod,
         Session,
         IVODTranscript,
     )
+    from ivod.db import check_and_create_database_tables
     
-    # 原有的測試環境邏輯
+    # 原有的測試環境邏輯 - 確保表格存在
+    if not check_and_create_database_tables():
+        print("❌ 資料庫初始化失敗")
+        sys.exit(1)
+    
     db = Session()
     bind = db.get_bind()
     print("⚙️ 使用的 DB URL:", bind.engine.url)
