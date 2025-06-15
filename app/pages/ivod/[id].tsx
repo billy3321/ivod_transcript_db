@@ -180,6 +180,18 @@ export default function IvodDetail() {
               </div>
             </div>
             
+            {data.speaker_name && (
+              <div className="flex items-start text-gray-600">
+                <svg className="w-4 h-4 mr-2 mt-0.5 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+                </svg>
+                <div>
+                  <span className="font-medium">發言委員：</span>
+                  <span className="ml-1">{data.speaker_name}</span>
+                </div>
+              </div>
+            )}
+            
             {data.video_type && (
               <div className="flex items-start text-gray-600">
                 <svg className="w-4 h-4 mr-2 mt-0.5 text-gray-400" fill="currentColor" viewBox="0 0 20 20">

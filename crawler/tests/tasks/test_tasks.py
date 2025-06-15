@@ -65,6 +65,9 @@ def test_run_retry_noop(monkeypatch):
         def filter(self, *args):
             return self
 
+        def order_by(self, *args):
+            return self
+
         def all(self):
             return []
 
@@ -76,20 +79,24 @@ def test_run_retry_noop(monkeypatch):
 
     monkeypatch.setattr(tasks, "Session", lambda: DummyDB())
     run_retry(skip_ssl=False)
-    assert calls == ["close"]
+    assert calls == ["commit", "close"]
 
 
 def test_run_retry_with_objects(monkeypatch):
     import ivod.tasks as tasks
 
     monkeypatch.setattr(tasks, "make_browser", lambda skip_ssl: None)
-    objs = [type("O", (), {"ivod_id": 1111}), type("O", (), {"ivod_id": 2222})]
+    from datetime import date
+    objs = [type("O", (), {"ivod_id": 1111, "date": date(2023, 1, 1)}), type("O", (), {"ivod_id": 2222, "date": date(2023, 1, 2)})]
 
     class DummyQuery:
         def __init__(self, objs):
             self.objs = objs
 
         def filter(self, *args):
+            return self
+
+        def order_by(self, *args):
             return self
 
         def all(self):
@@ -112,7 +119,10 @@ def test_run_retry_with_objects(monkeypatch):
     db_instance = DummyDB()
     processed = []
     monkeypatch.setattr(tasks, "Session", lambda: db_instance)
-    monkeypatch.setattr(tasks, "process_ivod", lambda br, ivod_id, db: processed.append((ivod_id, db)))
+    def mock_process_ivod(br, ivod_id):
+        processed.append((ivod_id, db_instance))
+        return {'ai_status': 'success', 'ly_status': 'success'}
+    monkeypatch.setattr(tasks, "process_ivod", mock_process_ivod)
     run_retry(skip_ssl=True)
     expected = [(1111, db_instance), (2222, db_instance), (1111, db_instance), (2222, db_instance)]
     assert processed == expected

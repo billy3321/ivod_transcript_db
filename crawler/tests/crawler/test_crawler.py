@@ -62,22 +62,22 @@ class DummyBrowser:
         return DummyResponse(self.raw)
 
 
-def test_fetch_lastest_date_primary():
+def test_fetch_latest_date_primary():
     js = {"ivods": [{"日期": "2023-01-02"}]}
     raw = json.dumps(js)
     br = DummyBrowser(raw)
-    result = fetch_lastest_date(br)
+    result = fetch_latest_date(br)
     assert result == date.fromisoformat("2023-01-02")
 
 
-def test_fetch_lastest_date_fallback(monkeypatch):
+def test_fetch_latest_date_fallback(monkeypatch):
     js = {"ivods": [{"日期": "2023-01-03"}]}
     raw = json.dumps(js)
     br = DummyBrowser("")
     monkeypatch.setattr(br, "open", lambda url: (_ for _ in ()).throw(Exception("fail")))
     dummy = type("R", (), {"text": raw})()
     monkeypatch.setattr(requests, "get", lambda url, verify: dummy)
-    result = fetch_lastest_date(br)
+    result = fetch_latest_date(br)
     assert result == date.fromisoformat("2023-01-03")
 
 

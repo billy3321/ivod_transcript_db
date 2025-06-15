@@ -34,7 +34,7 @@ describe('List', () => {
 
     expect(screen.getByText('Test Meeting（Test Speaker 發言）')).toBeInTheDocument();
     expect(screen.getByText('委員會A, 委員會B')).toBeInTheDocument();
-    expect(screen.getByText('2022-01-01')).toBeInTheDocument();
+    expect(screen.getByText('2022/01/01 08:00:00')).toBeInTheDocument();
     expect(screen.getByText('時長: 10:00')).toBeInTheDocument();
     expect(screen.getByText('發言')).toBeInTheDocument();
   });
@@ -146,7 +146,7 @@ describe('List', () => {
     render(<List items={items} />);
 
     expect(screen.getByText('重要會議（完整會議）')).toBeInTheDocument();
-    expect(screen.getByText('完整會議')).toBeInTheDocument();
+    expect(screen.getAllByText('完整會議')).toHaveLength(2); // Once in title, once in metadata
     expect(screen.getByText('09:00:00 - 11:00:00')).toBeInTheDocument();
   });
 
@@ -208,8 +208,9 @@ describe('List', () => {
     expect(screen.getByText('搜尋結果摘要')).toBeInTheDocument();
     
     // Check if the highlighted content is present
-    const excerptContainer = screen.getByText(/這是一段包含.*搜尋關鍵字.*的摘要文字/);
-    expect(excerptContainer).toBeInTheDocument();
+    expect(screen.getByText((content, element) => {
+      return element?.textContent === '這是一段包含搜尋關鍵字的摘要文字...';
+    })).toBeInTheDocument();
   });
 
   it('does not display search excerpt when not available', () => {
@@ -267,5 +268,56 @@ describe('List', () => {
 
     // Should not show search excerpt section
     expect(screen.queryByText('搜尋結果摘要')).not.toBeInTheDocument();
+  });
+
+  it('displays speaker_name in metadata section', () => {
+    const items = [
+      {
+        ivod_id: 9,
+        date: '2022-01-09',
+        title: '發言委員測試',
+        meeting_name: '測試會議',
+        committee_names: ['測試委員會'],
+        speaker_name: '王委員',
+        video_length: '30:00',
+        video_start: null,
+        video_end: null,
+        video_type: 'speech',
+        category: null,
+        meeting_code: null,
+        meeting_code_str: null,
+        meeting_time: null,
+      },
+    ];
+    render(<List items={items} />);
+
+    // Should display speaker_name in both title and metadata section
+    expect(screen.getByText('發言委員測試（王委員 發言）')).toBeInTheDocument();
+    expect(screen.getByText('王委員')).toBeInTheDocument();
+  });
+
+  it('does not display speaker metadata when speaker_name is null', () => {
+    const items = [
+      {
+        ivod_id: 10,
+        date: '2022-01-10',
+        title: '無發言委員測試',
+        meeting_name: '測試會議',
+        committee_names: ['測試委員會'],
+        speaker_name: null,
+        video_length: '30:00',
+        video_start: null,
+        video_end: null,
+        video_type: 'speech',
+        category: null,
+        meeting_code: null,
+        meeting_code_str: null,
+        meeting_time: null,
+      },
+    ];
+    render(<List items={items} />);
+
+    // Should display title without speaker info
+    expect(screen.getByText('無發言委員測試')).toBeInTheDocument();
   });
 });

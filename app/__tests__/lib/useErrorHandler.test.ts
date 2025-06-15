@@ -1,12 +1,12 @@
 import { renderHook, act } from '@testing-library/react';
 import { useErrorHandler } from '@/lib/useErrorHandler';
 
-// Mock the logger
-jest.mock('@/lib/logger', () => ({
+// Mock the logger-client
+jest.mock('@/lib/logger-client', () => ({
   logClientError: jest.fn(),
 }));
 
-import { logClientError } from '@/lib/logger';
+import { logClientError } from '@/lib/logger-client';
 const mockLogClientError = logClientError as jest.MockedFunction<typeof logClientError>;
 
 // Mock fetch

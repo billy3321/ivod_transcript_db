@@ -90,10 +90,16 @@ TEST_SQLITE_PATH=../db/ivod_test.db python integration_test.py
 pytest tests/core/test_core.py
 pytest tests/crawler/test_crawler.py
 
+# Test comprehensive coverage improvements (2025-06)
+pytest tests/tasks/test_tasks_comprehensive.py        # Comprehensive workflow tests
+pytest tests/db/test_db_comprehensive.py             # Comprehensive database tests
+pytest tests/db/test_database_env_comprehensive.py   # Environment configuration tests
+pytest tests/crawler/test_crawler_comprehensive.py   # Comprehensive crawler tests
+
 # Test new modules (refactoring improvements)
-pytest tests/test_exceptions.py
-pytest tests/test_config.py  
-pytest tests/test_batch_processing.py
+pytest tests/test_exceptions.py                      # Exception hierarchy tests (13 tests)
+pytest tests/test_config.py                         # Configuration management tests (29 tests)
+pytest tests/test_batch_processing.py               # Batch processing tests (10 tests)
 ```
 
 ## Environment Configuration
@@ -261,14 +267,33 @@ All changes maintain full backward compatibility:
 - **Database Integration**: Full workflow testing with real data
 - **ES Integration**: Index creation and search validation
 
+### Comprehensive Test Coverage (2025-06)
+- **tasks.py**: 300+ lines of comprehensive tests covering logging, workflows, error handling
+- **db.py**: 400+ lines of tests covering database operations, Elasticsearch integration, and user messaging
+- **database_env.py**: 300+ lines of tests covering environment configuration for development/production/testing
+- **crawler.py**: 500+ lines of tests covering HTTP scraping, SSL handling, and data fetching
+- **Database Availability Testing**: Specific tests for database connection failures with user feedback messages
+
 ### Test Organization
 ```
 tests/
-├── core/           # Core module tests
-├── crawler/        # Crawler functionality tests
-├── db/            # Database operation tests
-├── tasks/         # Workflow and task tests
-└── unit/          # Additional unit tests
+├── core/                          # Core module tests
+├── crawler/                       # Crawler functionality tests
+│   ├── test_crawler.py           # Basic crawler tests
+│   └── test_crawler_comprehensive.py  # Comprehensive crawler coverage
+├── db/                           # Database operation tests
+│   ├── test_db.py                # Basic database tests  
+│   ├── test_db_comprehensive.py  # Comprehensive database coverage
+│   └── test_database_env_comprehensive.py  # Environment configuration tests
+├── tasks/                        # Workflow and task tests
+│   ├── test_tasks.py             # Basic workflow tests
+│   ├── test_tasks_comprehensive.py  # Comprehensive workflow coverage
+│   ├── test_fix.py               # Fix workflow tests
+│   └── test_run_es.py            # Elasticsearch workflow tests
+├── test_config.py                # Configuration management tests (29 tests)
+├── test_exceptions.py            # Exception hierarchy tests (13 tests)
+├── test_batch_processing.py      # Batch processing tests (10 tests)
+└── unit/                         # Additional unit tests
 ```
 
 ## Production Deployment

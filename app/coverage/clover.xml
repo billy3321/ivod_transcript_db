@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<coverage generated="1750003170436" clover="3.2.0">
+  <project timestamp="1750003170437" name="All files">
+    <metrics statements="97" coveredstatements="88" conditionals="54" coveredconditionals="50" methods="27" coveredmethods="18" elements="178" coveredelements="156" complexity="0" loc="97" ncloc="97" packages="1" files="7" classes="7"/>
+    <file name="ChevronIcon.tsx" path="/Users/billy3321/git/cic/ivod_transcript_db/app/components/ChevronIcon.tsx">
+      <metrics statements="4" coveredstatements="4" conditionals="4" coveredconditionals="3" methods="1" coveredmethods="1"/>
+      <line num="2" count="1" type="stmt"/>
+      <line num="9" count="20" type="cond" truecount="1" falsecount="1"/>
+      <line num="10" count="20" type="stmt"/>
+      <line num="27" count="1" type="stmt"/>
+    </file>
+    <file name="ClientOnly.tsx" path="/Users/billy3321/git/cic/ivod_transcript_db/app/components/ClientOnly.tsx">
+      <metrics statements="8" coveredstatements="8" conditionals="3" coveredconditionals="2" methods="2" coveredmethods="2"/>
+      <line num="1" count="1" type="stmt"/>
+      <line num="8" count="40" type="cond" truecount="1" falsecount="1"/>
+      <line num="9" count="40" type="stmt"/>
+      <line num="11" count="40" type="stmt"/>
+      <line num="12" count="20" type="stmt"/>
+      <line num="15" count="40" type="cond" truecount="1" falsecount="0"/>
+      <line num="16" count="20" type="stmt"/>
+      <line num="19" count="20" type="stmt"/>
+    </file>
+    <file name="ErrorBoundary.tsx" path="/Users/billy3321/git/cic/ivod_transcript_db/app/components/ErrorBoundary.tsx">
+      <metrics statements="25" coveredstatements="23" conditionals="11" coveredconditionals="11" methods="7" coveredmethods="5"/>
+      <line num="1" count="1" type="stmt"/>
+      <line num="2" count="1" type="stmt"/>
+      <line num="15" count="1" type="stmt"/>
+      <line num="17" count="41" type="cond" truecount="2" falsecount="0"/>
+      <line num="18" count="40" type="stmt"/>
+      <line num="21" count="1" type="stmt"/>
+      <line num="23" count="38" type="stmt"/>
+      <line num="26" count="1" type="stmt"/>
+      <line num="28" count="19" type="stmt"/>
+      <line num="29" count="19" type="stmt"/>
+      <line num="30" count="19" type="stmt"/>
+      <line num="31" count="19" type="stmt"/>
+      <line num="32" count="19" type="stmt"/>
+      <line num="35" count="19" type="stmt"/>
+      <line num="42" count="19" type="stmt"/>
+      <line num="48" count="99" type="stmt"/>
+      <line num="49" count="99" type="cond" truecount="1" falsecount="0"/>
+      <line num="51" count="57" type="cond" truecount="1" falsecount="0"/>
+      <line num="52" count="3" type="stmt"/>
+      <line num="55" count="54" type="stmt"/>
+      <line num="108" count="0" type="stmt"/>
+      <line num="114" count="0" type="stmt"/>
+      <line num="125" count="42" type="stmt"/>
+      <line num="127" count="1" type="stmt"/>
+      <line num="129" count="1" type="stmt"/>
+    </file>
+    <file name="Header.tsx" path="/Users/billy3321/git/cic/ivod_transcript_db/app/components/Header.tsx">
+      <metrics statements="9" coveredstatements="9" conditionals="2" coveredconditionals="2" methods="2" coveredmethods="2"/>
+      <line num="2" count="1" type="stmt"/>
+      <line num="3" count="1" type="stmt"/>
+      <line num="4" count="1" type="stmt"/>
+      <line num="10" count="26" type="stmt"/>
+      <line num="11" count="26" type="stmt"/>
+      <line num="13" count="26" type="stmt"/>
+      <line num="18" count="26" type="stmt"/>
+      <line num="70" count="52" type="stmt"/>
+      <line num="89" count="1" type="stmt"/>
+    </file>
+    <file name="Icon.tsx" path="/Users/billy3321/git/cic/ivod_transcript_db/app/components/Icon.tsx">
+      <metrics statements="4" coveredstatements="4" conditionals="2" coveredconditionals="1" methods="1" coveredmethods="1"/>
+      <line num="8" count="25" type="cond" truecount="1" falsecount="1"/>
+      <line num="9" count="25" type="stmt"/>
+      <line num="21" count="25" type="stmt"/>
+      <line num="37" count="2" type="stmt"/>
+    </file>
+    <file name="SearchHeader.tsx" path="/Users/billy3321/git/cic/ivod_transcript_db/app/components/SearchHeader.tsx">
+      <metrics statements="29" coveredstatements="22" conditionals="6" coveredconditionals="5" methods="11" coveredmethods="4"/>
+      <line num="2" count="1" type="stmt"/>
+      <line num="3" count="1" type="stmt"/>
+      <line num="32" count="1" type="stmt"/>
+      <line num="33" count="20" type="stmt"/>
+      <line num="34" count="20" type="stmt"/>
+      <line num="35" count="20" type="stmt"/>
+      <line num="36" count="20" type="stmt"/>
+      <line num="37" count="20" type="stmt"/>
+      <line num="38" count="20" type="stmt"/>
+      <line num="39" count="20" type="stmt"/>
+      <line num="40" count="20" type="stmt"/>
+      <line num="41" count="20" type="stmt"/>
+      <line num="42" count="20" type="stmt"/>
+      <line num="43" count="20" type="stmt"/>
+      <line num="44" count="20" type="stmt"/>
+      <line num="45" count="20" type="stmt"/>
+      <line num="46" count="20" type="stmt"/>
+      <line num="48" count="20" type="stmt"/>
+      <line num="49" count="0" type="stmt"/>
+      <line num="52" count="20" type="stmt"/>
+      <line num="67" count="1" type="stmt"/>
+      <line num="78" count="1" type="stmt"/>
+      <line num="116" count="1" type="stmt"/>
+      <line num="135" count="0" type="stmt"/>
+      <line num="156" count="0" type="stmt"/>
+      <line num="171" count="0" type="stmt"/>
+      <line num="186" count="0" type="stmt"/>
+      <line num="200" count="0" type="stmt"/>
+      <line num="213" count="0" type="stmt"/>
+    </file>
+    <file name="SearchResults.tsx" path="/Users/billy3321/git/cic/ivod_transcript_db/app/components/SearchResults.tsx">
+      <metrics statements="18" coveredstatements="18" conditionals="26" coveredconditionals="26" methods="3" coveredmethods="3"/>
+      <line num="2" count="1" type="stmt"/>
+      <line num="3" count="1" type="stmt"/>
+      <line num="14" count="1" type="stmt"/>
+      <line num="15" count="23" type="stmt"/>
+      <line num="16" count="23" type="stmt"/>
+      <line num="17" count="23" type="stmt"/>
+      <line num="18" count="23" type="stmt"/>
+      <line num="19" count="23" type="stmt"/>
+      <line num="22" count="23" type="stmt"/>
+      <line num="23" count="23" type="cond" truecount="1" falsecount="0"/>
+      <line num="25" count="21" type="stmt"/>
+      <line num="57" count="23" type="stmt"/>
+      <line num="58" count="23" type="cond" truecount="1" falsecount="0"/>
+      <line num="59" count="2" type="stmt"/>
+      <line num="62" count="21" type="cond" truecount="7" falsecount="0"/>
+      <line num="63" count="16" type="stmt"/>
+      <line num="67" count="5" type="stmt"/>
+      <line num="76" count="23" type="stmt"/>
+    </file>
+  </project>
+</coverage>

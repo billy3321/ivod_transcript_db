@@ -22,7 +22,19 @@ This document provides a comprehensive overview of the testing infrastructure an
 
 ## Test Coverage Details
 
+### 📊 Latest Coverage Statistics (2025-06)
+- **Overall Coverage**: 89.94% (excellent improvement from 87.49%)
+- **Statement Coverage**: 89.94%
+- **Branch Coverage**: 81.28%
+- **Function Coverage**: 90%
+- **Line Coverage**: 89.65%
+
 ### Unit Tests Status: ✅ 64/64 PASSING (100%)
+
+### 🆕 Comprehensive Test Suites Added (2025-06)
+- **logger-client.comprehensive.test.ts**: 28 tests - 100% coverage
+- **api-middleware.comprehensive.test.ts**: 42 tests - 96.82% coverage  
+- **utils.comprehensive.test.ts**: 70 tests - 93.75% coverage
 
 #### Component Tests
 - **SearchForm.test.tsx**: ✅ 4 tests
@@ -163,6 +175,52 @@ TEST_SQLITE_PATH=../db/ivod_test.db
 # Elasticsearch (mocked in tests)
 ES_HOST=localhost
 ES_PORT=9200
+```
+
+## 🆕 Comprehensive Test Suite Details (2025-06)
+
+### Logger Client Testing (`logger-client.comprehensive.test.ts`)
+- **Coverage**: 100% (improved from 16.66%)
+- **Test Scenarios**: 28 comprehensive tests
+- **Key Features Tested**:
+  - API call success and failure scenarios
+  - Network error handling and fallback behavior
+  - Browser environment compatibility (window.location, navigator.userAgent)
+  - Parameter validation and edge cases
+  - Error logging with structured context
+
+### API Middleware Testing (`api-middleware.comprehensive.test.ts`)
+- **Coverage**: 96.82% (improved from 74.6%)
+- **Test Scenarios**: 42 comprehensive tests
+- **Key Features Tested**:
+  - Error handling across development/production environments
+  - Parameter parsing and validation (parseIntParam, parseStringParam)
+  - APIError class functionality and inheritance
+  - Response format standardization
+  - Cross-environment configuration testing
+
+### Utils Testing (`utils.comprehensive.test.ts`)
+- **Coverage**: 93.75% (improved from 66.25%)
+- **Test Scenarios**: 70 comprehensive tests
+- **Key Features Tested**:
+  - Cross-database backend compatibility (SQLite, PostgreSQL, MySQL)
+  - Date/time formatting with timezone considerations
+  - Committee name formatting across different data structures
+  - Input validation and edge case handling
+  - Search condition creation for different database types
+
+### Running Comprehensive Tests
+```bash
+# Run all comprehensive test suites
+npm test -- --testPathPattern="comprehensive"
+
+# Run specific comprehensive test files
+npm test -- --testPathPattern="logger-client.comprehensive"
+npm test -- --testPathPattern="api-middleware.comprehensive"
+npm test -- --testPathPattern="utils.comprehensive"
+
+# Generate coverage report
+npm test -- --coverage --watchAll=false
 ```
 
 ## Future Test Improvements

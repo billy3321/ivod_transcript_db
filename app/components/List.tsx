@@ -62,6 +62,13 @@ export default function List({ items, loading = false }: ListProps) {
                   <span>{formatTimestamp(item.date)}</span>
                 </div>
                 
+                {item.speaker_name && (
+                  <div className="flex items-center">
+                    <Icon type="user" className="w-4 h-4 mr-1 text-gray-400" />
+                    <span className="truncate">{item.speaker_name}</span>
+                  </div>
+                )}
+                
                 {item.video_type && (
                   <div className="flex items-center">
                     <Icon type="video" className="w-4 h-4 mr-1 text-gray-400" />
