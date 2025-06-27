@@ -163,6 +163,10 @@ NEXT_PUBLIC_ES_INDEX=ivod_transcripts
 LOG_LEVEL=info                    # 日誌級別：error, warn, info, debug
 LOG_PATH=logs                     # 日誌檔案目錄
 ADMIN_TOKEN=your_secure_admin_token_here  # 管理員日誌介面存取金鑰
+
+# Google Analytics 設定（可選）
+# 新增您的 Google Analytics 4 測量 ID 以啟用追蹤
+# NEXT_PUBLIC_GA_MEASUREMENT_ID=G-XXXXXXXXXX
 ```
 
 ## 6. 本地開發
@@ -1888,9 +1892,123 @@ sudo tail -f /var/log/nginx/access.log
 sudo tail -f /var/log/nginx/error.log
 ```
 
-## 12. 安全性考慮
+## 12. Google Analytics 網站分析
 
-### 12.1 基本安全措施
+### 12.1 概述
+
+本應用程式包含可選的 Google Analytics 4 (GA4) 整合功能，用於網站流量分析和使用者行為追蹤。GA4 腳本只有在明確設定測量 ID 時才會載入，確保隱私和效能。
+
+### 12.2 功能特色
+
+- **條件式載入**：只有設定 `NEXT_PUBLIC_GA_MEASUREMENT_ID` 時才載入 GA 腳本
+- **Next.js 優化**：使用 Next.js `Script` 組件的 `afterInteractive` 策略
+- **自動頁面追蹤**：自動追蹤頁面瀏覽和導航
+- **TypeScript 支援**：包含 gtag 全域函數的型別宣告
+- **安全載入**：使用 HTTPS 連線到 Google 服務
+
+### 12.3 設定步驟
+
+#### 1. 取得 Google Analytics 4 測量 ID
+
+1. 前往 [Google Analytics](https://analytics.google.com/)
+2. 建立新的 GA4 資源（如果尚未有的話）
+3. 在「管理」→「資料串流」中選擇您的網站
+4. 複製測量 ID（格式：G-XXXXXXXXXX）
+
+#### 2. 設定環境變數
+
+在您的 `.env` 檔案中加入：
+```bash
+NEXT_PUBLIC_GA_MEASUREMENT_ID=G-XXXXXXXXXX  # 替換為您的實際測量 ID
+```
+
+#### 3. 重新啟動應用程式
+
+```bash
+# 開發環境
+npm run dev
+
+# 正式環境（PM2）
+pm2 restart ivod-app
+
+# 正式環境（systemd）
+sudo systemctl restart ivod-app
+```
+
+### 12.4 驗證設定
+
+#### 檢查載入狀態
+1. 開啟網站並按 F12 開啟開發者工具
+2. 在 Network 標籤中確認有載入來自 `googletagmanager.com` 的請求
+3. 在 Console 中輸入 `gtag` 確認函數已定義
+
+#### 即時檢視測試
+1. 在 Google Analytics 中開啟「即時」報表
+2. 瀏覽您的網站
+3. 確認在即時報表中看到活動
+
+### 12.5 停用 Google Analytics
+
+若要停用追蹤功能：
+
+```bash
+# 方法一：註解掉環境變數
+# NEXT_PUBLIC_GA_MEASUREMENT_ID=G-XXXXXXXXXX
+
+# 方法二：完全移除環境變數
+# （從 .env 檔案中刪除該行）
+```
+
+重新啟動應用程式後，GA 腳本將不會載入。
+
+### 12.6 技術實作詳情
+
+#### 元件架構
+- **`components/GoogleAnalytics.tsx`**：React 元件，條件式載入 GA4 腳本
+- **`pages/_app.tsx`**：應用程式入口，條件式渲染 GA 元件
+
+#### 程式碼範例
+```typescript
+// 在 _app.tsx 中的實作
+const gaId = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID;
+
+return (
+  <ErrorBoundary>
+    <QueryClientProvider client={queryClient}>
+      {gaId && <GoogleAnalytics measurementId={gaId} />}
+      <Layout>
+        <Component {...pageProps} />
+      </Layout>
+    </QueryClientProvider>
+  </ErrorBoundary>
+);
+```
+
+### 12.7 隱私考量
+
+- GA 腳本僅在明確設定時載入，預設不會追蹤使用者
+- 使用 HTTPS 安全連線到 Google 服務
+- 遵循 Google 推薦的實作模式
+- 符合 GDPR 等隱私法規的條件式載入原則
+
+### 12.8 常見問題
+
+**Q: 為什麼看不到追蹤資料？**
+A: 請確認：
+1. 測量 ID 格式正確（G-XXXXXXXXXX）
+2. 環境變數已正確設定並重啟應用程式
+3. 網路連線可以存取 Google Analytics
+4. 瀏覽器沒有封鎖追蹤腳本
+
+**Q: 如何在開發環境中測試？**
+A: 在開發環境的 `.env` 中設定測量 ID，GA 會追蹤 localhost 的活動。
+
+**Q: 正式環境和開發環境可以使用不同的測量 ID 嗎？**
+A: 是的，建議為不同環境建立不同的 GA4 資源和測量 ID。
+
+## 13. 安全性考慮
+
+### 13.1 基本安全措施
 
 ```bash
 # 更新系統
@@ -1907,7 +2025,7 @@ sudo systemctl enable fail2ban
 sudo systemctl start fail2ban
 ```
 
-### 12.2 資料庫安全
+### 13.2 資料庫安全
 
 ```bash
 # PostgreSQL 安全設定
@@ -1918,7 +2036,7 @@ sudo nano /etc/postgresql/*/main/postgresql.conf
 sudo mysql_secure_installation
 ```
 
-### 12.3 環境變數安全
+### 13.3 環境變數安全
 
 ```bash
 # 確保環境變數檔案權限正確
@@ -1926,4 +2044,4 @@ sudo chmod 600 /home/ubuntu/ivod_transcript_db/app/.env
 sudo chown www-data:www-data /home/ubuntu/ivod_transcript_db/app/.env
 ```
 
-這份完整的文件涵蓋了從開發到正式環境部署的所有面向，包括詳細的 Ubuntu Linux 部署指南、故障排除和安全性考慮。
+這份完整的文件涵蓋了從開發到正式環境部署的所有面向，包括詳細的 Ubuntu Linux 部署指南、Google Analytics 整合、故障排除和安全性考慮。
