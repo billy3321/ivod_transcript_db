@@ -16,3 +16,4 @@ __pycache__/
 coverage.xml
 *.pyc
 db/ivod_local.db
+docs/plan

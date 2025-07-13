@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "ivod-transcript-db": {
+      "command": "curl",
+      "args": [
+        "-X", "POST",
+        "-H", "Content-Type: application/json",
+        "-d", "@-",
+        "http://localhost:3000/mcp"
+      ],
+      "env": {
+        "NODE_ENV": "development"
+      }
+    }
+  }
+}

@@ -16,6 +16,7 @@
 - [Prisma](https://www.prisma.io/) ORM 用於關聯式資料庫（PostgreSQL / MySQL / SQLite）
 - [Elasticsearch](https://www.elastic.co/) 用於全文逐字稿搜尋
 - [Tailwind CSS](https://tailwindcss.com/) 用於樣式設計
+- **Model Context Protocol (MCP)** 伺服器整合，支援 AI 服務直接存取資料
 
 ### 🆕 重構架構特色（2024-12）
 - **模組化組件架構**：將原本580行的主頁面拆分為專門化的組件
@@ -39,7 +40,11 @@ app/
 │       ├── ivods/[id].ts      # 🆕 使用統一中介軟體的詳細API
 │       ├── search.ts          # 🆕 使用統一中介軟體的搜尋API
 │       ├── logs.ts            # POST: 客戶端錯誤日誌記錄
-│       └── admin/logs.ts      # GET/DELETE: 管理員日誌檢視和管理
+│       ├── admin/logs.ts      # GET/DELETE: 管理員日誌檢視和管理
+│       └── 🆕 mcp/            # MCP (Model Context Protocol) API 端點
+│           ├── index.ts       # MCP 主要路由處理器
+│           ├── tools.ts       # MCP 工具實作（搜尋功能）
+│           └── resources.ts   # MCP 資源端點（使用指南）
 ├── components/
 │   ├── 🆕 SearchHeader.tsx    # 搜尋介面組件（140行）
 │   ├── 🆕 SearchResults.tsx   # 結果顯示組件（80行）
@@ -60,7 +65,12 @@ app/
 │   ├── searchParser.ts        # 進階搜尋語法解析器
 │   ├── logger.ts              # 結構化日誌系統
 │   ├── useErrorHandler.ts     # React錯誤處理hook
-│   └── utils.ts               # 工具函數
+│   ├── utils.ts               # 工具函數
+│   └── 🆕 mcp/                # MCP (Model Context Protocol) 核心邏輯
+│       ├── handler.ts         # MCP 請求處理器
+│       ├── tools.ts           # MCP 工具定義
+│       ├── resources.ts       # MCP 資源管理
+│       └── types.ts           # MCP 型別定義
 └── public/
     └── ...                    # 靜態資源
 ```
@@ -2006,7 +2016,401 @@ A: 在開發環境的 `.env` 中設定測量 ID，GA 會追蹤 localhost 的活�
 **Q: 正式環境和開發環境可以使用不同的測量 ID 嗎？**
 A: 是的，建議為不同環境建立不同的 GA4 資源和測量 ID。
 
-## 13. 安全性考慮
+## 13. MCP (Model Context Protocol) 伺服器設定
+
+### 13.1 概述
+
+本應用程式整合了完整的 MCP (Model Context Protocol) 伺服器功能，讓 AI 服務（如 OpenAI Assistant、Claude 等）能夠直接存取和搜尋台灣立法院 IVOD 逐字稿資料。MCP 伺服器提供標準化的介面，支援 Tools、Resources 和 Prompts 三大核心功能。
+
+### 13.2 MCP 功能特色
+
+#### 🔧 Tools（工具）
+- **`search_transcripts`**：統一的逐字稿搜尋工具
+  - 支援關鍵字、立委、委員會、話題等多維度搜尋
+  - 提供 union（聯集）和 intersection（交集）搜尋模式
+  - 可自訂段落長度和上下文句子數量
+  - 支援日期範圍篩選和結果數量限制
+- **`get_meeting_transcript`**：完整會議逐字稿取得
+  - 根據 IVOD ID 取得特定會議的完整內容
+  - 支援自動選擇最佳逐字稿版本
+
+#### 📚 Resources（資源文檔）
+- **使用指南**：詳細的 IVOD 搜尋系統使用說明
+- **搜尋範例集**：常用搜尋查詢的完整範例
+- **API 參考文檔**：工具參數和回應格式的詳細說明
+- **資料結構說明**：IVOD 資料庫架構和欄位解釋
+- **搜尋最佳實踐**：優化搜尋效果的建議和技巧
+
+#### 🎯 Prompts（提示模板）
+- **立委表現分析**：分析特定立委的發言和關注議題
+- **政策追蹤**：追蹤法案或政策的發展過程
+- **委員會活動總結**：總結委員會的活動和討論重點
+- **辯論分析**：分析特定議題的立法院辯論情況
+- **立法時間軸**：建立法案的完整時間軸
+- **跨黨派比較**：比較不同立委對議題的立場
+- **政策影響評估**：評估政策提案的潜在影響
+- **主題概覽**：快速了解特定主題的討論概況
+
+### 13.3 MCP 端點資訊
+
+- **URL**: `http://localhost:3000/mcp`
+- **協議**: JSON-RPC 2.0
+- **協議版本**: 2024-11-05
+- **支援功能**: Tools、Resources、Prompts
+
+### 13.4 技術架構
+
+```plain
+lib/mcp/
+├── handler.ts          # MCP 請求處理器和路由
+├── types.ts           # TypeScript 介面定義
+├── simple-tools.ts    # 搜尋工具實作（資料庫版本）
+├── resources.ts       # 文檔資源管理
+└── prompts.ts         # 提示模板管理
+```
+
+### 13.5 設定和啟動
+
+MCP 伺服器會隨著主應用程式自動啟動，無需額外設定。確保應用程式正常運行後，MCP 端點即可使用。
+
+```bash
+# 開發環境
+npm run dev
+
+# 正式環境
+npm run build
+npm start
+
+# PM2 部署
+pm2 start ecosystem.config.js
+```
+
+### 13.6 測試 MCP 功能
+
+#### 基本連線測試
+```bash
+# 測試 Initialize
+curl -X POST http://localhost:3000/mcp \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "initialize",
+    "params": {
+      "protocolVersion": "2024-11-05",
+      "capabilities": {},
+      "clientInfo": {"name": "test-client", "version": "1.0.0"}
+    }
+  }'
+```
+
+#### 工具列表查詢
+```bash
+# 取得可用工具清單
+curl -X POST http://localhost:3000/mcp \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": 2,
+    "method": "tools/list"
+  }'
+```
+
+#### 搜尋逐字稿
+```bash
+# 搜尋預算相關討論
+curl -X POST http://localhost:3000/mcp \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": 3,
+    "method": "tools/call",
+    "params": {
+      "name": "search_transcripts",
+      "arguments": {
+        "query": "預算",
+        "limit": 5
+      }
+    }
+  }'
+```
+
+#### 自動化測試腳本
+應用程式提供完整的 MCP 測試腳本：
+
+```bash
+# 執行完整的 MCP 功能測試
+node test-mcp-complete.js
+```
+
+測試內容包括：
+- Initialize 協議初始化
+- Tools/List 工具清單
+- Tools/Call 工具呼叫
+- Resources/List 資源清單
+- Resources/Read 資源讀取
+- Prompts/List 提示清單
+- Prompts/Get 提示生成
+
+### 13.7 與 AI 服務整合
+
+#### OpenAI Assistant 整合範例
+
+```python
+# OpenAI Assistant 設定範例
+import openai
+
+client = openai.OpenAI()
+
+# 建立具有 MCP 功能的 Assistant
+assistant = client.beta.assistants.create(
+  name="IVOD Legislative Assistant",
+  instructions="""你是台灣立法院逐字稿分析助手。你可以：
+1. 搜尋立委發言記錄
+2. 分析政策討論
+3. 追蹤法案進展
+4. 比較不同立委立場
+
+使用 MCP 工具來存取立法院 IVOD 資料，提供準確和及時的分析。""",
+  model="gpt-4",
+  tools=[{
+    "type": "function",
+    "function": {
+      "name": "mcp_request",
+      "description": "向 IVOD MCP 伺服器發送請求",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "method": {"type": "string"},
+          "params": {"type": "object"}
+        }
+      }
+    }
+  }]
+)
+```
+
+#### Claude 整合範例
+
+```typescript
+// Claude 與 MCP 整合
+const claudeWithMCP = async (userQuery: string) => {
+  // 1. 先從 MCP 資源讀取使用指南
+  const usageGuide = await mcpRequest('resources/read', {
+    uri: 'ivod://usage-guide'
+  });
+  
+  // 2. 根據查詢選擇適當的提示模板
+  const promptTemplate = await mcpRequest('prompts/get', {
+    name: 'analyze-legislator-performance',
+    arguments: { legislator_name: '黃國昌' }
+  });
+  
+  // 3. 執行搜尋
+  const searchResults = await mcpRequest('tools/call', {
+    name: 'search_transcripts',
+    arguments: { speakers: ['黃國昌'], limit: 10 }
+  });
+  
+  // 4. 整合結果並回應使用者
+  return processResults(searchResults, promptTemplate);
+};
+```
+
+### 13.8 MCP 搜尋範例
+
+#### 基本搜尋
+```json
+{
+  "method": "tools/call",
+  "params": {
+    "name": "search_transcripts",
+    "arguments": {
+      "query": "數位發展",
+      "limit": 10
+    }
+  }
+}
+```
+
+#### 複合搜尋
+```json
+{
+  "method": "tools/call",
+  "params": {
+    "name": "search_transcripts",
+    "arguments": {
+      "speakers": ["黃國昌", "王鴻薇"],
+      "committees": ["交通委員會"],
+      "topics": ["5G", "數位轉型"],
+      "search_mode": "intersection",
+      "date_from": "2024-01-01",
+      "limit": 15
+    }
+  }
+}
+```
+
+#### 詳細段落搜尋
+```json
+{
+  "method": "tools/call",
+  "params": {
+    "name": "search_transcripts",
+    "arguments": {
+      "query": "AI治理",
+      "excerpt_length": 1200,
+      "context_sentences": 5,
+      "scope": "transcript_only",
+      "limit": 5
+    }
+  }
+}
+```
+
+### 13.9 回應格式
+
+#### 成功回應範例
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "content": [{
+      "type": "text",
+      "text": "{\"results\":[{\"ivod_id\":162050,\"speaker_name\":\"黃國昌\",\"date\":\"2025-05-28\",\"meeting_info\":{\"title\":\"立法院第11屆第3會期交通委員會第13次全體委員會議\",\"meeting_name\":\"交通委員會會議\",\"committee_names\":[\"交通委員會\"],\"category\":\"委員會會議\"},\"transcript\":{\"source\":\"ly_transcript\",\"excerpts\":[{\"text\":\"相關逐字稿段落內容...\",\"relevance_score\":0.8}],\"full_length\":15420},\"ivod_url\":\"https://ivod.ly.gov.tw/Play/VOD/162050\"}],\"metadata\":{\"total_found\":15,\"search_time_ms\":245,\"success\":true}}"
+    }]
+  }
+}
+```
+
+#### 錯誤回應範例
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "error": {
+    "code": -32601,
+    "message": "Method not found",
+    "data": "Unknown method: invalid_method"
+  }
+}
+```
+
+### 13.10 效能和最佳實踐
+
+#### 搜尋效能
+- **一般搜尋**：< 500ms
+- **複雜搜尋**：< 2000ms
+- **單筆逐字稿**：< 200ms
+- **建議設定**：limit ≤ 50 以保持最佳效能
+
+#### 最佳實踐
+1. **使用具體關鍵字**："數位發展部" 而非 "政府單位"
+2. **組合多個條件**：同時指定立委和委員會縮小範圍
+3. **適當的結果數量**：根據需要調整 limit 參數
+4. **選擇搜尋模式**：union（廣泛）vs intersection（精確）
+
+#### 快取和重用
+- MCP 資源會快取在記憶體中
+- 搜尋結果包含 metadata 以便客戶端快取
+- 提示模板可重複使用，提高 AI 對話效率
+
+### 13.11 除錯和監控
+
+#### 日誌記錄
+MCP 請求會自動記錄到應用程式日誌系統：
+
+```bash
+# 查看 MCP 相關日誌
+sudo tail -f /var/log/pm2/ivod-app.log | grep MCP
+
+# 或在開發環境
+npm run dev  # 在控制台查看 MCP 請求日誌
+```
+
+#### 常見問題排除
+
+**問題：MCP 端點無回應**
+```bash
+# 檢查應用程式狀態
+curl http://localhost:3000/api/health
+
+# 檢查 MCP 端點
+curl -X POST http://localhost:3000/mcp \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}'
+```
+
+**問題：搜尋結果為空**
+- 檢查資料庫連線狀態
+- 確認搜尋參數格式正確
+- 查看應用程式錯誤日誌
+
+**問題：工具呼叫失敗**
+- 驗證 JSON-RPC 2.0 格式
+- 檢查必要參數是否提供
+- 確認工具名稱拼寫正確
+
+### 13.12 安全考量
+
+- **輸入驗證**：所有 MCP 參數都經過嚴格驗證
+- **錯誤處理**：敏感錯誤資訊不會暴露給客戶端
+- **速率限制**：建議在 Nginx 層加入 API 速率限制
+- **存取控制**：可透過 Nginx 配置限制 MCP 端點存取
+
+```nginx
+# 在 Nginx 配置中限制 MCP 存取
+location /mcp {
+    # 限制存取來源
+    allow 127.0.0.1;
+    allow your.trusted.ip.range;
+    deny all;
+    
+    # 限制請求頻率
+    limit_req zone=api burst=10 nodelay;
+    
+    proxy_pass http://ivod_backend;
+}
+```
+
+### 13.13 未來擴展
+
+MCP 伺服器架構支援輕鬆擴展新功能：
+
+#### 新增自訂工具
+```typescript
+// 在 simple-tools.ts 中新增工具
+export async function analyzeDebatePatterns(args: unknown) {
+  // 實作辯論模式分析邏輯
+  return { content: [{ type: 'text', text: JSON.stringify(result) }] };
+}
+
+// 在 handler.ts 中註冊
+private tools = new Map([
+  ['search_transcripts', searchTranscripts],
+  ['get_meeting_transcript', getMeetingTranscript],
+  ['analyze_debate_patterns', analyzeDebatePatterns]  // 新工具
+]);
+```
+
+#### 新增自訂資源
+```typescript
+// 在 resources.ts 中新增資源
+export const AVAILABLE_RESOURCES: MCPResource[] = [
+  // 現有資源...
+  {
+    uri: "ivod://committee-guide",
+    name: "委員會運作指南",
+    description: "立法院各委員會的職掌和運作方式說明",
+    mimeType: "text/markdown"
+  }
+];
+```
+
+這個 MCP 整合為 AI 助手提供了強大的台灣立法資料存取能力，支援複雜的政治分析和研究任務。
+
+## 14. 安全性考慮
 
 ### 13.1 基本安全措施
 

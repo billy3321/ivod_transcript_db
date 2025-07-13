@@ -23,6 +23,7 @@ This is a dual-component system for scraping and serving Taiwan Legislative Yuan
 - **Framework**: Next.js with TypeScript, API routes for backend logic
 - **Database**: Prisma ORM with multi-backend support (SQLite/PostgreSQL/MySQL)
 - **Search**: Elasticsearch integration with fallback to database search
+- **MCP Server**: Model Context Protocol integration for AI service access
 - **UI Components**: Modular React components for list, search, pagination, transcript viewing
 - **Styling**: Tailwind CSS v4 with responsive design and Chinese font support
 - **Testing**: Jest + React Testing Library + Cypress E2E
@@ -102,6 +103,7 @@ Both components share similar `.env` configuration:
 2. Failed records can be retried via `ivod_retry.py`
 3. Elasticsearch indexing runs separately via `ivod_es.py`
 4. Web app reads from same database and searches via Elasticsearch (with DB fallback)
+5. MCP server provides standardized API for AI services to access transcript data
 
 ### Error Handling Patterns
 - HTTP failures are caught and marked with status="failed"

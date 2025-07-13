@@ -119,9 +119,13 @@ const nextConfig = {
     ];
   },
   
-  // Rewrites for SEO-friendly URLs
+  // Rewrites for SEO-friendly URLs and API routes
   async rewrites() {
     return [
+      {
+        source: '/mcp',
+        destination: '/api/mcp',
+      },
       {
         source: '/立委/:speaker',
         destination: '/?speaker=:speaker',
