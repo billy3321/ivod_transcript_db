@@ -5,6 +5,7 @@ import { listResources, readResource } from './resources';
 import { listPrompts, getPrompt } from './prompts';
 import { listResourceTemplates } from './resource-templates';
 import { z, ZodError } from 'zod';
+import { JSON_RPC_ERRORS, isValidErrorCode } from './error-codes';
 
 // Zod schemas for tool input validation
 const searchTranscriptsSchema = z.object({
@@ -41,11 +42,21 @@ export class MCPHandler {
   }
 
   async handleRequest(request: MCPRequest): Promise<MCPResponse> {
+    // 輸入驗證 - 檢查請求格式
+    if (!request || typeof request !== 'object') {
+      return this.createErrorResponse(null, -32600, 'Invalid Request: Request must be an object');
+    }
+
     const { jsonrpc, id, method, params } = request;
 
     // 驗證 JSON-RPC 格式
     if (jsonrpc !== '2.0') {
-      return this.createErrorResponse(id, -32600, 'Invalid Request');
+      return this.createErrorResponse(id, JSON_RPC_ERRORS.INVALID_REQUEST, 'Invalid Request: jsonrpc must be "2.0"');
+    }
+
+    // 驗證 method 參數
+    if (!method || typeof method !== 'string') {
+      return this.createErrorResponse(id, JSON_RPC_ERRORS.INVALID_REQUEST, 'Invalid Request: method is required and must be a string');
     }
 
     try {
@@ -63,8 +74,15 @@ export class MCPHandler {
           return this.createSuccessResponse(id, { resources: await listResources() });
           
         case 'resources/read':
-          const resourceContent = await this.readResource(params);
-          return this.createSuccessResponse(id, { contents: [resourceContent] });
+          try {
+            const resourceContent = await this.readResource(params);
+            return this.createSuccessResponse(id, { contents: [resourceContent] });
+          } catch (error) {
+            if (error instanceof Error && error.message.includes('required')) {
+              return this.createErrorResponse(id, JSON_RPC_ERRORS.INVALID_PARAMS, 'Invalid params: ' + error.message);
+            }
+            throw error;
+          }
           
         case 'resources/templates/list':
           return this.createSuccessResponse(id, { resourceTemplates: await listResourceTemplates() });
@@ -73,7 +91,15 @@ export class MCPHandler {
           return this.createSuccessResponse(id, { prompts: await listPrompts() });
           
         case 'prompts/get':
-          return this.createSuccessResponse(id, await this.getPrompt(params));
+          try {
+            const promptResult = await this.getPrompt(params);
+            return this.createSuccessResponse(id, promptResult);
+          } catch (error) {
+            if (error instanceof Error && error.message.includes('required')) {
+              return this.createErrorResponse(id, JSON_RPC_ERRORS.INVALID_PARAMS, 'Invalid params: ' + error.message);
+            }
+            throw error;
+          }
           
         case 'getCapabilities':
         case 'initialize':
@@ -91,14 +117,14 @@ export class MCPHandler {
           });
           
         default:
-          return this.createErrorResponse(id, -32601, 'Method not found');
+          return this.createErrorResponse(id, JSON_RPC_ERRORS.METHOD_NOT_FOUND, 'Method not found');
       }
     } catch (error) {
       logger.error('MCP request error:', { 
         error: error instanceof Error ? error.message : String(error),
         method: request.method 
       });
-      return this.createErrorResponse(id, -32603, 'Internal error');
+      return this.createErrorResponse(id, JSON_RPC_ERRORS.INTERNAL_ERROR, 'Internal error');
     }
   }
 
@@ -198,28 +224,49 @@ export class MCPHandler {
     };
   }
 
-  private async callTool(id: string | number, params: { name: string; arguments: any }) {
+  private async callTool(id: string | number, params: any) {
+    // 驗證 params 結構
+    if (!params || typeof params !== 'object') {
+      return this.createErrorResponse(id, JSON_RPC_ERRORS.INVALID_PARAMS, 'Invalid params: params must be an object');
+    }
+
     const { name, arguments: args } = params;
     
+    // 驗證工具名稱
+    if (!name || typeof name !== 'string') {
+      return this.createErrorResponse(id, JSON_RPC_ERRORS.INVALID_PARAMS, 'Invalid params: tool name is required and must be a string');
+    }
+
     const tool = this.tools.get(name);
     if (!tool) {
-      return this.createErrorResponse(id, -32601, `Tool '${name}' not found`);
+      return this.createErrorResponse(id, JSON_RPC_ERRORS.METHOD_NOT_FOUND, `Method not found: Tool '${name}' does not exist`);
     }
 
     const schema = this.toolSchemas.get(name);
     if (!schema) {
       // This should not happen if tools and schemas are in sync
-      return this.createErrorResponse(id, -32603, `Internal error: Schema not found for tool '${name}'`);
+      return this.createErrorResponse(id, JSON_RPC_ERRORS.INTERNAL_ERROR, `Internal error: Schema not found for tool '${name}'`);
+    }
+
+    // 驗證工具參數
+    if (args === undefined || args === null) {
+      // 允許空參數，但要確保是有效的空物件
+      args = {};
     }
 
     const validationResult = schema.safeParse(args);
 
     if (!validationResult.success) {
+      const formattedErrors = this.formatZodError(validationResult.error);
       return this.createErrorResponse(
         id, 
-        -32602, 
-        'Invalid params', 
-        this.formatZodError(validationResult.error)
+        JSON_RPC_ERRORS.INVALID_PARAMS, 
+        `Invalid params for tool '${name}'`,
+        {
+          tool: name,
+          validationErrors: formattedErrors,
+          receivedParams: args
+        }
       );
     }
 
@@ -229,30 +276,61 @@ export class MCPHandler {
     } catch (error) {
       logger.error('Tool execution error:', { 
         error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
         metadata: {
           tool: name,
           args: validationResult.data
         }
       });
-      return this.createErrorResponse(id, -32603, 'Tool execution failed');
+      
+      // 提供更詳細的錯誤信息給開發者，但不洩露敏感信息
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      return this.createErrorResponse(
+        id, 
+        JSON_RPC_ERRORS.INTERNAL_ERROR, 
+        `Internal error while executing tool '${name}': ${errorMessage}`
+      );
     }
   }
 
-  private async readResource(params: { uri?: string }) {
+  private async readResource(params: any) {
+    // 參數驗證
+    if (!params || typeof params !== 'object') {
+      throw new Error('Resource params is required and must be an object');
+    }
+
     const { uri } = params;
     
-    if (!uri) {
-      throw new Error('Resource URI is required');
+    if (!uri || typeof uri !== 'string') {
+      throw new Error('Resource URI is required and must be a string');
+    }
+
+    if (uri.trim().length === 0) {
+      throw new Error('Resource URI cannot be empty');
     }
 
     return await readResource(uri);
   }
 
-  private async getPrompt(params: { name?: string; arguments?: Record<string, string> }) {
+  private async getPrompt(params: any) {
+    // 參數驗證
+    if (!params || typeof params !== 'object') {
+      throw new Error('Prompt params is required and must be an object');
+    }
+
     const { name, arguments: args } = params;
     
-    if (!name) {
-      throw new Error('Prompt name is required');
+    if (!name || typeof name !== 'string') {
+      throw new Error('Prompt name is required and must be a string');
+    }
+
+    if (name.trim().length === 0) {
+      throw new Error('Prompt name cannot be empty');
+    }
+
+    // 驗證 arguments 參數（如果提供）
+    if (args !== undefined && (typeof args !== 'object' || args === null || Array.isArray(args))) {
+      throw new Error('Prompt arguments must be an object');
     }
 
     return await getPrompt(name, args);
@@ -267,11 +345,32 @@ export class MCPHandler {
   }
 
   private createErrorResponse(id: string | number | null, code: number, message: string, data?: any): MCPResponse {
-    return {
-      jsonrpc: '2.0',
-      id: id || 0,
-      error: { code, message, data }
+    // 確保錯誤代碼符合 JSON-RPC 2.0 規範
+    if (!isValidErrorCode(code)) {
+      logger.warn('Invalid JSON-RPC error code used', { code, message, validRange: '-32768 to -32000' });
+      // 使用通用內部錯誤代碼作為後備
+      code = JSON_RPC_ERRORS.INTERNAL_ERROR;
+    }
+
+    const errorResponse = {
+      jsonrpc: '2.0' as const,
+      id: id !== null ? id : null,
+      error: { 
+        code, 
+        message,
+        ...(data && { data })
+      }
     };
+
+    // 記錄錯誤以便監控
+    logger.error('MCP Error Response', {
+      id,
+      code,
+      message,
+      data: data ? JSON.stringify(data) : undefined
+    });
+
+    return errorResponse;
   }
 
   private formatZodError(error: ZodError): any {
