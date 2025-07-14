@@ -1,0 +1,84 @@
+{
+  "mcp_server": {
+    "base_url": "http://localhost:3000/api/mcp",
+    "timeout": 30,
+    "retry_attempts": 3,
+    "retry_delay": 1.0
+  },
+  "tools": {
+    "search_transcripts": {
+      "endpoint": "tools/call",
+      "method": "POST",
+      "mcp_method": "tools/call",
+      "mcp_tool_name": "search_transcripts",
+      "cache_ttl": 300,
+      "max_concurrent_requests": 5,
+      "parameter_mapping": {
+        "query": "query",
+        "speakers": "speakers",
+        "committees": "committees",
+        "meeting_name": "meeting_name",
+        "transcription_source": "transcription_source",
+        "mode": "mode",
+        "date_from": "date_from",
+        "date_to": "date_to",
+        "max_results": "max_results"
+      },
+      "validation": {
+        "required_fields": [],
+        "field_limits": {
+          "speakers": {
+            "max_items": 10,
+            "max_length": 50
+          },
+          "committees": {
+            "max_items": 5,
+            "max_length": 100
+          },
+          "query": {
+            "max_length": 500
+          },
+          "max_results": {
+            "min": 1,
+            "max": 50
+          }
+        },
+        "date_format": "YYYY-MM-DD"
+      }
+    },
+    "get_meeting_transcript": {
+      "endpoint": "tools/call",
+      "method": "POST",
+      "mcp_method": "tools/call",
+      "mcp_tool_name": "get_meeting_transcript",
+      "cache_ttl": 3600,
+      "max_concurrent_requests": 3,
+      "parameter_mapping": {
+        "ivod_id": "ivod_id",
+        "transcript_type": "transcript_type"
+      },
+      "validation": {
+        "required_fields": ["ivod_id"],
+        "field_limits": {
+          "ivod_id": {
+            "type": "integer",
+            "min": 1,
+            "max": 99999999
+          }
+        }
+      }
+    }
+  },
+  "response_format": {
+    "success_wrapper": "result.content[0].text",
+    "parse_json": true,
+    "error_field": "error",
+    "expected_format": "json"
+  },
+  "monitoring": {
+    "log_requests": true,
+    "log_responses": false,
+    "log_errors": true,
+    "metrics_enabled": true
+  }
+}

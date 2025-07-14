@@ -1,0 +1,142 @@
+{
+  "functions": [
+    {
+      "name": "search_transcripts",
+      "description": "搜尋台灣立法院逐字稿，根據立委姓名、委員會、關鍵字、日期等條件查詢相關發言記錄",
+      "mcp_tool": "search_transcripts",
+      "enabled": true,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "搜尋關鍵字，支援進階語法如引號、AND/OR、排除等。例如：\"數位發展 AND 政策\"、\"交通建設 OR 基礎設施\"",
+            "examples": ["數位發展", "交通建設", "\"預算審查\"", "教育政策 AND 改革"]
+          },
+          "speakers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "立委姓名陣列，可指定一個或多個立委。例如：[\"黃國昌\", \"王鴻薇\"]",
+            "examples": [["黃國昌"], ["王鴻薇", "賴士葆"], ["柯建銘"]]
+          },
+          "committees": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "委員會名稱陣列，可指定一個或多個委員會。例如：[\"交通委員會\", \"經濟委員會\"]",
+            "examples": [["交通委員會"], ["經濟委員會", "財政委員會"], ["教育及文化委員會"]]
+          },
+          "meeting_name": {
+            "type": "string",
+            "description": "會議名稱，支援模糊匹配。例如：\"院會\"、\"委員會會議\"、\"質詢\"",
+            "examples": ["院會", "委員會會議", "質詢", "總質詢"]
+          },
+          "transcription_source": {
+            "type": "string",
+            "enum": ["all", "ly_only"],
+            "default": "all",
+            "description": "逐字稿來源選擇。ly_only=僅搜尋立法院官方逐字稿(更精確但數量較少), all=搜尋所有逐字稿(包含AI處理版本)",
+            "recommendation": "對於重要查詢建議使用 ly_only 以獲得最精確的結果"
+          },
+          "mode": {
+            "type": "string",
+            "enum": ["keyword_all_fields", "keyword_transcript_only", "semantic_search"],
+            "default": "keyword_transcript_only",
+            "description": "搜尋模式。keyword_all_fields=關鍵字搜尋所有欄位(標題、發言人、內容), keyword_transcript_only=僅搜尋逐字稿內容, semantic_search=語意搜尋"
+          },
+          "date_from": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "description": "搜尋起始日期，格式 YYYY-MM-DD。例如：\"2024-01-01\"",
+            "examples": ["2024-01-01", "2023-06-15", "2024-09-01"]
+          },
+          "date_to": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "description": "搜尋結束日期，格式 YYYY-MM-DD。例如：\"2024-12-31\"",
+            "examples": ["2024-12-31", "2023-12-31", "2024-06-30"]
+          },
+          "max_results": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50,
+            "default": 20,
+            "description": "回傳結果數量上限。建議值：快速查詢用10, 一般查詢用20, 詳細分析用50"
+          }
+        },
+        "required": []
+      },
+      "usage_examples": [
+        {
+          "description": "查詢黃國昌立委關於數位發展的發言",
+          "arguments": {
+            "speakers": ["黃國昌"],
+            "query": "數位發展",
+            "transcription_source": "ly_only",
+            "max_results": 10
+          }
+        },
+        {
+          "description": "查詢交通委員會2024年關於交通建設的討論",
+          "arguments": {
+            "committees": ["交通委員會"],
+            "query": "交通建設",
+            "date_from": "2024-01-01",
+            "date_to": "2024-12-31",
+            "max_results": 15
+          }
+        },
+        {
+          "description": "查詢院會中關於預算審查的發言",
+          "arguments": {
+            "meeting_name": "院會",
+            "query": "預算審查",
+            "mode": "keyword_all_fields"
+          }
+        }
+      ]
+    },
+    {
+      "name": "get_meeting_transcript",
+      "description": "根據 IVOD ID 取得特定立法院會議的完整逐字稿內容",
+      "mcp_tool": "get_meeting_transcript",
+      "enabled": true,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "ivod_id": {
+            "type": "integer",
+            "description": "IVOD 會議的唯一識別碼，這是一個數字ID。可以從搜尋結果中獲得，或從立法院IVOD網站URL中取得",
+            "examples": [123456, 789012, 345678]
+          },
+          "transcript_type": {
+            "type": "string",
+            "enum": ["auto", "ly_only", "ai_only"],
+            "default": "auto",
+            "description": "逐字稿類型選擇。auto=自動選擇最佳版本(優先立法院版), ly_only=僅立法院官方版本(最精確), ai_only=僅AI處理版本(較完整但可能有錯誤)"
+          }
+        },
+        "required": ["ivod_id"]
+      },
+      "usage_examples": [
+        {
+          "description": "取得特定會議的完整逐字稿（自動選擇最佳版本）",
+          "arguments": {
+            "ivod_id": 123456,
+            "transcript_type": "auto"
+          }
+        },
+        {
+          "description": "取得立法院官方版本的完整逐字稿",
+          "arguments": {
+            "ivod_id": 789012,
+            "transcript_type": "ly_only"
+          }
+        }
+      ]
+    }
+  ]
+}
