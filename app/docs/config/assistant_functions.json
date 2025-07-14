@@ -65,6 +65,10 @@
             "maximum": 50,
             "default": 20,
             "description": "回傳結果數量上限。建議值：快速查詢用10, 一般查詢用20, 詳細分析用50"
+          },
+          "cursor": {
+            "type": "string",
+            "description": "用於分頁的游標，從上一次搜尋結果的 nextCursor 欄位取得。"
           }
         },
         "required": []

@@ -67,6 +67,16 @@
           }
         }
       }
+    },
+    "log": {
+      "endpoint": "log",
+      "method": "POST",
+      "mcp_method": "log"
+    },
+    "completion_create": {
+      "endpoint": "completion/create",
+      "method": "POST",
+      "mcp_method": "completion/create"
     }
   },
   "response_format": {

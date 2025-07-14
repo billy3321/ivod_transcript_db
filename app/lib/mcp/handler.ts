@@ -1,9 +1,8 @@
 import { searchTranscripts, getMeetingTranscript } from './search';
 import { MCPRequest, MCPResponse } from './types';
 import { logger } from '@/lib/logger';
-import { listResources, readResource } from './resources';
+import { listResources, readResource, listResourceTemplates } from './resources';
 import { listPrompts, getPrompt } from './prompts';
-import { listResourceTemplates } from './resource-templates';
 import { z, ZodError } from 'zod';
 import { JSON_RPC_ERRORS, isValidErrorCode } from './error-codes';
 
@@ -20,6 +19,7 @@ const searchTranscriptsSchema = z.object({
   date_from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   date_to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   max_results: z.number().max(50).default(20),
+  cursor: z.string().optional(),
 });
 
 const getMeetingTranscriptSchema = z.object({
@@ -41,7 +41,7 @@ export class MCPHandler {
     this.toolSchemas.set('get_meeting_transcript', getMeetingTranscriptSchema);
   }
 
-  async handleRequest(request: MCPRequest): Promise<MCPResponse> {
+  public async handleRequest(request: MCPRequest): Promise<MCPResponse | undefined> {
     // 輸入驗證 - 檢查請求格式
     if (!request || typeof request !== 'object') {
       return this.createErrorResponse(null, -32600, 'Invalid Request: Request must be an object');
@@ -100,15 +100,25 @@ export class MCPHandler {
             }
             throw error;
           }
+
+        case 'log':
+          // Per MCP spec, no response is sent for log messages
+          logger.info('MCP log received', { metadata: { params } });
+          return; // No response
+
+        case 'completion/create':
+          return this.createErrorResponse(id, JSON_RPC_ERRORS.METHOD_NOT_FOUND, 'Completion API not implemented');
           
         case 'getCapabilities':
         case 'initialize':
           return this.createSuccessResponse(id, {
-            protocolVersion: '2024-11-05',
+            protocolVersion: '2025-06-18',
             capabilities: {
               tools: {},
               resources: {},
-              prompts: {}
+              prompts: {},
+              completion: {},
+              logging: {},
             },
             serverInfo: {
               name: 'ivod-transcript-server',
@@ -183,12 +193,12 @@ export class MCPHandler {
               },
               date_from: { 
                 type: 'string', 
-                pattern: '^\\d{4}-\\d{2}-\\d{2}$',
+                pattern: '^\\d{4}-\\d{2}-\\d{2}',
                 description: '搜尋起始日期 (YYYY-MM-DD)' 
               },
               date_to: { 
                 type: 'string', 
-                pattern: '^\\d{4}-\\d{2}-\\d{2}$',
+                pattern: '^\\d{4}-\\d{2}-\\d{2}',
                 description: '搜尋結束日期 (YYYY-MM-DD)' 
               },
               max_results: { 
@@ -196,6 +206,10 @@ export class MCPHandler {
                 default: 20, 
                 maximum: 50,
                 description: '回傳結果數量上限' 
+              },
+              cursor: { 
+                type: 'string', 
+                description: '用於分頁的游標' 
               }
             }
           }
@@ -273,7 +287,10 @@ export class MCPHandler {
 
     try {
       const result = await tool(validationResult.data);
-      return this.createSuccessResponse(id, result);
+      if (name === 'search_transcripts' && result.nextCursor) {
+        return this.createSuccessResponse(id, { content: result.content }, result.nextCursor);
+      }
+      return this.createSuccessResponse(id, { content: result.content });
     } catch (error) {
       logger.error('Tool execution error:', { 
         error: error instanceof Error ? error.message : String(error),
@@ -337,11 +354,12 @@ export class MCPHandler {
     return await getPrompt(name, args);
   }
 
-  private createSuccessResponse(id: string | number, result: any): MCPResponse {
+  private createSuccessResponse(id: string | number, result: any, nextCursor?: string): MCPResponse {
     return {
       jsonrpc: '2.0',
       id,
-      result
+      result,
+      ...(nextCursor && { nextCursor }),
     };
   }
 

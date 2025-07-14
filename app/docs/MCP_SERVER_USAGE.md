@@ -2,20 +2,141 @@
 
 ## 概述
 
-IVOD MCP Server 提供標準化的 Model Context Protocol 介面，讓 AI 服務能夠存取台灣立法院逐字稿資料。
+IVOD MCP Server 提供標準化的 Model Context Protocol (MCP) 介面，讓 AI 服務能夠存取台灣立法院逐字稿資料。
+
+**MCP Protocol Version**: `2025-06-18`
 
 ## 端點資訊
 
-- **URL**: `http://localhost:3000/mcp`
+- **URL**: `http://localhost:3000/api/mcp`
 - **Method**: POST
 - **Content-Type**: application/json
 - **Protocol**: JSON-RPC 2.0
 
-## 可用工具
+## 可用方法
 
-### 1. search_transcripts - 統一逐字稿搜尋
+### 1. `ping`
 
-**功能**：根據多種條件搜尋立法院逐字稿並回傳相關段落
+**功能**：檢查伺服器是否存活。
+
+**範例請求**：
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "ping"
+}
+```
+
+**範例回應**：
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {}
+}
+```
+
+### 2. `getCapabilities`
+
+**功能**：取得伺服器支援的 MCP 協定版本和功能。
+
+**範例請求**：
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "getCapabilities"
+}
+```
+
+### 3. `initialize`
+
+**功能**：初始化伺服器會話。回傳與 `getCapabilities` 相同的資訊。
+
+**範例請求**：
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "initialize"
+}
+```
+
+### 4. `log`
+
+**功能**：允許客戶端向伺服器發送日誌訊息。伺服器不會回傳回應。
+
+**參數**：
+```typescript
+{
+  level: 'error' | 'warn' | 'info' | 'debug';
+  message: string;
+  context?: Record<string, any>;
+}
+```
+
+**範例請求**：
+```json
+{
+  "jsonrpc": "2.0",
+  "id": null, // log 方法的 id 可以為 null
+  "method": "log",
+  "params": {
+    "level": "info",
+    "message": "User performed a search",
+    "context": {
+      "user_id": "abc-123",
+      "query": "數位發展"
+    }
+  }
+}
+```
+
+### 5. `completion/create`
+
+**功能**：用於生成文本補全。目前尚未實作，將回傳錯誤。
+
+**範例請求**：
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "completion/create",
+  "params": {
+    "prompt": "Hello, world!"
+  }
+}
+```
+
+### 6. `tools/list`
+
+**功能**：列出伺服器提供的所有工具及其描述和輸入 schema。
+
+**範例請求**：
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "tools/list"
+}
+```
+
+### 7. `tools/call`
+
+**功能**：呼叫指定的工具並執行其功能。
+
+**參數**：
+```typescript
+{
+  name: string;     // 工具名稱，例如 "search_transcripts"
+  arguments: object; // 傳遞給工具的參數
+}
+```
+
+#### 7.1. `search_transcripts` - 統一逐字稿搜尋
+
+**功能**：根據多種條件搜尋立法院逐字稿並回傳相關段落。支援分頁。
 
 **參數**：
 ```typescript
@@ -26,7 +147,12 @@ IVOD MCP Server 提供標準化的 Model Context Protocol 介面，讓 AI 服務
   meeting_name?: string;    // 會議名稱（模糊匹配）
   date_from?: string;       // 搜尋起始日期（YYYY-MM-DD）
   date_to?: string;         // 搜尋結束日期（YYYY-MM-DD）
-  limit?: number;           // 結果數量限制（1-100，預設20）
+  max_results?: number;     // 結果數量限制（1-50，預設20）
+  cursor?: string;          // 用於分頁的游標，從上一次搜尋結果的 nextCursor 欄位取得
+  mode?: 'keyword_all_fields' | 'keyword_transcript_only' | 'semantic_search' | 'hybrid_search'; // 搜尋模式
+  transcription_source?: 'all' | 'ly_only'; // 逐字稿來源
+  max_excerpt_length?: number; // 段落長度上限
+  max_context_sentences?: number; // 上下文句子數量上限
 }
 ```
 
@@ -42,7 +168,7 @@ IVOD MCP Server 提供標準化的 Model Context Protocol 介面，讓 AI 服務
       "speakers": ["黃國昌", "王鴻薇"],
       "committees": ["交通委員會", "內政委員會"],
       "query": "預算",
-      "limit": 15
+      "max_results": 15
     }
   }
 }
@@ -60,13 +186,14 @@ IVOD MCP Server 提供標準化的 Model Context Protocol 介面，讓 AI 服務
         "text": "{\"results\": [...], \"metadata\": {...}}"
       }
     ]
-  }
+  },
+  "nextCursor": "<opaque_cursor_string>" // 如果有更多結果，會包含此欄位
 }
 ```
 
-### 2. get_meeting_transcript - 取得完整會議逐字稿
+#### 7.2. `get_meeting_transcript` - 取得完整會議逐字稿
 
-**功能**：根據 IVOD ID 取得特定會議的完整逐字稿
+**功能**：根據 IVOD ID 取得特定會議的完整逐字稿。
 
 **參數**：
 ```typescript
@@ -92,9 +219,71 @@ IVOD MCP Server 提供標準化的 Model Context Protocol 介面，讓 AI 服務
 }
 ```
 
+### 8. `resources/list`
+
+**功能**：列出伺服器提供的所有資源。
+
+**範例請求**：
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "resources/list"
+}
+```
+
+### 9. `resources/read`
+
+**功能**：讀取指定 URI 的資源內容。
+
+**參數**：
+```typescript
+{
+  uri: string; // 資源的 URI
+}
+```
+
+### 10. `resources/templates/list`
+
+**功能**：列出伺服器提供的所有資源模板。
+
+**範例請求**：
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "resources/templates/list"
+}
+```
+
+### 11. `prompts/list`
+
+**功能**：列出伺服器提供的所有提示。
+
+**範例請求**：
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "prompts/list"
+}
+```
+
+### 12. `prompts/get`
+
+**功能**：取得指定名稱的提示內容。
+
+**參數**：
+```typescript
+{
+  name: string;     // 提示名稱
+  arguments?: object; // 傳遞給提示的參數
+}
+```
+
 ## 回應資料格式
 
-### 搜尋結果結構
+### 搜尋結果結構 (`search_transcripts`)
 
 ```json
 {
@@ -137,7 +326,7 @@ IVOD MCP Server 提供標準化的 Model Context Protocol 介面，讓 AI 服務
 }
 ```
 
-### 完整逐字稿結構
+### 完整逐字稿結構 (`get_meeting_transcript`)
 
 ```json
 {
@@ -170,7 +359,7 @@ IVOD MCP Server 提供標準化的 Model Context Protocol 介面，讓 AI 服務
 ### 基本立委搜尋
 
 ```bash
-curl -X POST http://localhost:3000/mcp \
+curl -X POST http://localhost:3000/api/mcp \
   -H "Content-Type: application/json" \
   -d '{
     "jsonrpc": "2.0",
@@ -181,7 +370,7 @@ curl -X POST http://localhost:3000/mcp \
       "arguments": {
         "speakers": ["黃國昌"],
         "query": "數位發展",
-        "limit": 10
+        "max_results": 10
       }
     }
   }'
@@ -190,7 +379,7 @@ curl -X POST http://localhost:3000/mcp \
 ### 複雜複合搜尋
 
 ```bash
-curl -X POST http://localhost:3000/mcp \
+curl -X POST http://localhost:3000/api/mcp \
   -H "Content-Type: application/json" \
   -d '{
     "jsonrpc": "2.0",
@@ -204,7 +393,7 @@ curl -X POST http://localhost:3000/mcp \
         "query": "交通",
         "date_from": "2024-01-01",
         "date_to": "2024-12-31",
-        "limit": 20
+        "max_results": 20
       }
     }
   }'
@@ -213,7 +402,7 @@ curl -X POST http://localhost:3000/mcp \
 ### 僅搜尋逐字稿內容
 
 ```bash
-curl -X POST http://localhost:3000/mcp \
+curl -X POST http://localhost:3000/api/mcp \
   -H "Content-Type: application/json" \
   -d '{
     "jsonrpc": "2.0",
@@ -223,7 +412,7 @@ curl -X POST http://localhost:3000/mcp \
       "name": "search_transcripts",
       "arguments": {
         "query": "人工智慧 AND 法規",
-        "limit": 15
+        "max_results": 15
       }
     }
   }'
@@ -232,7 +421,7 @@ curl -X POST http://localhost:3000/mcp \
 ### 取得完整會議逐字稿
 
 ```bash
-curl -X POST http://localhost:3000/mcp \
+curl -X POST http://localhost:3000/api/mcp \
   -H "Content-Type: application/json" \
   -d '{
     "jsonrpc": "2.0",
@@ -244,6 +433,41 @@ curl -X POST http://localhost:3000/mcp \
         "ivod_id": 123456,
         "transcript_type": "ly_only"
       }
+    }
+  }'
+```
+
+### 使用 `log` 方法
+
+```bash
+curl -X POST http://localhost:3000/api/mcp \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": null,
+    "method": "log",
+    "params": {
+      "level": "warn",
+      "message": "Unexpected tool call",
+      "context": {
+        "tool_name": "unknown_tool",
+        "input": {"foo": "bar"}
+      }
+    }
+  }'
+```
+
+### 使用 `completion/create` 方法 (目前未實作)
+
+```bash
+curl -X POST http://localhost:3000/api/mcp \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": 5,
+    "method": "completion/create",
+    "params": {
+      "prompt": "請總結這段文字：..."
     }
   }'
 ```
@@ -272,19 +496,19 @@ curl -X POST http://localhost:3000/mcp \
 
 ### 工具特定錯誤
 
-當工具執行出錯時，錯誤資訊會包含在回應的 `content` 中：
+當工具執行出錯時，錯誤資訊會包含在回應的 `error.data` 中：
 
 ```json
 {
   "jsonrpc": "2.0",
   "id": 1,
-  "result": {
-    "content": [
-      {
-        "type": "text",
-        "text": "{\"error\": \"No transcript found for IVOD ID: 999999\", \"success\": false}"
-      }
-    ]
+  "error": {
+    "code": -32603,
+    "message": "Internal error while executing tool 'get_meeting_transcript': No transcript found for IVOD ID: 999999",
+    "data": {
+      "tool": "get_meeting_transcript",
+      "args": {"ivod_id":999999,"transcript_type":"auto"}
+    }
   }
 }
 ```
@@ -309,7 +533,7 @@ curl -X POST http://localhost:3000/mcp \
         "-X", "POST",
         "-H", "Content-Type: application/json",
         "-d", "@-",
-        "http://localhost:3000/mcp"
+        "http://localhost:3000/api/mcp"
       ]
     }
   }
@@ -381,6 +605,10 @@ curl -X POST http://localhost:3000/mcp \
         "maximum": 50,
         "description": "回傳結果數量上限，預設 20",
         "default": 20
+      },
+      "cursor": {
+        "type": "string",
+        "description": "用於分頁的游標，從上一次搜尋結果的 nextCursor 欄位取得。"
       }
     }
   }
@@ -416,7 +644,7 @@ curl -X POST http://localhost:3000/mcp \
 
 ```javascript
 async function search_transcripts(params) {
-  const response = await fetch('http://localhost:3000/mcp', {
+  const response = await fetch('http://localhost:3000/api/mcp', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -438,13 +666,15 @@ async function search_transcripts(params) {
     throw new Error(`MCP Error: ${result.error.message}`);
   }
   
-  // 解析 JSON 字串回應
-  const content = JSON.parse(result.result.content[0].text);
-  return content;
+  // MCP 規範的分頁回應，nextCursor 在頂層
+  return {
+    content: JSON.parse(result.result.content[0].text),
+    nextCursor: result.nextCursor
+  };
 }
 
 async function get_meeting_transcript(params) {
-  const response = await fetch('http://localhost:3000/mcp', {
+  const response = await fetch('http://localhost:3000/api/mcp', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -469,6 +699,25 @@ async function get_meeting_transcript(params) {
   const content = JSON.parse(result.result.content[0].text);
   return content;
 }
+
+async function log_message(level, message, context) {
+  await fetch('http://localhost:3000/api/mcp', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      jsonrpc: '2.0',
+      id: null,
+      method: 'log',
+      params: {
+        level,
+        message,
+        context
+      }
+    })
+  });
+}
 ```
 
 #### Function 實作範例 (Python)
@@ -479,18 +728,15 @@ import json
 from typing import Dict, List, Optional, Any
 
 class IVODMCPClient:
-    def __init__(self, base_url: str = "http://localhost:3000/mcp"):
+    def __init__(self, base_url: str = "http://localhost:3000/api/mcp"):
         self.base_url = base_url
     
-    def _call_mcp(self, tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
+    def _call_mcp(self, method_name: str, params: Dict[str, Any], request_id: Optional[int] = 1) -> Dict[str, Any]:
         payload = {
             "jsonrpc": "2.0",
-            "id": 1,
-            "method": "tools/call",
-            "params": {
-                "name": tool_name,
-                "arguments": arguments
-            }
+            "id": request_id,
+            "method": method_name,
+            "params": params
         }
         
         response = requests.post(
@@ -504,10 +750,8 @@ class IVODMCPClient:
         if "error" in result:
             raise Exception(f"MCP Error: {result['error']['message']}")
         
-        # 解析 JSON 字串回應
-        content = json.loads(result["result"]["content"][0]["text"])
-        return content
-    
+        return result
+
     def search_transcripts(
         self,
         query: Optional[str] = None,
@@ -518,7 +762,8 @@ class IVODMCPClient:
         mode: str = "keyword_transcript_only",
         date_from: Optional[str] = None,
         date_to: Optional[str] = None,
-        max_results: int = 20
+        max_results: int = 20,
+        cursor: Optional[str] = None
     ) -> Dict[str, Any]:
         """搜尋立法院逐字稿"""
         
@@ -541,8 +786,17 @@ class IVODMCPClient:
             arguments["date_to"] = date_to
         if max_results != 20:
             arguments["max_results"] = max_results
+        if cursor is not None:
+            arguments["cursor"] = cursor
         
-        return self._call_mcp("search_transcripts", arguments)
+        mcp_response = self._call_mcp("tools/call", {"name": "search_transcripts", "arguments": arguments})
+        content = json.loads(mcp_response["result"]["content"][0]["text"])
+        
+        response_data = {"content": content}
+        if "nextCursor" in mcp_response:
+            response_data["nextCursor"] = mcp_response["nextCursor"]
+        
+        return response_data
     
     def get_meeting_transcript(
         self,
@@ -555,7 +809,16 @@ class IVODMCPClient:
         if transcript_type != "auto":
             arguments["transcript_type"] = transcript_type
         
-        return self._call_mcp("get_meeting_transcript", arguments)
+        mcp_response = self._call_mcp("tools/call", {"name": "get_meeting_transcript", "arguments": arguments})
+        content = json.loads(mcp_response["result"]["content"][0]["text"])
+        return content
+
+    def log(self, level: str, message: str, context: Optional[Dict[str, Any]] = None):
+        """發送日誌訊息到 MCP Server"""
+        params = {"level": level, "message": message}
+        if context is not None:
+            params["context"] = context
+        self._call_mcp("log", params, request_id=None) # log 方法的 id 可以為 None
 
 # 使用範例
 client = IVODMCPClient()
@@ -568,11 +831,22 @@ results = client.search_transcripts(
     max_results=10
 )
 
+print(f"找到 {results['content']['metadata']['total_found']} 筆相關記錄")
+for result in results['content']['results']:
+    print(f"日期: {result['date']}")
+    print(f"發言人: {result['speaker_name']}")
+    print(f"會議: {result['meeting_info']['title']}")
+    print(f"內容摘錄: {result['transcript']['excerpts'][0]['text'][:100]}...")
+    print("-" * 50)
+
 # 取得特定會議的完整逐字稿
 transcript = client.get_meeting_transcript(
     ivod_id=123456,
     transcript_type="ly_only"
 )
+
+# 發送日誌訊息
+client.log("info", "Application started", {"version": "1.0"})
 ```
 
 #### OpenAI Assistant API 整合範例
@@ -605,6 +879,22 @@ assistant = client.beta.assistants.create(
         "description": "取得完整會議逐字稿",
         # ... (使用上面定義的完整 schema)
       }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "log",
+        "description": "向 MCP Server 發送日誌訊息",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "level": {"type": "string", "enum": ["error", "warn", "info", "debug"]},
+            "message": {"type": "string"},
+            "context": {"type": "object", "additionalProperties": True}
+          },
+          "required": ["level", "message"]
+        }
+      }
     }
   ]
 )
@@ -623,6 +913,9 @@ def handle_function_calls(run, thread_id):
                 result = ivod_client.search_transcripts(**arguments)
             elif function_name == "get_meeting_transcript":
                 result = ivod_client.get_meeting_transcript(**arguments)
+            elif function_name == "log":
+                ivod_client.log(**arguments)
+                result = {"status": "logged"}
             else:
                 result = {"error": f"Unknown function: {function_name}"}
             
@@ -642,7 +935,7 @@ def handle_function_calls(run, thread_id):
 
 #### 使用注意事項
 
-1. **網路連線**：確保 MCP Server 在 `http://localhost:3000` 正常運行
+1. **網路連線**：確保 MCP Server 在 `http://localhost:3000/api/mcp` 正常運行
 2. **錯誤處理**：妥善處理網路錯誤和 MCP 錯誤回應
 3. **參數驗證**：在呼叫前驗證參數格式和範圍
 4. **效能考量**：避免頻繁的大量查詢，適當設定 `max_results` 限制
@@ -662,22 +955,33 @@ results = client.search_transcripts(
     max_results=15
 )
 
-print(f"找到 {results['metadata']['total_found']} 筆相關記錄")
-for result in results['results']:
+print(f"找到 {results['content']['metadata']['total_found']} 筆相關記錄")
+for result in results['content']['results']:
     print(f"日期: {result['date']}")
     print(f"發言人: {result['speaker_name']}")
     print(f"會議: {result['meeting_info']['title']}")
     print(f"內容摘錄: {result['transcript']['excerpts'][0]['text'][:100]}...")
     print("-" * 50)
+
+# 檢查是否有下一頁
+if "nextCursor" in results:
+    print(f"下一頁游標: {results['nextCursor']}")
+    # 繼續搜尋下一頁
+    next_page_results = client.search_transcripts(
+        query="數位交通",
+        cursor=results['nextCursor'],
+        max_results=15
+    )
+    print(f"下一頁找到 {next_page_results['content']['metadata']['total_found']} 筆記錄")
 ```
 
 ## 效能和限制
 
 ### 搜尋限制
-- 最大回傳結果：100 筆
+- 最大回傳結果：50 筆 (由 `max_results` 控制)
 - 預設結果數量：20 筆
-- 段落長度範圍：200-2000 字符
-- 上下文句子範圍：1-10 句
+- 段落長度範圍：100-3000 字符
+- 上下文句子範圍：0-10 句
 
 ### 效能考量
 - 搜尋通常在 2 秒內完成
@@ -693,7 +997,7 @@ for result in results['results']:
 ### 常見問題
 
 1. **連線錯誤**
-   - 確認服務器正在運行：`http://localhost:3000`
+   - 確認服務器正在運行：`http://localhost:3000/api/mcp`
    - 檢查防火牆設定
 
 2. **資料庫連線問題**
@@ -702,7 +1006,7 @@ for result in results['results']:
 
 3. **搜尋無結果**
    - 檢查搜尋條件是否過於嚴格
-   - 嘗試調整 `search_mode` 從 `intersection` 到 `union`
+   - 嘗試調整搜尋模式或擴大日期範圍
    - 確認日期範圍設定
 
 4. **Elasticsearch 問題**
@@ -718,7 +1022,7 @@ tail -f logs/app.log | grep MCP
 
 測試基本連線：
 ```bash
-curl -X POST http://localhost:3000/mcp \
+curl -X POST http://localhost:3000/api/mcp \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc": "2.0", "id": 1, "method": "tools/list"}'
 ```

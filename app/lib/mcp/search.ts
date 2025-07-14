@@ -24,6 +24,7 @@ const MCPSearchSchema = z.object({
   date_from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   date_to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   max_results: z.number().max(50).default(20),
+  cursor: z.string().optional(),
 });
 
 const GetTranscriptSchema = z.object({
@@ -31,7 +32,7 @@ const GetTranscriptSchema = z.object({
   transcript_type: z.enum(['auto', 'ly_only', 'ai_only']).default('auto')
 });
 
-export async function searchTranscripts(args: unknown) {
+export async function searchTranscripts(args: unknown): Promise<{ content: any[], nextCursor?: string }> {
   const startTime = Date.now();
   
   try {
@@ -42,7 +43,7 @@ export async function searchTranscripts(args: unknown) {
     });
 
     // 根據搜尋模式執行對應的搜尋邏輯
-    const results = await executeSearch(params);
+    const { results, nextCursor } = await executeSearch(params);
 
     // 格式化結果並提取段落
     const enrichedResults = await Promise.all(
@@ -59,7 +60,7 @@ export async function searchTranscripts(args: unknown) {
         search_time_ms: Date.now() - startTime,
         success: true,
         search_mode: params.mode,
-        note: `Using ${params.mode} search mode with Prisma query.`
+        note: `Using ${params.mode} search mode with Prisma query.`,
       }
     };
 
@@ -74,7 +75,8 @@ export async function searchTranscripts(args: unknown) {
       content: [{
         type: 'text',
         text: JSON.stringify(response, null, 2)
-      }]
+      }],
+      nextCursor
     };
 
   } catch (error) {
@@ -99,7 +101,7 @@ export async function searchTranscripts(args: unknown) {
 }
 
 // 搜尋模式分派邏輯（符合設計文檔）
-async function executeSearch(params: z.infer<typeof MCPSearchSchema>): Promise<any[]> {
+async function executeSearch(params: z.infer<typeof MCPSearchSchema>): Promise<{ results: any[], nextCursor?: string }> {
   switch (params.mode) {
     case 'keyword_all_fields':
       return await searchAllFields(params);
@@ -117,25 +119,30 @@ async function executeSearch(params: z.infer<typeof MCPSearchSchema>): Promise<a
 }
 
 // 關鍵字搜尋 - 全部欄位
-async function searchAllFields(params: z.infer<typeof MCPSearchSchema>): Promise<any[]> {
+async function searchAllFields(params: z.infer<typeof MCPSearchSchema>): Promise<{ results: any[], nextCursor?: string }>{
   const whereConditions = buildSearchConditions(params, true); // includeAllFields = true
   
   return await performPrismaQuery(params, whereConditions);
 }
 
 // 關鍵字搜尋 - 僅逐字稿
-async function searchTranscriptOnly(params: z.infer<typeof MCPSearchSchema>): Promise<any[]> {
+async function searchTranscriptOnly(params: z.infer<typeof MCPSearchSchema>): Promise<{ results: any[], nextCursor?: string }> {
   const whereConditions = buildSearchConditions(params, false); // includeAllFields = false
   
   return await performPrismaQuery(params, whereConditions);
 }
 
 // 執行 Prisma 查詢
-async function performPrismaQuery(params: z.infer<typeof MCPSearchSchema>, whereConditions: any): Promise<any[]> {
+async function performPrismaQuery(params: z.infer<typeof MCPSearchSchema>, whereConditions: any): Promise<{ results: any[], nextCursor?: string }> {
+  const take = params.max_results;
+  const cursor = params.cursor ? { ivod_id: parseInt(params.cursor, 10) } : undefined;
+
   const results = await prisma.iVODTranscript.findMany({
     where: whereConditions,
     orderBy: { date: 'desc' },
-    take: params.max_results,
+    take: take + 1,
+    cursor,
+    skip: cursor ? 1 : 0,
     select: {
       ivod_id: true,
       title: true,
@@ -150,7 +157,15 @@ async function performPrismaQuery(params: z.infer<typeof MCPSearchSchema>, where
     }
   });
 
-  return results;
+  let nextCursor: string | undefined = undefined;
+  if (results.length > take) {
+    const nextItem = results.pop();
+    if (nextItem) {
+      nextCursor = nextItem.ivod_id.toString();
+    }
+  }
+
+  return { results, nextCursor };
 }
 
 // 建立搜尋條件 (支援搜尋模式和 MCP array 參數)
@@ -451,14 +466,14 @@ export async function getMeetingTranscript(args: unknown) {
 
     const response: FullTranscriptResult = {
       ivod_id: result.ivod_id,
-      speaker_name: result.speaker_name,
+      speaker_name: result.speaker_name || '',
       date: result.date.toISOString().split('T')[0],
       
       meeting_info: {
-        title: result.title,
-        meeting_name: result.meeting_name,
+        title: result.title || '',
+        meeting_name: result.meeting_name || '',
         committee_names: parseCommitteeNames(result.committee_names),
-        category: result.category
+        category: result.category || '',
       },
       
       transcript: {

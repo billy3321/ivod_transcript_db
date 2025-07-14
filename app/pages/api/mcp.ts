@@ -91,7 +91,7 @@ export default async function mcpEndpoint(req: NextApiRequest, res: NextApiRespo
       method: req.body?.method,
       metadata: { 
         id: req.body?.id,
-        success: !response.error
+        success: response ? !response.error : true
       }
     });
 
