@@ -45,7 +45,10 @@ export class RateLimiter {
       if (now >= entry.resetTime) {
         // 解除封鎖
         this.store.delete(identifier);
-        logger.info('Rate limit block expired', { identifier });
+        logger.info('Rate limit block expired', { 
+          component: 'RateLimiter',
+          metadata: { identifier }
+        });
       } else {
         return {
           allowed: false,
@@ -82,10 +85,13 @@ export class RateLimiter {
       entry.resetTime = now + this.blockDurationMs;
       
       logger.warn('Rate limit exceeded, blocking client', {
-        identifier,
-        count: entry.count,
-        maxRequests: this.maxRequests,
-        blockUntil: new Date(entry.resetTime).toISOString()
+        component: 'RateLimiter',
+        metadata: {
+          identifier,
+          count: entry.count,
+          maxRequests: this.maxRequests,
+          blockUntil: new Date(entry.resetTime).toISOString()
+        }
       });
 
       return {
@@ -108,7 +114,10 @@ export class RateLimiter {
    */
   reset(identifier: string): void {
     this.store.delete(identifier);
-    logger.info('Rate limit reset for client', { identifier });
+    logger.info('Rate limit reset for client', { 
+      component: 'RateLimiter',
+      metadata: { identifier }
+    });
   }
 
   /**
@@ -123,13 +132,13 @@ export class RateLimiter {
     let blockedClients = 0;
     let activeRequests = 0;
 
-    for (const entry of this.store.values()) {
+    Array.from(this.store.values()).forEach(entry => {
       if (entry.blocked && now < entry.resetTime) {
         blockedClients++;
       } else if (!entry.blocked && now < entry.resetTime) {
         activeRequests += entry.count;
       }
-    }
+    });
 
     return {
       totalClients: this.store.size,
@@ -158,8 +167,11 @@ export class RateLimiter {
 
       if (toDelete.length > 0) {
         logger.debug('Rate limiter cleanup', { 
-          cleanedEntries: toDelete.length,
-          remainingEntries: this.store.size 
+          component: 'RateLimiter',
+          metadata: {
+            cleanedEntries: toDelete.length,
+            remainingEntries: this.store.size 
+          }
         });
       }
     }, this.windowMs);

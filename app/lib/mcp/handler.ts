@@ -249,12 +249,13 @@ export class MCPHandler {
     }
 
     // 驗證工具參數
-    if (args === undefined || args === null) {
+    let toolArgs = args;
+    if (toolArgs === undefined || toolArgs === null) {
       // 允許空參數，但要確保是有效的空物件
-      args = {};
+      toolArgs = {};
     }
 
-    const validationResult = schema.safeParse(args);
+    const validationResult = schema.safeParse(toolArgs);
 
     if (!validationResult.success) {
       const formattedErrors = this.formatZodError(validationResult.error);
@@ -265,7 +266,7 @@ export class MCPHandler {
         {
           tool: name,
           validationErrors: formattedErrors,
-          receivedParams: args
+          receivedParams: toolArgs
         }
       );
     }
@@ -347,7 +348,10 @@ export class MCPHandler {
   private createErrorResponse(id: string | number | null, code: number, message: string, data?: any): MCPResponse {
     // 確保錯誤代碼符合 JSON-RPC 2.0 規範
     if (!isValidErrorCode(code)) {
-      logger.warn('Invalid JSON-RPC error code used', { code, message, validRange: '-32768 to -32000' });
+      logger.warn('Invalid JSON-RPC error code used', { 
+        component: 'MCPHandler',
+        metadata: { code, message, validRange: '-32768 to -32000' }
+      });
       // 使用通用內部錯誤代碼作為後備
       code = JSON_RPC_ERRORS.INTERNAL_ERROR;
     }
@@ -364,10 +368,13 @@ export class MCPHandler {
 
     // 記錄錯誤以便監控
     logger.error('MCP Error Response', {
-      id,
-      code,
-      message,
-      data: data ? JSON.stringify(data) : undefined
+      component: 'MCPHandler',
+      metadata: {
+        id,
+        code,
+        message,
+        data: data ? JSON.stringify(data) : undefined
+      }
     });
 
     return errorResponse;

@@ -47,10 +47,12 @@ export default async function mcpEndpoint(req: NextApiRequest, res: NextApiRespo
     }
 
     logger.warn('MCP request rate limited', {
-      clientId,
-      blocked: rateLimitResult.blocked,
-      resetTime: new Date(rateLimitResult.resetTime).toISOString(),
-      userAgent: req.headers['user-agent']
+      userAgent: req.headers['user-agent'],
+      metadata: {
+        clientId,
+        blocked: rateLimitResult.blocked,
+        resetTime: new Date(rateLimitResult.resetTime).toISOString(),
+      }
     });
 
     return res.status(429).json({
