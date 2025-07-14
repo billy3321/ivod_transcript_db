@@ -127,7 +127,21 @@ async function searchTranscriptOnly(params: z.infer<typeof MCPSearchSchema>): Pr
 // 執行 Prisma 查詢
 async function performPrismaQuery(params: z.infer<typeof MCPSearchSchema>, whereConditions: any): Promise<{ results: any[], nextCursor?: string }> {
   const take = params.max_results;
-  const cursor = params.cursor ? { ivod_id: parseInt(params.cursor, 10) } : undefined;
+  
+  // 優雅處理無效游標
+  let cursor: { ivod_id: number } | undefined = undefined;
+  if (params.cursor) {
+    const cursorId = parseInt(params.cursor, 10);
+    if (isNaN(cursorId) || cursorId <= 0) {
+      // 無效游標時從頭開始，而不是拋出錯誤
+      logger.warn('Invalid cursor provided, starting from beginning', { 
+        metadata: { component: 'MCP_Search', cursor: params.cursor }
+      });
+      cursor = undefined;
+    } else {
+      cursor = { ivod_id: cursorId };
+    }
+  }
 
   const results = await prisma.iVODTranscript.findMany({
     where: whereConditions,

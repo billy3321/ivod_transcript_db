@@ -289,7 +289,7 @@ export class MCPHandler {
     try {
       const result = await tool(validationResult.data);
       if (name === 'search_transcripts' && result.nextCursor) {
-        return this.createSuccessResponse(id, { content: result.content }, result.nextCursor);
+        return this.createSuccessResponse(id, { content: result.content, nextCursor: result.nextCursor });
       }
       return this.createSuccessResponse(id, { content: result.content });
     } catch (error) {
@@ -355,12 +355,11 @@ export class MCPHandler {
     return await getPrompt(name, args);
   }
 
-  private createSuccessResponse(id: string | number, result: any, nextCursor?: string): MCPResponse {
+  private createSuccessResponse(id: string | number, result: any): MCPResponse {
     return {
       jsonrpc: '2.0',
       id,
       result,
-      ...(nextCursor && { nextCursor }),
     };
   }
 

@@ -10,7 +10,6 @@ export interface MCPResponse {
   id: string | number | null;
   result?: any;
   error?: MCPError;
-  nextCursor?: string;
 }
 
 export interface MCPError {
