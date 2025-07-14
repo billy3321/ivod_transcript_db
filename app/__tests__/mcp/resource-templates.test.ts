@@ -125,13 +125,13 @@ describe('MCP Resource Templates', () => {
 
     it('should generate legislator search content', async () => {
       const uriTemplate = "ivod://search/legislator/{name}";
-      const params = { name: '黃國昌' };
+      const params = { name: '沈伯洋' };
       
       const content = await generateTemplateContent(uriTemplate, params);
       
-      expect(content).toContain('黃國昌 立委發言紀錄查詢');
+      expect(content).toContain('沈伯洋 立委發言紀錄查詢');
       expect(content).toContain('search_transcripts');
-      expect(content).toContain('"speakers": ["黃國昌"]');
+      expect(content).toContain('"speakers": ["沈伯洋"]');
     });
 
     it('should throw error for non-existent template', async () => {

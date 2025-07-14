@@ -68,14 +68,14 @@ describe('MCP Integration Tests (node-mocks-http)', () => {
     it('should handle a speaker search', async () => {
       const response = await invokeMCP('tools/call', {
         name: 'search_transcripts',
-        arguments: { speakers: ['黃國昌'], limit: 2 },
+        arguments: { speakers: ['沈伯洋'], limit: 2 },
       });
       const result = getResultText(response);
       expect(result).toBeDefined();
       expect(result.results).toBeInstanceOf(Array);
       expect(result.results.length).toBeGreaterThanOrEqual(0);
       result.results.forEach((r: any) => {
-        expect(r.speaker_name).toContain('黃國昌');
+        expect(r.speaker_name).toContain('沈伯洋');
       });
     });
 

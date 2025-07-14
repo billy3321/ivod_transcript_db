@@ -164,7 +164,7 @@ describe('MCPHandler', () => {
           name: 'search_transcripts',
           arguments: {
             query: '測試查詢',
-            speakers: ['黃國昌', '王鴻薇'],
+            speakers: ['沈伯洋', '黃捷'],
             committees: ['交通委員會']
           }
         }
@@ -177,7 +177,7 @@ describe('MCPHandler', () => {
       expect(response.result).toEqual(mockSearchResult);
       expect(searchTranscripts).toHaveBeenCalledWith({
         query: '測試查詢',
-        speakers: ['黃國昌', '王鴻薇'],
+        speakers: ['沈伯洋', '黃捷'],
         committees: ['交通委員會'],
         mode: 'keyword_transcript_only',
         transcription_source: 'all',

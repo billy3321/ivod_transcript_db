@@ -18,8 +18,8 @@
             "items": {
               "type": "string"
             },
-            "description": "立委姓名陣列，可指定一個或多個立委。例如：[\"黃國昌\", \"王鴻薇\"]",
-            "examples": [["黃國昌"], ["王鴻薇", "賴士葆"], ["柯建銘"]]
+            "description": "立委姓名陣列，可指定一個或多個立委。例如：[\"沈伯洋\", \"黃捷\"]",
+            "examples": [["沈伯洋"], ["黃捷", "鍾佳濱"], ["柯建銘"]]
           },
           "committees": {
             "type": "array",
@@ -89,9 +89,9 @@
       },
       "usage_examples": [
         {
-          "description": "查詢黃國昌立委關於數位發展的發言",
+          "description": "查詢沈伯洋立委關於數位發展的發言",
           "arguments": {
-            "speakers": ["黃國昌"],
+            "speakers": ["沈伯洋"],
             "query": "數位發展",
             "transcription_source": "ly_only",
             "max_results": 10

@@ -194,7 +194,7 @@ describe('searchParser', () => {
     });
 
     it('should handle mixed quoted and unquoted terms with consistent field matching', () => {
-      const parsedQuery = parseAdvancedSearchQuery('"黃國昌" 立委 "預算審查"');
+      const parsedQuery = parseAdvancedSearchQuery('"沈伯洋" 立委 "預算審查"');
       const query = buildElasticsearchQuery(parsedQuery);
       
       // Should have 3 must clauses: 2 quoted phrases + 1 general term
@@ -218,8 +218,8 @@ describe('searchParser', () => {
     });
 
     it('should build query with flexible phrase matching that works like unquoted search', () => {
-      const quotedQuery = parseAdvancedSearchQuery('"黃國昌"');
-      const unquotedQuery = parseAdvancedSearchQuery('黃國昌');
+      const quotedQuery = parseAdvancedSearchQuery('"沈伯洋"');
+      const unquotedQuery = parseAdvancedSearchQuery('沈伯洋');
       
       const quotedESQuery = buildElasticsearchQuery(quotedQuery);
       const unquotedESQuery = buildElasticsearchQuery(unquotedQuery);

@@ -296,9 +296,9 @@ describe('MCP Resources Tests', () => {
         { uriTemplate: 'ivod://search/topic/{query}', name: '議題查詢', mimeType: 'text/markdown' },
         { uriTemplate: 'ivod://search/legislator/{name}', name: '立委查詢', mimeType: 'text/markdown' }
       ];
-      const legislatorUri = 'ivod://search/legislator/黃國昌';
-      const mockParams = { name: '黃國昌' };
-      const mockContent = '# 黃國昌 立委發言紀錄查詢';
+      const legislatorUri = 'ivod://search/legislator/沈伯洋';
+      const mockParams = { name: '沈伯洋' };
+      const mockContent = '# 沈伯洋 立委發言紀錄查詢';
 
       mockTemplates.listResourceTemplates.mockResolvedValue(templates);
       // Return null for first template, match for second

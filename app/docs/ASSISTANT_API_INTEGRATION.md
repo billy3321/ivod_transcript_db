@@ -163,7 +163,7 @@ SEARCH_TRANSCRIPTS_SCHEMA = {
             "speakers": {
                 "type": "array",
                 "items": {"type": "string"},
-                "description": "立委姓名陣列，例如 ['黃國昌', '王鴻薇']"
+                "description": "立委姓名陣列，例如 ['沈伯洋', '黃捷']"
             },
             "committees": {
                 "type": "array", 
@@ -542,7 +542,7 @@ BASE_URL = "http://localhost:5000"
 def test_chat():
     """測試對話功能"""
     response = requests.post(f"{BASE_URL}/chat", json={
-        "message": "請查詢黃國昌立委在交通委員會關於數位交通政策的發言"
+        "message": "請查詢沈伯洋立委在交通委員會關於數位交通政策的發言"
     })
     
     result = response.json()
@@ -565,7 +565,7 @@ def test_continued_chat(thread_id):
 def test_direct_search():
     """測試直接搜尋"""
     response = requests.post(f"{BASE_URL}/search", json={
-        "speakers": ["黃國昌"],
+        "speakers": ["沈伯洋"],
         "committees": ["交通委員會"],
         "query": "數位交通",
         "transcription_source": "ly_only",
@@ -629,7 +629,7 @@ curl http://localhost:5000/health
 # 測試對話
 curl -X POST http://localhost:5000/chat \
   -H "Content-Type: application/json" \
-  -d '{"message": "請查詢黃國昌立委的發言"}'
+  -d '{"message": "請查詢沈伯洋立委的發言"}'
 ```
 
 ## API 文檔
@@ -641,7 +641,7 @@ curl -X POST http://localhost:5000/chat \
 **請求格式**：
 ```json
 {
-  "message": "請查詢黃國昌立委關於數位發展的發言",
+  "message": "請查詢沈伯洋立委關於數位發展的發言",
   "thread_id": "可選的對話 ID，用於續接對話"
 }
 ```

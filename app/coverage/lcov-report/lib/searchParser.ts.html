@@ -2573,8 +2573,8 @@ function extractQuotedPhrasesFromOriginal(query: string): string[] {
  * 
  * Note: Quoted phrases use 'best_fields' with 'and' operator instead of 'phrase' type
  * to allow flexible word positioning while still requiring all words to be present.
- * This fixes the issue where quoted searches (e.g., "黃國昌") would fail to find results
- * that unquoted searches (e.g., 黃國昌) would find.
+ * This fixes the issue where quoted searches (e.g., "沈伯洋") would fail to find results
+ * that unquoted searches (e.g., 沈伯洋) would find.
  */
 export function buildElasticsearchQuery(parsedQuery: AdvancedSearchQuery) {
   const mustClauses: any[] = [];

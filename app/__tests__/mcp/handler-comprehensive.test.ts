@@ -170,7 +170,7 @@ describe('MCPHandler Comprehensive Tests', () => {
           name: 'search_transcripts',
           arguments: {
             query: '測試查詢',
-            speakers: ['黃國昌', '王鴻薇'],
+            speakers: ['沈伯洋', '黃捷'],
             committees: ['交通委員會']
           }
         }
@@ -183,7 +183,7 @@ describe('MCPHandler Comprehensive Tests', () => {
       expect(response.result).toEqual(mockResult);
       expect(mockSearchTranscripts).toHaveBeenCalledWith({
         query: '測試查詢',
-        speakers: ['黃國昌', '王鴻薇'],
+        speakers: ['沈伯洋', '黃捷'],
         committees: ['交通委員會'],
         mode: 'keyword_transcript_only',
         transcription_source: 'all',
@@ -333,7 +333,7 @@ describe('MCPHandler Comprehensive Tests', () => {
             role: 'user',
             content: {
               type: 'text',
-              text: '請分析黃國昌委員的表現...'
+              text: '請分析沈伯洋委員的表現...'
             }
           }
         ]
@@ -347,7 +347,7 @@ describe('MCPHandler Comprehensive Tests', () => {
         params: {
           name: 'analyze-legislator-performance',
           arguments: {
-            legislator_name: '黃國昌'
+            legislator_name: '沈伯洋'
           }
         }
       };
@@ -358,7 +358,7 @@ describe('MCPHandler Comprehensive Tests', () => {
       expect(mockGetPrompt).toHaveBeenCalledWith(
         'analyze-legislator-performance',
         {
-          legislator_name: '黃國昌'
+          legislator_name: '沈伯洋'
         }
       );
     });

@@ -2203,13 +2203,13 @@ const claudeWithMCP = async (userQuery: string) => {
   // 2. 根據查詢選擇適當的提示模板
   const promptTemplate = await mcpRequest('prompts/get', {
     name: 'analyze-legislator-performance',
-    arguments: { legislator_name: '黃國昌' }
+    arguments: { legislator_name: '沈伯洋' }
   });
   
   // 3. 執行搜尋
   const searchResults = await mcpRequest('tools/call', {
     name: 'search_transcripts',
-    arguments: { speakers: ['黃國昌'], limit: 10 }
+    arguments: { speakers: ['沈伯洋'], limit: 10 }
   });
   
   // 4. 整合結果並回應使用者
@@ -2240,7 +2240,7 @@ const claudeWithMCP = async (userQuery: string) => {
   "params": {
     "name": "search_transcripts",
     "arguments": {
-      "speakers": ["黃國昌", "王鴻薇"],
+      "speakers": ["沈伯洋", "黃捷"],
       "committees": ["交通委員會"],
       "topics": ["5G", "數位轉型"],
       "search_mode": "intersection",
@@ -2278,7 +2278,7 @@ const claudeWithMCP = async (userQuery: string) => {
   "result": {
     "content": [{
       "type": "text",
-      "text": "{\"results\":[{\"ivod_id\":162050,\"speaker_name\":\"黃國昌\",\"date\":\"2025-05-28\",\"meeting_info\":{\"title\":\"立法院第11屆第3會期交通委員會第13次全體委員會議\",\"meeting_name\":\"交通委員會會議\",\"committee_names\":[\"交通委員會\"],\"category\":\"委員會會議\"},\"transcript\":{\"source\":\"ly_transcript\",\"excerpts\":[{\"text\":\"相關逐字稿段落內容...\",\"relevance_score\":0.8}],\"full_length\":15420},\"ivod_url\":\"https://ivod.ly.gov.tw/Play/VOD/162050\"}],\"metadata\":{\"total_found\":15,\"search_time_ms\":245,\"success\":true}}"
+      "text": "{\"results\":[{\"ivod_id\":162050,\"speaker_name\":\"沈伯洋\",\"date\":\"2025-05-28\",\"meeting_info\":{\"title\":\"立法院第11屆第3會期交通委員會第13次全體委員會議\",\"meeting_name\":\"交通委員會會議\",\"committee_names\":[\"交通委員會\"],\"category\":\"委員會會議\"},\"transcript\":{\"source\":\"ly_transcript\",\"excerpts\":[{\"text\":\"相關逐字稿段落內容...\",\"relevance_score\":0.8}],\"full_length\":15420},\"ivod_url\":\"https://ivod.ly.gov.tw/Play/VOD/162050\"}],\"metadata\":{\"total_found\":15,\"search_time_ms\":245,\"success\":true}}"
     }]
   }
 }

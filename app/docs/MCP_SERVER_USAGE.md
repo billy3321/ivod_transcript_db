@@ -142,7 +142,7 @@ IVOD MCP Server 提供標準化的 Model Context Protocol (MCP) 介面，讓 AI 
 ```typescript
 {
   query?: string;           // 關鍵字搜尋（支援進階語法）
-  speakers?: string[];      // 發言人陣列，例如 ["黃國昌", "王鴻薇"]
+  speakers?: string[];      // 發言人陣列，例如 ["沈伯洋", "黃捷"]
   committees?: string[];    // 委員會陣列，例如 ["交通委員會", "經濟委員會"]
   meeting_name?: string;    // 會議名稱（模糊匹配）
   date_from?: string;       // 搜尋起始日期（YYYY-MM-DD）
@@ -165,7 +165,7 @@ IVOD MCP Server 提供標準化的 Model Context Protocol (MCP) 介面，讓 AI 
   "params": {
     "name": "search_transcripts",
     "arguments": {
-      "speakers": ["黃國昌", "王鴻薇"],
+      "speakers": ["沈伯洋", "黃捷"],
       "committees": ["交通委員會", "內政委員會"],
       "query": "預算",
       "max_results": 15
@@ -290,7 +290,7 @@ IVOD MCP Server 提供標準化的 Model Context Protocol (MCP) 介面，讓 AI 
   "results": [
     {
       "ivod_id": 123456,
-      "speaker_name": "黃國昌",
+      "speaker_name": "沈伯洋",
       "date": "2024-12-01",
       "meeting_info": {
         "title": "立法院第11屆第2會期交通委員會第8次全體委員會議",
@@ -332,7 +332,7 @@ IVOD MCP Server 提供標準化的 Model Context Protocol (MCP) 介面，讓 AI 
 {
   "result": {
     "ivod_id": 123456,
-    "speaker_name": "黃國昌",
+    "speaker_name": "沈伯洋",
     "date": "2024-12-01",
     "meeting_info": {
       "title": "立法院第11屆第2會期交通委員會第8次全體委員會議",
@@ -368,7 +368,7 @@ curl -X POST http://localhost:3000/api/mcp \
     "params": {
       "name": "search_transcripts",
       "arguments": {
-        "speakers": ["黃國昌"],
+        "speakers": ["沈伯洋"],
         "query": "數位發展",
         "max_results": 10
       }
@@ -388,7 +388,7 @@ curl -X POST http://localhost:3000/api/mcp \
     "params": {
       "name": "search_transcripts",
       "arguments": {
-        "speakers": ["黃國昌", "王鴻薇"],
+        "speakers": ["沈伯洋", "黃捷"],
         "committees": ["交通委員會", "內政委員會"],
         "query": "交通",
         "date_from": "2024-01-01",
@@ -566,7 +566,7 @@ curl -X POST http://localhost:3000/api/mcp \
       "speakers": {
         "type": "array",
         "items": {"type": "string"},
-        "description": "立委姓名陣列，例如 [\"黃國昌\", \"王鴻薇\"]"
+        "description": "立委姓名陣列，例如 [\"沈伯洋\", \"黃捷\"]"
       },
       "committees": {
         "type": "array", 
@@ -823,9 +823,9 @@ class IVODMCPClient:
 # 使用範例
 client = IVODMCPClient()
 
-# 搜尋黃國昌立委關於數位發展的發言
+# 搜尋沈伯洋立委關於數位發展的發言
 results = client.search_transcripts(
-    speakers=["黃國昌"],
+    speakers=["沈伯洋"],
     query="數位發展",
     transcription_source="ly_only",
     max_results=10
@@ -944,9 +944,9 @@ def handle_function_calls(run, thread_id):
 #### 完整查詢範例
 
 ```python
-# 查詢黃國昌在交通委員會關於數位交通的發言
+# 查詢沈伯洋在交通委員會關於數位交通的發言
 results = client.search_transcripts(
-    speakers=["黃國昌"],
+    speakers=["沈伯洋"],
     committees=["交通委員會"],
     query="數位交通",
     transcription_source="ly_only",
