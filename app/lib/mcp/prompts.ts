@@ -144,6 +144,10 @@ function generateTopicAndDateRangeSearchPrompt(args?: Record<string, string>): G
   const date_from = args?.date_from || "";
   const date_to = args?.date_to || "";
 
+  const dateFilter = (date_from || date_to) ? `,
+    "date_from": "${date_from || '2024-01-01'}",
+    "date_to": "${date_to || '2024-12-31'}"` : '';
+
   const text = [
     `請查詢「**${query}**」在立法院於特定時間區間內的相關討論記錄，並基於實際的逐字稿內容回答相關問題。`,
     "",
