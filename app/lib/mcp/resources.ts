@@ -6,30 +6,35 @@ const RESOURCE_TEMPLATES: MCPResourceTemplate[] = [
   {
     uriTemplate: "ivod://search/topic/{query}",
     name: "議題逐字稿查詢",
+    title: "議題逐字稿查詢",
     description: "根據特定議題關鍵字查詢立法院相關討論逐字稿",
     mimeType: "text/markdown"
   },
   {
     uriTemplate: "ivod://search/legislator/{name}",
     name: "立委發言查詢",
+    title: "立委發言查詢",
     description: "查詢特定立委的發言紀錄和逐字稿",
     mimeType: "text/markdown"
   },
   {
     uriTemplate: "ivod://search/meeting/{meeting_name}",
     name: "會議逐字稿查詢",
+    title: "會議逐字稿查詢",
     description: "根據會議名稱或類型查詢相關會議逐字稿",
     mimeType: "text/markdown"
   },
   {
     uriTemplate: "ivod://search/committee/{committee}",
-    name: "委員會逐字稿查詢", 
+    name: "委員會逐字稿查詢",
+    title: "委員會逐字稿查詢", 
     description: "查詢特定委員會的會議討論逐字稿",
     mimeType: "text/markdown"
   },
   {
     uriTemplate: "ivod://transcript/full/{ivod_id}",
     name: "完整會議逐字稿",
+    title: "完整會議逐字稿",
     description: "取得特定 IVOD ID 的完整會議逐字稿內容",
     mimeType: "text/markdown"
   }
@@ -40,30 +45,35 @@ export const AVAILABLE_RESOURCES: MCPResource[] = [
   {
     uri: "ivod://usage-guide",
     name: "IVOD 搜尋使用指南",
+    title: "IVOD 搜尋使用指南",
     description: "詳細說明如何使用 IVOD 逐字稿搜尋功能的完整指南",
     mimeType: "text/markdown"
   },
   {
     uri: "ivod://search-examples",
     name: "搜尋範例集",
+    title: "搜尋範例集",
     description: "常用的搜尋查詢範例，包含立委、委員會、話題搜尋等",
     mimeType: "text/markdown"
   },
   {
     uri: "ivod://api-reference",
     name: "API 參考文檔",
+    title: "API 參考文檔",
     description: "search_transcripts 和 get_meeting_transcript 工具的詳細參數說明",
     mimeType: "text/markdown"
   },
   {
     uri: "ivod://data-structure",
     name: "資料結構說明",
+    title: "資料結構說明",
     description: "IVOD 資料庫結構和逐字稿格式的詳細說明",
     mimeType: "text/markdown"
   },
   {
     uri: "ivod://best-practices", 
     name: "搜尋最佳實踐",
+    title: "搜尋最佳實踐",
     description: "如何優化搜尋查詢、提高搜尋效果的建議和技巧",
     mimeType: "text/markdown"
   }
@@ -89,6 +99,8 @@ export async function readResource(uri: string): Promise<ResourceContent> {
       const text = await generateTemplateContent(template.uriTemplate, params);
       return {
         uri,
+        name: template.name,
+        title: template.title,
         mimeType: template.mimeType || 'text/markdown',
         text
       };
@@ -124,6 +136,8 @@ export async function readResource(uri: string): Promise<ResourceContent> {
 
     return {
       uri,
+      name: resource.name,
+      title: resource.title,
       mimeType: resource.mimeType,
       text
     };

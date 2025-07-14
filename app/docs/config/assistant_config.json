@@ -1,7 +1,7 @@
 {
   "assistant": {
     "name": "台灣立法院逐字稿分析助手",
-    "model": "gpt-4",
+    "model": "gpt-4.1",
     "instructions": {
       "main": "你是一個專門分析台灣立法院逐字稿的助手。你的任務是幫助用戶查詢和分析立法院的會議記錄、立委發言和相關討論。",
       "guidelines": [

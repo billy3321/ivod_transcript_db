@@ -22,20 +22,25 @@ export interface MCPError {
 export interface MCPResource {
   uri: string;
   name: string;
-  description: string;
-  mimeType: string;
+  title?: string;
+  description?: string;
+  mimeType?: string;
 }
 
 export interface ResourceContent {
   uri: string;
-  mimeType: string;
-  text: string;
+  name?: string;
+  title?: string;
+  mimeType?: string;
+  text?: string;
+  blob?: string;
 }
 
 export interface MCPResourceTemplate {
   uriTemplate: string;
   name: string;
-  description: string;
+  title?: string;
+  description?: string;
   mimeType?: string;
 }
 
@@ -80,7 +85,7 @@ export interface SearchParams {
   speakers?: string[];
   committees?: string[];
   meeting_name?: string;
-  mode?: 'keyword_all_fields' | 'keyword_transcript_only' | 'semantic_search' | 'hybrid_search';
+  mode?: 'keyword_all_fields' | 'keyword_transcript_only';
   transcription_source?: 'all' | 'ly_only';
   max_excerpt_length?: number;
   max_context_sentences?: number;

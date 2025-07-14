@@ -1,9 +1,17 @@
 {
   "mcp_server": {
+    "protocol_version": "2025-06-18",
     "base_url": "http://localhost:3000/api/mcp",
-    "timeout": 30,
+    "timeout": 60,
     "retry_attempts": 3,
     "retry_delay": 1.0
+  },
+  "capabilities": {
+    "tools": true,
+    "resources": true,
+    "prompts": true,
+    "logging": true,
+    "completion": false
   },
   "tools": {
     "search_transcripts": {
@@ -11,6 +19,8 @@
       "method": "POST",
       "mcp_method": "tools/call",
       "mcp_tool_name": "search_transcripts",
+      "title": "立法院逐字稿搜尋",
+      "description": "統一的立法院逐字稿搜尋工具，支援所有搜尋模式",
       "cache_ttl": 300,
       "max_concurrent_requests": 5,
       "parameter_mapping": {
@@ -22,7 +32,10 @@
         "mode": "mode",
         "date_from": "date_from",
         "date_to": "date_to",
-        "max_results": "max_results"
+        "max_results": "max_results",
+        "cursor": "cursor",
+        "max_excerpt_length": "max_excerpt_length",
+        "max_context_sentences": "max_context_sentences"
       },
       "validation": {
         "required_fields": [],
@@ -41,9 +54,22 @@
           "max_results": {
             "min": 1,
             "max": 50
+          },
+          "max_excerpt_length": {
+            "min": 100,
+            "max": 3000
+          },
+          "max_context_sentences": {
+            "min": 0,
+            "max": 10
           }
         },
         "date_format": "YYYY-MM-DD"
+      },
+      "pagination": {
+        "supported": true,
+        "cursor_field": "cursor",
+        "response_cursor_field": "nextCursor"
       }
     },
     "get_meeting_transcript": {
@@ -51,6 +77,8 @@
       "method": "POST",
       "mcp_method": "tools/call",
       "mcp_tool_name": "get_meeting_transcript",
+      "title": "取得完整會議逐字稿",
+      "description": "取得特定會議的完整逐字稿內容",
       "cache_ttl": 3600,
       "max_concurrent_requests": 3,
       "parameter_mapping": {
@@ -67,23 +95,95 @@
           }
         }
       }
+    }
+  },
+  "methods": {
+    "ping": {
+      "endpoint": "ping",
+      "method": "POST",
+      "description": "檢查伺服器是否存活"
+    },
+    "initialize": {
+      "endpoint": "initialize",
+      "method": "POST",
+      "description": "初始化伺服器會話"
+    },
+    "getCapabilities": {
+      "endpoint": "getCapabilities",
+      "method": "POST",
+      "description": "取得伺服器支援的功能"
+    },
+    "tools/list": {
+      "endpoint": "tools/list",
+      "method": "POST",
+      "description": "列出所有可用工具",
+      "pagination": {
+        "supported": true,
+        "cursor_field": "cursor",
+        "response_cursor_field": "nextCursor"
+      }
+    },
+    "tools/call": {
+      "endpoint": "tools/call",
+      "method": "POST",
+      "description": "呼叫指定工具"
+    },
+    "resources/list": {
+      "endpoint": "resources/list",
+      "method": "POST",
+      "description": "列出所有可用資源",
+      "pagination": {
+        "supported": true,
+        "cursor_field": "cursor",
+        "response_cursor_field": "nextCursor"
+      }
+    },
+    "resources/read": {
+      "endpoint": "resources/read",
+      "method": "POST",
+      "description": "讀取指定資源內容"
+    },
+    "resources/templates/list": {
+      "endpoint": "resources/templates/list",
+      "method": "POST",
+      "description": "列出所有資源模板"
+    },
+    "prompts/list": {
+      "endpoint": "prompts/list",
+      "method": "POST",
+      "description": "列出所有提示模板",
+      "pagination": {
+        "supported": true,
+        "cursor_field": "cursor",
+        "response_cursor_field": "nextCursor"
+      }
+    },
+    "prompts/get": {
+      "endpoint": "prompts/get",
+      "method": "POST",
+      "description": "取得指定提示內容"
     },
     "log": {
       "endpoint": "log",
       "method": "POST",
-      "mcp_method": "log"
+      "description": "發送日誌訊息（無回應）"
     },
-    "completion_create": {
+    "completion/create": {
       "endpoint": "completion/create",
       "method": "POST",
-      "mcp_method": "completion/create"
+      "description": "建立文本補全（未實作）",
+      "implemented": false
     }
   },
   "response_format": {
     "success_wrapper": "result.content[0].text",
     "parse_json": true,
     "error_field": "error",
-    "expected_format": "json"
+    "expected_format": "json",
+    "pagination": {
+      "cursor_location": "top_level",
+      "cursor_field": "nextCursor"
+    }
   },
   "monitoring": {
     "log_requests": true,

@@ -12,7 +12,7 @@ const searchTranscriptsSchema = z.object({
   speakers: z.array(z.string()).optional(),
   committees: z.array(z.string()).optional(),
   meeting_name: z.string().optional(),
-  mode: z.enum(['keyword_all_fields', 'keyword_transcript_only', 'semantic_search', 'hybrid_search']).default('keyword_transcript_only'),
+  mode: z.enum(['keyword_all_fields', 'keyword_transcript_only']).default('keyword_transcript_only'),
   transcription_source: z.enum(['all', 'ly_only']).default('all'),
   max_excerpt_length: z.number().min(100).max(3000).default(1200),
   max_context_sentences: z.number().min(0).max(10).default(5),
@@ -117,7 +117,6 @@ export class MCPHandler {
               tools: {},
               resources: {},
               prompts: {},
-              completion: {},
               logging: {},
             },
             serverInfo: {
@@ -143,6 +142,7 @@ export class MCPHandler {
       tools: [
         {
           name: 'search_transcripts',
+          title: '立法院逐字稿搜尋',
           description: '統一的立法院逐字稿搜尋工具，支援所有搜尋模式',
           inputSchema: {
             type: 'object',
@@ -167,9 +167,9 @@ export class MCPHandler {
               },
               mode: {
                 type: 'string',
-                enum: ['keyword_all_fields', 'keyword_transcript_only', 'semantic_search', 'hybrid_search'],
+                enum: ['keyword_all_fields', 'keyword_transcript_only'],
                 default: 'keyword_transcript_only',
-                description: '搜尋模式：keyword_all_fields=關鍵字(全部欄位), keyword_transcript_only=關鍵字(僅逐字稿), semantic_search=語意搜尋, hybrid_search=混合搜尋'
+                description: '搜尋模式：keyword_all_fields=關鍵字(全部欄位), keyword_transcript_only=關鍵字(僅逐字稿)'
               },
               transcription_source: {
                 type: 'string',
@@ -216,6 +216,7 @@ export class MCPHandler {
         },
         {
           name: 'get_meeting_transcript',
+          title: '取得完整會議逐字稿',
           description: '取得特定會議的完整逐字稿內容',
           inputSchema: {
             type: 'object',

@@ -2,7 +2,8 @@ import { logger } from '@/lib/logger';
 
 export interface MCPPrompt {
   name: string;
-  description: string;
+  title?: string;
+  description?: string;
   arguments?: MCPPromptArgument[];
   uriTemplate?: string;
 }
@@ -29,6 +30,7 @@ export interface GetPromptResult {
 const BASE_PROMPTS: Omit<MCPPrompt, 'uriTemplate'>[] = [
   {
     name: "search-topic-discussions",
+    title: "查詢議題討論記錄",
     description: "查詢特定議題在立法院的討論記錄",
     arguments: [
       { name: "query", description: "議題關鍵字，例如：數位發展、交通安全", required: true }
@@ -36,6 +38,7 @@ const BASE_PROMPTS: Omit<MCPPrompt, 'uriTemplate'>[] = [
   },
   {
     name: "search-topic-and-date-range-discussions",
+    title: "查詢議題時間區間討論記錄",
     description: "查詢特定議題在立法院特定時間的討論記錄",
     arguments: [
       { name: "query", description: "議題關鍵字，例如：數位發展、交通安全", required: true },
@@ -45,6 +48,7 @@ const BASE_PROMPTS: Omit<MCPPrompt, 'uriTemplate'>[] = [
   },
   {
     name: "find-legislator-statements",
+    title: "查詢立委發言記錄",
     description: "查詢特定立委的發言和立場",
     arguments: [
       { name: "legislator_name", description: "立委姓名，例如：黃國昌", required: true },
@@ -53,6 +57,7 @@ const BASE_PROMPTS: Omit<MCPPrompt, 'uriTemplate'>[] = [
   },
   {
     name: "analyze-committee-discussions",
+    title: "分析委員會討論內容",
     description: "分析特定委員會的會議討論內容",
     arguments: [
       { name: "committee_name", description: "委員會名稱，例如：交通委員會", required: true },
@@ -61,6 +66,7 @@ const BASE_PROMPTS: Omit<MCPPrompt, 'uriTemplate'>[] = [
   },
   {
     name: "get-meeting-details",
+    title: "取得會議詳細內容",
     description: "取得特定會議的完整逐字稿內容",
     arguments: [
       { name: "ivod_id", description: "IVOD會議ID，例如：123456", required: true },

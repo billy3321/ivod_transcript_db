@@ -149,7 +149,7 @@ IVOD MCP Server 提供標準化的 Model Context Protocol (MCP) 介面，讓 AI 
   date_to?: string;         // 搜尋結束日期（YYYY-MM-DD）
   max_results?: number;     // 結果數量限制（1-50，預設20）
   cursor?: string;          // 用於分頁的游標，從上一次搜尋結果的 nextCursor 欄位取得
-  mode?: 'keyword_all_fields' | 'keyword_transcript_only' | 'semantic_search' | 'hybrid_search'; // 搜尋模式
+  mode?: 'keyword_all_fields' | 'keyword_transcript_only'; // 搜尋模式
   transcription_source?: 'all' | 'ly_only'; // 逐字稿來源
   max_excerpt_length?: number; // 段落長度上限
   max_context_sentences?: number; // 上下文句子數量上限
@@ -585,7 +585,7 @@ curl -X POST http://localhost:3000/api/mcp \
       },
       "mode": {
         "type": "string",
-        "enum": ["keyword_all_fields", "keyword_transcript_only", "semantic_search"],
+        "enum": ["keyword_all_fields", "keyword_transcript_only"],
         "description": "搜尋模式：keyword_all_fields=關鍵字搜尋所有欄位, keyword_transcript_only=僅搜尋逐字稿內容",
         "default": "keyword_transcript_only"
       },

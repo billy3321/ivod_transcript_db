@@ -14,9 +14,7 @@ const MCPSearchSchema = z.object({
   meeting_name: z.string().optional(),
   mode: z.enum([
     'keyword_all_fields', 
-    'keyword_transcript_only', 
-    'semantic_search', 
-    'hybrid_search'
+    'keyword_transcript_only'
   ]).default('keyword_transcript_only'),
   transcription_source: z.enum(['all', 'ly_only']).default('all'),
   max_excerpt_length: z.number().min(100).max(3000).default(1200),
@@ -107,12 +105,6 @@ async function executeSearch(params: z.infer<typeof MCPSearchSchema>): Promise<{
       return await searchAllFields(params);
     case 'keyword_transcript_only':
       return await searchTranscriptOnly(params);
-    case 'semantic_search':
-      // 未來功能：語意搜尋
-      throw new Error('Semantic search is not yet implemented');
-    case 'hybrid_search':
-      // 未來功能：混合搜尋
-      throw new Error('Hybrid search is not yet implemented');
     default:
       return await searchTranscriptOnly(params);
   }

@@ -1,7 +1,69 @@
 {
+  "mcp_server": {
+    "protocol_version": "2025-06-18",
+    "base_url": "https://ivod.billy3321.tw/api/mcp",
+    "timeout": 60,
+    "retry_attempts": 3,
+    "retry_delay": 1.0
+  },
+  "assistant": {
+    "name": "台灣立法院逐字稿分析助手",
+    "model": "gpt-4.1",
+    "instructions": {
+      "main": "你是一個專門分析台灣立法院逐字稿的助手。你的任務是幫助用戶查詢和分析立法院的會議記錄、立委發言和相關討論。",
+      "guidelines": [
+        "根據用戶的問題，使用提供的工具搜尋相關的立法院逐字稿資料",
+        "基於實際的逐字稿內容回答問題，提供有憑有據的分析",
+        "當搜尋立委發言時，優先使用 transcription_source=\"ly_only\" 以獲得更精確的結果",
+        "對於複雜查詢，可以組合使用多個搜尋條件（立委姓名+委員會+關鍵字+日期）",
+        "如果找不到相關資料，請明確說明並建議調整搜尋條件"
+      ],
+      "response_format": [
+        "引用具體的發言內容，使用引號標示",
+        "標註發言的日期、會議名稱和發言人",
+        "提供客觀的分析，避免主觀推測",
+        "如果有爭議或不同觀點，請平衡呈現各方立場",
+        "在回答末尾提供IVOD連結供用戶查看完整內容"
+      ],
+      "search_strategies": [
+        "對於立委相關查詢：先用立委姓名搜尋，再結合關鍵字細化",
+        "對於政策議題查詢：使用相關關鍵字，可指定特定委員會",
+        "對於時事查詢：結合日期範圍和關鍵字搜尋",
+        "對於會議記錄查詢：使用meeting_name參數精確定位"
+      ]
+    },
+    "temperature": 0.01,
+    "top_p": 0.9
+  },
+  "function_calling": {
+    "auto_invoke": true,
+    "max_iterations": 10,
+    "timeout_seconds": 60,
+    "retry_on_error": true,
+    "max_retries": 2
+  },
+  "response_limits": {
+    "max_response_length": 4000,
+    "max_search_results_per_call": 20,
+    "max_concurrent_functions": 3
+  },
+  "default_search_params": {
+    "transcription_source": "ly_only",
+    "mode": "keyword_transcript_only",
+    "max_results": 15
+  },
+  "error_handling": {
+    "graceful_degradation": true,
+    "fallback_messages": {
+      "no_results": "很抱歉，根據您的搜尋條件沒有找到相關的立法院逐字稿。建議您：\n1. 調整關鍵字或使用同義詞\n2. 擴大日期範圍\n3. 減少搜尋條件的限制\n4. 嘗試使用「所有逐字稿」選項",
+      "connection_error": "目前無法連接到立法院逐字稿資料庫，請稍後再試。",
+      "timeout_error": "搜尋請求處理時間過長，請嘗試使用更具體的搜尋條件。"
+    }
+  },
   "functions": [
     {
       "name": "search_transcripts",
+      "title": "立法院逐字稿搜尋",
       "description": "搜尋台灣立法院逐字稿，根據立委姓名、委員會、關鍵字、日期等條件查詢相關發言記錄",
       "mcp_tool": "search_transcripts",
       "enabled": true,
@@ -51,13 +113,13 @@
             "type": "string",
             "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
             "description": "搜尋起始日期，格式 YYYY-MM-DD。例如：\"2024-01-01\"",
-            "examples": ["2024-01-01", "2023-06-15", "2024-09-01"]
+            "examples": ["2025-02-01", "2025-06-15", "2025-04-01"]
           },
           "date_to": {
             "type": "string",
             "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
             "description": "搜尋結束日期，格式 YYYY-MM-DD。例如：\"2024-12-31\"",
-            "examples": ["2024-12-31", "2023-12-31", "2024-06-30"]
+            "examples": ["2025-02-01", "2025-06-15", "2025-04-01"]
           },
           "max_results": {
             "type": "integer",
@@ -68,7 +130,7 @@
           },
           "cursor": {
             "type": "string",
-            "description": "用於分頁的游標，從上一次搜尋結果的 nextCursor 欄位取得。"
+            "description": "用於分頁的游標，從上一次搜尋結果的 nextCursor 欄位取得"
           },
           "max_excerpt_length": {
             "type": "integer",
@@ -119,6 +181,7 @@
     },
     {
       "name": "get_meeting_transcript",
+      "title": "取得完整會議逐字稿",
       "description": "根據 IVOD ID 取得特定立法院會議的完整逐字稿內容",
       "mcp_tool": "get_meeting_transcript",
       "enabled": true,
@@ -156,5 +219,112 @@
         }
       ]
     }
-  ]
+  ],
+  "tools": {
+    "search_transcripts": {
+      "endpoint": "tools/call",
+      "method": "POST",
+      "mcp_method": "tools/call",
+      "mcp_tool_name": "search_transcripts",
+      "title": "立法院逐字稿搜尋",
+      "description": "統一的立法院逐字稿搜尋工具，支援所有搜尋模式",
+      "cache_ttl": 300,
+      "max_concurrent_requests": 5,
+      "parameter_mapping": {
+        "query": "query",
+        "speakers": "speakers",
+        "committees": "committees",
+        "meeting_name": "meeting_name",
+        "transcription_source": "transcription_source",
+        "mode": "mode",
+        "date_from": "date_from",
+        "date_to": "date_to",
+        "max_results": "max_results",
+        "cursor": "cursor",
+        "max_excerpt_length": "max_excerpt_length",
+        "max_context_sentences": "max_context_sentences"
+      },
+      "validation": {
+        "required_fields": [],
+        "field_limits": {
+          "speakers": {
+            "max_items": 10,
+            "max_length": 50
+          },
+          "committees": {
+            "max_items": 5,
+            "max_length": 100
+          },
+          "query": {
+            "max_length": 500
+          },
+          "max_results": {
+            "min": 1,
+            "max": 50
+          },
+          "max_excerpt_length": {
+            "min": 100,
+            "max": 3000
+          },
+          "max_context_sentences": {
+            "min": 0,
+            "max": 10
+          }
+        },
+        "date_format": "YYYY-MM-DD"
+      },
+      "pagination": {
+        "supported": true,
+        "cursor_field": "cursor",
+        "response_cursor_field": "nextCursor"
+      }
+    },
+    "get_meeting_transcript": {
+      "endpoint": "tools/call",
+      "method": "POST",
+      "mcp_method": "tools/call",
+      "mcp_tool_name": "get_meeting_transcript",
+      "title": "取得完整會議逐字稿",
+      "description": "取得特定會議的完整逐字稿內容",
+      "cache_ttl": 3600,
+      "max_concurrent_requests": 3,
+      "parameter_mapping": {
+        "ivod_id": "ivod_id",
+        "transcript_type": "transcript_type"
+      },
+      "validation": {
+        "required_fields": ["ivod_id"],
+        "field_limits": {
+          "ivod_id": {
+            "type": "integer",
+            "min": 1,
+            "max": 99999999
+          }
+        }
+      }
+    }
+  },
+  "response_format": {
+    "success_wrapper": "result.content[0].text",
+    "parse_json": true,
+    "error_field": "error",
+    "expected_format": "json",
+    "pagination": {
+      "cursor_location": "top_level",
+      "cursor_field": "nextCursor"
+    }
+  },
+  "capabilities": {
+    "tools": true,
+    "resources": true,
+    "prompts": true,
+    "logging": true,
+    "completion": false
+  },
+  "monitoring": {
+    "log_requests": true,
+    "log_responses": false,
+    "log_errors": true,
+    "metrics_enabled": true
+  }
 }
