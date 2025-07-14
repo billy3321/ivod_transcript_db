@@ -1,0 +1,57 @@
+{
+  "// 配置選項 1: 使用 curl (最簡單)": "for local development",
+  "option1_curl_local": {
+    "mcpServers": {
+      "ivod-transcript": {
+        "command": "curl",
+        "args": [
+          "-X", "POST",
+          "-H", "Content-Type: application/json",
+          "-d", "@-",
+          "http://localhost:3000/mcp"
+        ]
+      }
+    }
+  },
+
+  "// 配置選項 2: 使用 curl 連接生產環境": "for production server",
+  "option2_curl_production": {
+    "mcpServers": {
+      "ivod-transcript": {
+        "command": "curl",
+        "args": [
+          "-X", "POST",
+          "-H", "Content-Type: application/json",
+          "-d", "@-",
+          "https://ivod.billy3321.tw/mcp"
+        ]
+      }
+    }
+  },
+
+  "// 配置選項 3: 使用 node 腳本 (本地)": "for local with node",
+  "option3_node_local": {
+    "mcpServers": {
+      "ivod-transcript": {
+        "command": "node",
+        "args": [
+          "-e",
+          "const http = require('http'); process.stdin.setEncoding('utf8'); let input = ''; process.stdin.on('data', chunk => input += chunk); process.stdin.on('end', () => { const data = JSON.parse(input); const postData = JSON.stringify(data); const options = { hostname: 'localhost', port: 3000, path: '/mcp', method: 'POST', headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(postData) } }; const req = http.request(options, res => { let responseData = ''; res.on('data', chunk => responseData += chunk); res.on('end', () => console.log(responseData)); }); req.on('error', err => console.error(JSON.stringify({jsonrpc:'2.0',id:data.id||null,error:{code:-32603,message:err.message}}))); req.write(postData); req.end(); });"
+        ]
+      }
+    }
+  },
+
+  "// 配置選項 4: 使用 node 腳本 (生產)": "for production with node",
+  "option4_node_production": {
+    "mcpServers": {
+      "ivod-transcript": {
+        "command": "node",
+        "args": [
+          "-e",
+          "const https = require('https'); process.stdin.setEncoding('utf8'); let input = ''; process.stdin.on('data', chunk => input += chunk); process.stdin.on('end', () => { const data = JSON.parse(input); const postData = JSON.stringify(data); const options = { hostname: 'ivod.billy3321.tw', port: 443, path: '/mcp', method: 'POST', headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(postData) } }; const req = https.request(options, res => { let responseData = ''; res.on('data', chunk => responseData += chunk); res.on('end', () => console.log(responseData)); }); req.on('error', err => console.error(JSON.stringify({jsonrpc:'2.0',id:data.id||null,error:{code:-32603,message:err.message}}))); req.write(postData); req.end(); });"
+        ]
+      }
+    }
+  }
+}

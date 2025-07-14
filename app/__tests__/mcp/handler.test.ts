@@ -2,7 +2,7 @@ import { MCPHandler } from '@/lib/mcp/handler';
 import { MCPRequest } from '@/lib/mcp/types';
 
 // Mock the simple tools
-jest.mock('@/lib/mcp/simple-tools', () => ({
+jest.mock('@/lib/mcp/search', () => ({
   searchTranscripts: jest.fn(),
   getMeetingTranscript: jest.fn()
 }));
@@ -85,7 +85,9 @@ describe('MCPHandler', () => {
         result: {
           protocolVersion: '2024-11-05',
           capabilities: {
-            tools: {}
+            tools: {},
+            resources: {},
+            prompts: {}
           },
           serverInfo: {
             name: 'ivod-transcript-server',
@@ -108,7 +110,7 @@ describe('MCPHandler', () => {
         ]
       };
 
-      const { searchTranscripts } = require('@/lib/mcp/simple-tools');
+      const { searchTranscripts } = require('@/lib/mcp/search');
       searchTranscripts.mockResolvedValue(mockSearchResult);
 
       const request: MCPRequest = {
@@ -118,8 +120,7 @@ describe('MCPHandler', () => {
         params: {
           name: 'search_transcripts',
           arguments: {
-            query: '測試查詢',
-            limit: 10
+            query: '測試查詢'
           }
         }
       };
@@ -131,7 +132,58 @@ describe('MCPHandler', () => {
       expect(response.result).toEqual(mockSearchResult);
       expect(searchTranscripts).toHaveBeenCalledWith({
         query: '測試查詢',
-        limit: 10
+        mode: 'keyword_transcript_only',
+        transcription_source: 'all',
+        max_excerpt_length: 1200,
+        max_context_sentences: 5,
+        max_results: 20
+      });
+    });
+
+    it('should handle tools/call method with array parameters', async () => {
+      const mockSearchResult = {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify({
+              results: [],
+              metadata: { success: true }
+            })
+          }
+        ]
+      };
+
+      const { searchTranscripts } = require('@/lib/mcp/search');
+      searchTranscripts.mockResolvedValue(mockSearchResult);
+
+      const request: MCPRequest = {
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'tools/call',
+        params: {
+          name: 'search_transcripts',
+          arguments: {
+            query: '測試查詢',
+            speakers: ['黃國昌', '王鴻薇'],
+            committees: ['交通委員會']
+          }
+        }
+      };
+
+      const response = await handler.handleRequest(request);
+
+      expect(response.jsonrpc).toBe('2.0');
+      expect(response.id).toBe(1);
+      expect(response.result).toEqual(mockSearchResult);
+      expect(searchTranscripts).toHaveBeenCalledWith({
+        query: '測試查詢',
+        speakers: ['黃國昌', '王鴻薇'],
+        committees: ['交通委員會'],
+        mode: 'keyword_transcript_only',
+        transcription_source: 'all',
+        max_excerpt_length: 1200,
+        max_context_sentences: 5,
+        max_results: 20
       });
     });
 
@@ -170,8 +222,8 @@ describe('MCPHandler', () => {
       expect(response.jsonrpc).toBe('2.0');
       expect(response.id).toBe(1);
       expect(response.error).toBeDefined();
-      expect(response.error?.code).toBe(-32603);
-      expect(response.error?.message).toBe('Internal error');
+      expect(response.error?.code).toBe(-32601);
+      expect(response.error?.message).toBe("Tool 'unknown_tool' not found");
     });
 
     it('should handle errors gracefully', async () => {
@@ -185,7 +237,7 @@ describe('MCPHandler', () => {
         }
       };
 
-      const { searchTranscripts } = require('@/lib/mcp/simple-tools');
+      const { searchTranscripts } = require('@/lib/mcp/search');
       searchTranscripts.mockRejectedValue(new Error('Tool execution error'));
 
       const response = await handler.handleRequest(request);
@@ -194,7 +246,7 @@ describe('MCPHandler', () => {
       expect(response.id).toBe(1);
       expect(response.error).toBeDefined();
       expect(response.error?.code).toBe(-32603);
-      expect(response.error?.message).toBe('Internal error');
+      expect(response.error?.message).toBe('Tool execution failed');
     });
   });
 
@@ -211,22 +263,24 @@ describe('MCPHandler', () => {
       
       expect(searchTool.inputSchema.properties).toHaveProperty('query');
       expect(searchTool.inputSchema.properties).toHaveProperty('speakers');
-      expect(searchTool.inputSchema.properties).toHaveProperty('topics');
+      expect(searchTool.inputSchema.properties.speakers.type).toBe('array');
       expect(searchTool.inputSchema.properties).toHaveProperty('committees');
-      expect(searchTool.inputSchema.properties).toHaveProperty('search_mode');
-      expect(searchTool.inputSchema.properties).toHaveProperty('scope');
-      expect(searchTool.inputSchema.properties).toHaveProperty('excerpt_length');
-      expect(searchTool.inputSchema.properties).toHaveProperty('context_sentences');
+      expect(searchTool.inputSchema.properties.committees.type).toBe('array');
+      expect(searchTool.inputSchema.properties).toHaveProperty('meeting_name');
       expect(searchTool.inputSchema.properties).toHaveProperty('date_from');
       expect(searchTool.inputSchema.properties).toHaveProperty('date_to');
-      expect(searchTool.inputSchema.properties).toHaveProperty('limit');
+      expect(searchTool.inputSchema.properties).toHaveProperty('max_results');
+      expect(searchTool.inputSchema.properties).toHaveProperty('mode');
+      expect(searchTool.inputSchema.properties).toHaveProperty('transcription_source');
+      expect(searchTool.inputSchema.properties).toHaveProperty('max_excerpt_length');
+      expect(searchTool.inputSchema.properties).toHaveProperty('max_context_sentences');
       
       // 檢查預設值
-      expect(searchTool.inputSchema.properties.search_mode.default).toBe('union');
-      expect(searchTool.inputSchema.properties.scope.default).toBe('all');
-      expect(searchTool.inputSchema.properties.excerpt_length.default).toBe(800);
-      expect(searchTool.inputSchema.properties.context_sentences.default).toBe(3);
-      expect(searchTool.inputSchema.properties.limit.default).toBe(20);
+      expect(searchTool.inputSchema.properties.max_results.default).toBe(20);
+      expect(searchTool.inputSchema.properties.mode.default).toBe('keyword_transcript_only');
+      expect(searchTool.inputSchema.properties.transcription_source.default).toBe('all');
+      expect(searchTool.inputSchema.properties.max_excerpt_length.default).toBe(1200);
+      expect(searchTool.inputSchema.properties.max_context_sentences.default).toBe(5);
     });
 
     it('should provide correct get_meeting_transcript schema', async () => {

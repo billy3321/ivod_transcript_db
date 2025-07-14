@@ -33,16 +33,24 @@ export default async function handler(
       console.error('Database health check failed:', error);
     }
 
-    // 檢查 Elasticsearch（可選）
+    // 檢查 Elasticsearch（可選，靜默失敗）
     let elasticsearchStatus: 'healthy' | 'unhealthy' | undefined;
-    if (process.env.ES_HOST) {
+    if (process.env.ES_HOST && process.env.ENABLE_ELASTICSEARCH !== 'false') {
       try {
         const esClient = (await import('@/lib/elastic')).default;
-        await esClient.ping();
+        await Promise.race([
+          esClient.ping(),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 2000))
+        ]);
         elasticsearchStatus = 'healthy';
       } catch (error) {
-        console.error('Elasticsearch health check failed:', error);
+        // 靜默處理 Elasticsearch 連接失敗，系統會自動 fallback 到資料庫搜尋
         elasticsearchStatus = 'unhealthy';
+        
+        // 開發環境友好提示，不視為錯誤
+        if (process.env.NODE_ENV === 'development') {
+          console.info('🔍 Elasticsearch unavailable, using database search (normal in dev environment)');
+        }
       }
     }
 
@@ -54,9 +62,8 @@ export default async function handler(
       total: Math.round(memUsage.heapTotal / 1024 / 1024), // MB
     };
 
-    // 總體健康狀態
-    const isHealthy = databaseStatus === 'healthy' && 
-                     (elasticsearchStatus === undefined || elasticsearchStatus === 'healthy');
+    // 總體健康狀態（Elasticsearch 不可用不影響整體健康狀態）
+    const isHealthy = databaseStatus === 'healthy';
 
     const response: HealthResponse = {
       status: isHealthy ? 'healthy' : 'unhealthy',

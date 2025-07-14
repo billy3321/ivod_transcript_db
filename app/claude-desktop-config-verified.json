@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "ivod-transcript": {
+      "command": "curl",
+      "args": [
+        "-X", "POST",
+        "-H", "Content-Type: application/json",
+        "-d", "@-",
+        "https://ivod.billy3321.tw/mcp"
+      ]
+    }
+  }
+}

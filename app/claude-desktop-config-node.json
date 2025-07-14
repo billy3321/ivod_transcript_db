@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "ivod-transcript": {
+      "command": "node",
+      "args": [
+        "-e",
+        "const https = require('https'); process.stdin.setEncoding('utf8'); let input = ''; process.stdin.on('data', chunk => input += chunk); process.stdin.on('end', () => { const data = JSON.parse(input); const postData = JSON.stringify(data); const options = { hostname: 'ivod.billy3321.tw', port: 443, path: '/mcp', method: 'POST', headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(postData) } }; const req = https.request(options, res => { let responseData = ''; res.on('data', chunk => responseData += chunk); res.on('end', () => console.log(responseData)); }); req.on('error', err => console.error(JSON.stringify({jsonrpc:'2.0',id:data.id||null,error:{code:-32603,message:err.message}}))); req.write(postData); req.end(); });"
+      ]
+    }
+  }
+}

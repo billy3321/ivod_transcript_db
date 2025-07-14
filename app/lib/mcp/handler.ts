@@ -1,14 +1,44 @@
-import { searchTranscripts, getMeetingTranscript } from './simple-tools';
+import { searchTranscripts, getMeetingTranscript } from './search';
 import { MCPRequest, MCPResponse } from './types';
 import { logger } from '@/lib/logger';
 import { listResources, readResource } from './resources';
 import { listPrompts, getPrompt } from './prompts';
+import { listResourceTemplates } from './resource-templates';
+import { z, ZodError } from 'zod';
+
+// Zod schemas for tool input validation
+const searchTranscriptsSchema = z.object({
+  query: z.string().optional(),
+  speakers: z.array(z.string()).optional(),
+  committees: z.array(z.string()).optional(),
+  meeting_name: z.string().optional(),
+  mode: z.enum(['keyword_all_fields', 'keyword_transcript_only', 'semantic_search', 'hybrid_search']).default('keyword_transcript_only'),
+  transcription_source: z.enum(['all', 'ly_only']).default('all'),
+  max_excerpt_length: z.number().min(100).max(3000).default(1200),
+  max_context_sentences: z.number().min(0).max(10).default(5),
+  date_from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  date_to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  max_results: z.number().max(50).default(20),
+});
+
+const getMeetingTranscriptSchema = z.object({
+  ivod_id: z.number(),
+  transcript_type: z.enum(['auto', 'ly_only', 'ai_only']).default('auto'),
+});
 
 export class MCPHandler {
   private tools = new Map([
     ['search_transcripts', searchTranscripts],
     ['get_meeting_transcript', getMeetingTranscript]
   ]);
+
+  private toolSchemas: Map<string, z.ZodObject<any>>;
+
+  constructor() {
+    this.toolSchemas = new Map();
+    this.toolSchemas.set('search_transcripts', searchTranscriptsSchema);
+    this.toolSchemas.set('get_meeting_transcript', getMeetingTranscriptSchema);
+  }
 
   async handleRequest(request: MCPRequest): Promise<MCPResponse> {
     const { jsonrpc, id, method, params } = request;
@@ -20,24 +50,32 @@ export class MCPHandler {
 
     try {
       switch (method) {
+        case 'ping':
+          return this.createSuccessResponse(id, {});
+
         case 'tools/list':
           return this.createSuccessResponse(id, await this.listTools());
           
         case 'tools/call':
-          return this.createSuccessResponse(id, await this.callTool(params));
+          return this.callTool(id, params);
           
         case 'resources/list':
           return this.createSuccessResponse(id, { resources: await listResources() });
           
         case 'resources/read':
-          return this.createSuccessResponse(id, await this.readResource(params));
+          const resourceContent = await this.readResource(params);
+          return this.createSuccessResponse(id, { contents: [resourceContent] });
           
+        case 'resources/templates/list':
+          return this.createSuccessResponse(id, { resourceTemplates: await listResourceTemplates() });
+
         case 'prompts/list':
           return this.createSuccessResponse(id, { prompts: await listPrompts() });
           
         case 'prompts/get':
           return this.createSuccessResponse(id, await this.getPrompt(params));
           
+        case 'getCapabilities':
         case 'initialize':
           return this.createSuccessResponse(id, {
             protocolVersion: '2024-11-05',
@@ -82,41 +120,40 @@ export class MCPHandler {
                 items: { type: 'string' }, 
                 description: '立委姓名列表，例如：["黃國昌", "王鴻薇"]' 
               },
-              topics: { 
-                type: 'array', 
-                items: { type: 'string' }, 
-                description: '話題關鍵字列表，例如：["交通", "內政"]' 
-              },
               committees: { 
                 type: 'array', 
                 items: { type: 'string' }, 
                 description: '委員會列表，例如：["交通委員會", "內政委員會"]' 
               },
-              search_mode: { 
+              meeting_name: { 
                 type: 'string', 
-                enum: ['intersection', 'union'], 
-                default: 'union',
-                description: '搜尋模式：intersection=交集(AND)，union=聯集(OR)' 
+                description: '會議名稱篩選（模糊匹配），例如："院會"、"委員會會議"' 
               },
-              scope: { 
-                type: 'string', 
-                enum: ['all', 'transcript_only'], 
-                default: 'transcript_only',
-                description: '搜尋範圍：all=全部欄位，transcript_only=僅逐字稿' 
+              mode: {
+                type: 'string',
+                enum: ['keyword_all_fields', 'keyword_transcript_only', 'semantic_search', 'hybrid_search'],
+                default: 'keyword_transcript_only',
+                description: '搜尋模式：keyword_all_fields=關鍵字(全部欄位), keyword_transcript_only=關鍵字(僅逐字稿), semantic_search=語意搜尋, hybrid_search=混合搜尋'
               },
-              excerpt_length: { 
+              transcription_source: {
+                type: 'string',
+                enum: ['all', 'ly_only'],
+                default: 'all',
+                description: '逐字稿來源：all=搜尋所有逐字稿(立法院+AI), ly_only=僅搜尋立法院官方逐字稿'
+              },
+              max_excerpt_length: { 
                 type: 'number', 
-                default: 800, 
-                minimum: 200, 
-                maximum: 2000,
-                description: '段落長度（字符數）' 
+                default: 1200, 
+                minimum: 100, 
+                maximum: 3000,
+                description: '段落長度上限（字符數）' 
               },
-              context_sentences: { 
+              max_context_sentences: { 
                 type: 'number', 
-                default: 3, 
-                minimum: 1, 
+                default: 5, 
+                minimum: 0, 
                 maximum: 10,
-                description: '上下文句子數量' 
+                description: '上下文句子數量上限' 
               },
               date_from: { 
                 type: 'string', 
@@ -128,11 +165,11 @@ export class MCPHandler {
                 pattern: '^\\d{4}-\\d{2}-\\d{2}$',
                 description: '搜尋結束日期 (YYYY-MM-DD)' 
               },
-              limit: { 
+              max_results: { 
                 type: 'number', 
                 default: 20, 
-                maximum: 100,
-                description: '回傳結果數量限制' 
+                maximum: 50,
+                description: '回傳結果數量上限' 
               }
             }
           }
@@ -161,15 +198,44 @@ export class MCPHandler {
     };
   }
 
-  private async callTool(params: { name: string; arguments: any }) {
+  private async callTool(id: string | number, params: { name: string; arguments: any }) {
     const { name, arguments: args } = params;
     
     const tool = this.tools.get(name);
     if (!tool) {
-      throw new Error(`Tool '${name}' not found`);
+      return this.createErrorResponse(id, -32601, `Tool '${name}' not found`);
     }
 
-    return await tool(args);
+    const schema = this.toolSchemas.get(name);
+    if (!schema) {
+      // This should not happen if tools and schemas are in sync
+      return this.createErrorResponse(id, -32603, `Internal error: Schema not found for tool '${name}'`);
+    }
+
+    const validationResult = schema.safeParse(args);
+
+    if (!validationResult.success) {
+      return this.createErrorResponse(
+        id, 
+        -32602, 
+        'Invalid params', 
+        this.formatZodError(validationResult.error)
+      );
+    }
+
+    try {
+      const result = await tool(validationResult.data);
+      return this.createSuccessResponse(id, result);
+    } catch (error) {
+      logger.error('Tool execution error:', { 
+        error: error instanceof Error ? error.message : String(error),
+        metadata: {
+          tool: name,
+          args: validationResult.data
+        }
+      });
+      return this.createErrorResponse(id, -32603, 'Tool execution failed');
+    }
   }
 
   private async readResource(params: { uri?: string }) {
@@ -200,11 +266,19 @@ export class MCPHandler {
     };
   }
 
-  private createErrorResponse(id: string | number, code: number, message: string, data?: any): MCPResponse {
+  private createErrorResponse(id: string | number | null, code: number, message: string, data?: any): MCPResponse {
     return {
       jsonrpc: '2.0',
-      id,
+      id: id || 0,
       error: { code, message, data }
     };
+  }
+
+  private formatZodError(error: ZodError): any {
+    return error.issues.map(issue => ({
+      path: issue.path.join('.'),
+      message: issue.message,
+      code: issue.code,
+    }));
   }
 }

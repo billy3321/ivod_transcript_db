@@ -2064,7 +2064,7 @@ A: 是的，建議為不同環境建立不同的 GA4 資源和測量 ID。
 lib/mcp/
 ├── handler.ts          # MCP 請求處理器和路由
 ├── types.ts           # TypeScript 介面定義
-├── simple-tools.ts    # 搜尋工具實作（資料庫版本）
+├── search.ts    # 搜尋工具實作（資料庫版本）
 ├── resources.ts       # 文檔資源管理
 └── prompts.ts         # 提示模板管理
 ```
@@ -2380,7 +2380,7 @@ MCP 伺服器架構支援輕鬆擴展新功能：
 
 #### 新增自訂工具
 ```typescript
-// 在 simple-tools.ts 中新增工具
+// 在 search.ts 中新增工具
 export async function analyzeDebatePatterns(args: unknown) {
   // 實作辯論模式分析邏輯
   return { content: [{ type: 'text', text: JSON.stringify(result) }] };

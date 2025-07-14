@@ -2,24 +2,28 @@
 import { z } from 'zod';
 import prisma from '@/lib/prisma';
 import { getDbBackend, createContainsCondition, convertToDate } from '@/lib/utils';
-import { universalSearch, shouldUseUniversalSearch } from '@/lib/universal-search';
 import { extractSearchExcerpt, isTranscriptSearch } from '@/lib/searchHighlight';
 import { logger } from '@/lib/logger';
 import { TranscriptResult, FullTranscriptResult, SearchParams } from './types';
 
-// 統一搜尋參數驗證
-const UnifiedSearchSchema = z.object({
+// MCP 搜尋參數驗證（符合設計文檔的完整 schema）
+const MCPSearchSchema = z.object({
   query: z.string().optional(),
   speakers: z.array(z.string()).optional(),
-  topics: z.array(z.string()).optional(),
   committees: z.array(z.string()).optional(),
-  search_mode: z.enum(['intersection', 'union']).default('union'),
-  scope: z.enum(['all', 'transcript_only']).default('all'),
-  excerpt_length: z.number().min(200).max(2000).default(800),
-  context_sentences: z.number().min(1).max(10).default(3),
+  meeting_name: z.string().optional(),
+  mode: z.enum([
+    'keyword_all_fields', 
+    'keyword_transcript_only', 
+    'semantic_search', 
+    'hybrid_search'
+  ]).default('keyword_transcript_only'),
+  transcription_source: z.enum(['all', 'ly_only']).default('all'),
+  max_excerpt_length: z.number().min(100).max(3000).default(1200),
+  max_context_sentences: z.number().min(0).max(10).default(5),
   date_from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   date_to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-  limit: z.number().min(1).max(100).default(20)
+  max_results: z.number().max(50).default(20),
 });
 
 const GetTranscriptSchema = z.object({
@@ -31,16 +35,14 @@ export async function searchTranscripts(args: unknown) {
   const startTime = Date.now();
   
   try {
-    const params = UnifiedSearchSchema.parse(args);
+    const params = MCPSearchSchema.parse(args);
     
     logger.info('MCP search_transcripts request', {
       metadata: { params: JSON.stringify(params) }
     });
 
-    let results: any[] = [];
-
-    // 使用資料庫搜尋 (暫時不使用 Elasticsearch)
-    results = await performDatabaseSearch(params);
+    // 根據搜尋模式執行對應的搜尋邏輯
+    const results = await executeSearch(params);
 
     // 格式化結果並提取段落
     const enrichedResults = await Promise.all(
@@ -54,13 +56,10 @@ export async function searchTranscripts(args: unknown) {
       metadata: {
         total_found: enrichedResults.length,
         search_params: params,
-        excerpt_config: {
-          length: params.excerpt_length,
-          context_sentences: params.context_sentences
-        },
         search_time_ms: Date.now() - startTime,
         success: true,
-        note: "Using database search only (Elasticsearch disabled for compatibility)"
+        search_mode: params.mode,
+        note: `Using ${params.mode} search mode with Prisma query.`
       }
     };
 
@@ -99,40 +98,44 @@ export async function searchTranscripts(args: unknown) {
   }
 }
 
-// 資料庫搜尋 (重用現有邏輯)
-async function performDatabaseSearch(params: SearchParams): Promise<any[]> {
-  // 構建搜尋參數
-  const searchParams = {
-    q: params.query || '',
-    meeting_name: params.committees?.join(' ') || '',
-    speaker: params.speakers?.join(' ') || '',
-    committee: params.committees?.join(' ') || '',
-    date_from: params.date_from || '',
-    date_to: params.date_to || '',
-    page: 1,
-    pageSize: params.limit || 20,
-    sort: 'date_desc' as const
-  };
-
-  // 檢查是否需要使用 Universal Search
-  if (shouldUseUniversalSearch(searchParams)) {
-    try {
-      const result = await universalSearch(searchParams);
-      return result.data;
-    } catch (error: any) {
-      logger.warn('MCP Universal search failed, falling back to Prisma', {
-        error: error.message
-      });
-    }
+// 搜尋模式分派邏輯（符合設計文檔）
+async function executeSearch(params: z.infer<typeof MCPSearchSchema>): Promise<any[]> {
+  switch (params.mode) {
+    case 'keyword_all_fields':
+      return await searchAllFields(params);
+    case 'keyword_transcript_only':
+      return await searchTranscriptOnly(params);
+    case 'semantic_search':
+      // 未來功能：語意搜尋
+      throw new Error('Semantic search is not yet implemented');
+    case 'hybrid_search':
+      // 未來功能：混合搜尋
+      throw new Error('Hybrid search is not yet implemented');
+    default:
+      return await searchTranscriptOnly(params);
   }
+}
 
-  // 標準 Prisma 搜尋
-  const whereConditions = buildSearchConditions(params);
+// 關鍵字搜尋 - 全部欄位
+async function searchAllFields(params: z.infer<typeof MCPSearchSchema>): Promise<any[]> {
+  const whereConditions = buildSearchConditions(params, true); // includeAllFields = true
   
+  return await performPrismaQuery(params, whereConditions);
+}
+
+// 關鍵字搜尋 - 僅逐字稿
+async function searchTranscriptOnly(params: z.infer<typeof MCPSearchSchema>): Promise<any[]> {
+  const whereConditions = buildSearchConditions(params, false); // includeAllFields = false
+  
+  return await performPrismaQuery(params, whereConditions);
+}
+
+// 執行 Prisma 查詢
+async function performPrismaQuery(params: z.infer<typeof MCPSearchSchema>, whereConditions: any): Promise<any[]> {
   const results = await prisma.iVODTranscript.findMany({
     where: whereConditions,
     orderBy: { date: 'desc' },
-    take: params.limit || 20,
+    take: params.max_results,
     select: {
       ivod_id: true,
       title: true,
@@ -150,16 +153,16 @@ async function performDatabaseSearch(params: SearchParams): Promise<any[]> {
   return results;
 }
 
-// 建立搜尋條件
-function buildSearchConditions(params: SearchParams) {
+// 建立搜尋條件 (支援搜尋模式和 MCP array 參數)
+function buildSearchConditions(params: z.infer<typeof MCPSearchSchema>, includeAllFields: boolean = true) {
   const dbBackend = getDbBackend();
   const conditions: any[] = [];
 
-  // 關鍵字搜尋
+  // 關鍵字搜尋（根據模式決定搜尋範圍）
   if (params.query) {
     const searchFields = [];
     
-    if (params.scope === 'all') {
+    if (includeAllFields) {
       // 搜尋全部欄位
       searchFields.push(
         createContainsCondition('title', params.query, dbBackend),
@@ -169,65 +172,42 @@ function buildSearchConditions(params: SearchParams) {
       );
     }
     
-    // 總是搜尋逐字稿
-    searchFields.push(
-      createContainsCondition('ai_transcript', params.query, dbBackend),
-      createContainsCondition('ly_transcript', params.query, dbBackend)
-    );
+    // 根據 transcription_source 參數決定搜尋的逐字稿欄位
+    if (params.transcription_source === 'ly_only') {
+      // 僅搜尋立法院官方逐字稿
+      searchFields.push(
+        createContainsCondition('ly_transcript', params.query, dbBackend)
+      );
+    } else {
+      // 搜尋所有逐字稿欄位（預設）
+      searchFields.push(
+        createContainsCondition('ai_transcript', params.query, dbBackend),
+        createContainsCondition('ly_transcript', params.query, dbBackend)
+      );
+    }
     
     conditions.push({ OR: searchFields });
   }
 
-  // 立委條件
+  // 發言人條件（支援 array）
   if (params.speakers && params.speakers.length > 0) {
-    const speakerConditions = params.speakers.map(speaker =>
+    const speakerConditions = params.speakers.map((speaker: string) =>
       createContainsCondition('speaker_name', speaker, dbBackend)
     );
     conditions.push({ OR: speakerConditions });
   }
 
-  // 話題條件
-  if (params.topics && params.topics.length > 0) {
-    if (params.search_mode === 'intersection') {
-      // 交集模式：所有話題都要出現
-      params.topics.forEach(topic => {
-        conditions.push({
-          OR: [
-            createContainsCondition('ai_transcript', topic, dbBackend),
-            createContainsCondition('ly_transcript', topic, dbBackend),
-            createContainsCondition('title', topic, dbBackend),
-            createContainsCondition('meeting_name', topic, dbBackend)
-          ]
-        });
-      });
-    } else {
-      // 聯集模式：任一話題出現
-      const topicConditions: any[] = [];
-      params.topics.forEach(topic => {
-        topicConditions.push(
-          createContainsCondition('ai_transcript', topic, dbBackend),
-          createContainsCondition('ly_transcript', topic, dbBackend),
-          createContainsCondition('title', topic, dbBackend),
-          createContainsCondition('meeting_name', topic, dbBackend)
-        );
-      });
-      conditions.push({ OR: topicConditions });
-    }
+  // 會議名稱條件
+  if (params.meeting_name) {
+    conditions.push(createContainsCondition('meeting_name', params.meeting_name, dbBackend));
   }
 
-  // 委員會條件
+  // 委員會條件（支援 array）
   if (params.committees && params.committees.length > 0) {
-    const committeeConditions = params.committees.map(committee =>
+    const committeeConditions = params.committees.map((committee: string) =>
       createContainsCondition('committee_names', committee, dbBackend)
     );
-    
-    if (params.search_mode === 'intersection') {
-      params.committees.forEach(committee => {
-        conditions.push(createContainsCondition('committee_names', committee, dbBackend));
-      });
-    } else {
-      conditions.push({ OR: committeeConditions });
-    }
+    conditions.push({ OR: committeeConditions });
   }
 
   // 日期範圍條件
@@ -244,34 +224,48 @@ function buildSearchConditions(params: SearchParams) {
     conditions.push({ date: dateCondition });
   }
 
-  // 確保有逐字稿內容
-  conditions.push({
-    OR: [
-      { ly_transcript: { not: null } },
-      { ai_transcript: { not: null } }
-    ]
-  });
+  // 根據 transcription_source 參數確保有對應的逐字稿內容
+  if (params.transcription_source === 'ly_only') {
+    // 僅檢查立法院官方逐字稿
+    conditions.push({
+      ly_transcript: { not: null }
+    });
+  } else {
+    // 確保有任何逐字稿內容（預設）
+    conditions.push({
+      OR: [
+        { ly_transcript: { not: null } },
+        { ai_transcript: { not: null } }
+      ]
+    });
+  }
 
   return conditions.length > 0 ? { AND: conditions } : {};
 }
 
 // 格式化搜尋結果並提取段落
-async function formatTranscriptResult(item: any, params: SearchParams): Promise<TranscriptResult> {
-  // 選擇最佳逐字稿版本
-  const transcript = item.ly_transcript || item.ai_transcript;
-  const source: "ly_transcript" | "ai_transcript" = item.ly_transcript ? "ly_transcript" : "ai_transcript";
+async function formatTranscriptResult(item: any, params: any): Promise<TranscriptResult> {
+  // 根據 transcription_source 參數選擇逐字稿版本
+  let transcript: string | null;
+  let source: "ly_transcript" | "ai_transcript";
+  
+  if (params.transcription_source === 'ly_only') {
+    // 僅使用立法院官方逐字稿
+    transcript = item.ly_transcript;
+    source = "ly_transcript";
+  } else {
+    // 優先使用立法院官方逐字稿，如果沒有則使用AI逐字稿（預設）
+    transcript = item.ly_transcript || item.ai_transcript;
+    source = item.ly_transcript ? "ly_transcript" : "ai_transcript";
+  }
 
-  // 提取相關段落
+  // 提取相關段落（使用 params 中的細粒度控制參數）
   const searchTerms = getAllSearchTerms(params);
-  const excerpts = await extractExpandedExcerpts(
-    transcript,
-    searchTerms,
-    {
-      excerptLength: params.excerpt_length || 800,
-      contextSentences: params.context_sentences || 3,
-      maxExcerpts: 3
-    }
-  );
+  const excerpts = await extractContextualExcerpts(transcript, searchTerms, {
+    contextSentences: params.max_context_sentences,
+    maxExcerpts: Math.max(3, Math.ceil(params.max_excerpt_length / 400)), // 至少3個段落，最多根據長度調整
+    maxLength: params.max_excerpt_length
+  });
 
   return {
     ivod_id: item.ivod_id,
@@ -295,50 +289,78 @@ async function formatTranscriptResult(item: any, params: SearchParams): Promise<
   };
 }
 
-// 提取擴展段落
-async function extractExpandedExcerpts(
+// 提取包含上下文的逐字稿段落
+async function extractContextualExcerpts(
   transcript: string | null,
   searchTerms: string[],
   options: {
-    excerptLength: number;
     contextSentences: number;
     maxExcerpts: number;
+    maxLength: number;
   }
-) {
+): Promise<any[]> {
   if (!transcript || searchTerms.length === 0) return [];
 
+  // 將逐字稿按句子分割
+  const sentences = transcript.match(/[^.!?]+[.!?]+/g) || [];
+  if (sentences.length === 0) return [];
+
   const excerpts: any[] = [];
-  
-  // 使用現有的 extractSearchExcerpt 邏輯
+
   for (const term of searchTerms) {
-    if (term && isTranscriptSearch(term)) {
-      const excerpt = extractSearchExcerpt(transcript, term);
-      if (excerpt && excerpt.hasMatch) {
-        excerpts.push({
-          text: excerpt.text,
-          relevance_score: 0.8,
-          start_position: excerpt.matchPosition,
-          end_position: excerpt.matchPosition + term.length
-        });
+    if (!term || !isTranscriptSearch(term)) continue;
+
+    for (let i = 0; i < sentences.length; i++) {
+      if (sentences[i].includes(term)) {
+        const start = Math.max(0, i - options.contextSentences);
+        const end = Math.min(sentences.length, i + options.contextSentences + 1);
+        
+        let contextText = sentences.slice(start, end).join(' ').trim();
+        
+        // 控制段落長度
+        if (contextText.length > options.maxLength) {
+          contextText = contextText.substring(0, options.maxLength) + '...';
+        }
+        
+        // 避免重複加入相似的段落
+        if (!excerpts.some(e => e.text.includes(contextText.substring(0, 100)))) {
+          excerpts.push({
+            text: contextText,
+            relevance_score: 0.9, // 給予較高的相關性分數
+            match_term: term,
+            sentence_index: i,
+            excerpt_length: contextText.length
+          });
+        }
+
+        if (excerpts.length >= options.maxExcerpts) break;
       }
     }
+    if (excerpts.length >= options.maxExcerpts) break;
   }
 
-  // 依相關性排序並限制數量
-  return excerpts
-    .sort((a, b) => b.relevance_score - a.relevance_score)
-    .slice(0, options.maxExcerpts);
+  // 依句子順序排序
+  return excerpts.sort((a, b) => a.sentence_index - b.sentence_index);
 }
 
-function getAllSearchTerms(params: SearchParams): string[] {
-  const terms: string[] = [];
+function getAllSearchTerms(params: z.infer<typeof MCPSearchSchema>): string[] {
+  const terms: (string | undefined)[] = [];
   
-  if (params.query) terms.push(params.query);
-  if (params.speakers) terms.push(...params.speakers);
-  if (params.topics) terms.push(...params.topics);
-  if (params.committees) terms.push(...params.committees);
+  terms.push(params.query);
   
-  return terms.filter(Boolean);
+  if (params.speakers) {
+    terms.push(...params.speakers);
+  }
+  
+  if (params.committees) {
+    terms.push(...params.committees);
+  }
+
+  if (params.meeting_name) {
+    terms.push(params.meeting_name);
+  }
+  
+  return terms.filter((term): term is string => !!term);
 }
 
 function parseCommitteeNames(committeeNames: any): string[] {

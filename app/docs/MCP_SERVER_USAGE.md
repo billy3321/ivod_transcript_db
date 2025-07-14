@@ -20,17 +20,13 @@ IVOD MCP Server 提供標準化的 Model Context Protocol 介面，讓 AI 服務
 **參數**：
 ```typescript
 {
-  query?: string;                    // 關鍵字搜尋
-  speakers?: string[];               // 立委姓名列表
-  topics?: string[];                 // 話題關鍵字列表
-  committees?: string[];             // 委員會列表
-  search_mode?: 'intersection' | 'union';  // 搜尋模式（預設：union）
-  scope?: 'all' | 'transcript_only';      // 搜尋範圍（預設：all）
-  excerpt_length?: number;           // 段落長度（預設：800）
-  context_sentences?: number;        // 上下文句子數（預設：3）
-  date_from?: string;               // 起始日期 (YYYY-MM-DD)
-  date_to?: string;                 // 結束日期 (YYYY-MM-DD)
-  limit?: number;                   // 結果數量限制（預設：20）
+  query?: string;           // 關鍵字搜尋（支援進階語法）
+  speakers?: string[];      // 發言人陣列，例如 ["黃國昌", "王鴻薇"]
+  committees?: string[];    // 委員會陣列，例如 ["交通委員會", "經濟委員會"]
+  meeting_name?: string;    // 會議名稱（模糊匹配）
+  date_from?: string;       // 搜尋起始日期（YYYY-MM-DD）
+  date_to?: string;         // 搜尋結束日期（YYYY-MM-DD）
+  limit?: number;           // 結果數量限制（1-100，預設20）
 }
 ```
 
@@ -44,10 +40,8 @@ IVOD MCP Server 提供標準化的 Model Context Protocol 介面，讓 AI 服務
     "name": "search_transcripts",
     "arguments": {
       "speakers": ["黃國昌", "王鴻薇"],
-      "topics": ["交通", "數位發展"],
-      "search_mode": "union",
-      "excerpt_length": 1000,
-      "context_sentences": 5,
+      "committees": ["交通委員會", "內政委員會"],
+      "query": "預算",
       "limit": 15
     }
   }
@@ -186,7 +180,7 @@ curl -X POST http://localhost:3000/mcp \
       "name": "search_transcripts",
       "arguments": {
         "speakers": ["黃國昌"],
-        "topics": ["數位發展"],
+        "query": "數位發展",
         "limit": 10
       }
     }
@@ -206,11 +200,8 @@ curl -X POST http://localhost:3000/mcp \
       "name": "search_transcripts",
       "arguments": {
         "speakers": ["黃國昌", "王鴻薇"],
-        "topics": ["交通", "內政"],
-        "committees": ["交通委員會"],
-        "search_mode": "intersection",
-        "excerpt_length": 1200,
-        "context_sentences": 5,
+        "committees": ["交通委員會", "內政委員會"],
+        "query": "交通",
         "date_from": "2024-01-01",
         "date_to": "2024-12-31",
         "limit": 20
@@ -232,8 +223,6 @@ curl -X POST http://localhost:3000/mcp \
       "name": "search_transcripts",
       "arguments": {
         "query": "人工智慧 AND 法規",
-        "scope": "transcript_only",
-        "excerpt_length": 600,
         "limit": 15
       }
     }

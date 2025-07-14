@@ -97,14 +97,19 @@ async function searchHandler(req: NextApiRequest, res: NextApiResponse): Promise
       });
     } catch (error: any) {
       // Elasticsearch failed or not reachable; fallback to DB search
-      logger.warn('Elasticsearch search failed, falling back to database', {
-        error: error.message,
-        action: 'elasticsearch_fallback',
-        metadata: {
-          query: q,
-          hasAdvancedSyntax: parsedQuery.hasAdvancedSyntax
-        }
-      });
+      // 開發環境簡潔提示，生產環境記錄警告
+      if (process.env.NODE_ENV === 'development') {
+        console.info('🔍 Using database search (Elasticsearch unavailable)');
+      } else {
+        logger.warn('Elasticsearch unavailable, using database fallback', {
+          action: 'elasticsearch_fallback',
+          metadata: {
+            query: q,
+            hasAdvancedSyntax: parsedQuery.hasAdvancedSyntax,
+            reason: error.name === 'ConnectionError' ? 'connection_failed' : 'search_error'
+          }
+        });
+      }
       usedES = false;
     }
   }
