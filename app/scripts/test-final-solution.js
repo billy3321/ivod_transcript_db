@@ -198,7 +198,7 @@ async function testURLEncodingDecoding() {
   
   const testCases = [
     { 
-      raw: '黃國昌', 
+      raw: '沈伯洋', 
       encoded: '%E9%BB%83%E5%9C%8B%E6%98%8C',
       description: '中文姓名'
     },

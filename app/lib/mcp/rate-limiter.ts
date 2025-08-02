@@ -178,6 +178,13 @@ export class RateLimiter {
   }
 
   /**
+   * 清除所有條目（用於測試）
+   */
+  clear(): void {
+    this.store.clear();
+  }
+
+  /**
    * 停止清理定時器
    */
   destroy(): void {

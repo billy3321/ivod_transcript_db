@@ -13,14 +13,14 @@
 
 ## 範例
 
-查詢黃國昌委員在交通委員會關於「交通」的發言：
+查詢沈伯洋委員在交通委員會關於「交通」的發言：
 
 ```json
 {
   "tool": "search_transcripts",
   "arguments": {
     "query": "交通",
-    "speakers": ["黃國昌"],
+    "speakers": ["沈伯洋"],
     "committees": ["交通委員會"]
   }
 }

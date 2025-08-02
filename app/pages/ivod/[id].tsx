@@ -5,17 +5,30 @@ import { IVODDetail } from '@/types';
 import TranscriptViewer from '@/components/TranscriptViewer';
 import StructuredData from '@/components/StructuredData';
 import HLSPlayer from '@/components/HLSPlayer';
+import VideoDownloader from '@/components/VideoDownloader';
+import DownloadProgressDisplay from '@/components/DownloadProgressDisplay';
 import { formatCommitteeNames, formatIVODTitle, formatVideoTime, formatVideoType, formatTimestamp } from '@/lib/utils';
 import Link from 'next/link';
+
+interface DownloadProgress {
+  isDownloading: boolean;
+  progress: number;
+  conversionProgress: number;
+  isConverting: boolean;
+  downloadedSize: number;
+  totalSegments: number;
+  error: string | null;
+}
 
 export default function IvodDetail() {
   const router = useRouter();
   const { id } = router.query;
   const [data, setData] = useState<IVODDetail | null>(null);
   const [activeTab, setActiveTab] = useState<'ai' | 'ly'>('ly');
+  const [downloadProgress, setDownloadProgress] = useState<DownloadProgress | null>(null);
 
   useEffect(() => {
-    if (!id) return;
+    if (!router.isReady || !id) return;
     fetch(`/api/ivods/${id}`)
       .then(res => res.json())
       .then(json => {
@@ -29,7 +42,7 @@ export default function IvodDetail() {
           }
         }
       });
-  }, [id]);
+  }, [router.isReady, id]);
 
   const generateMetaTags = () => {
     if (!data) return null;
@@ -325,9 +338,6 @@ export default function IvodDetail() {
                   src={data.video_url}
                   className="mb-2"
                 />
-                <p className="text-xs text-gray-500 mt-2">
-                  📺 使用HLS播放器支援立法院IVOD串流格式
-                </p>
               </div>
             ) : (
               <div className="w-full h-48 bg-gray-100 rounded-lg flex items-center justify-center mb-4">
@@ -340,31 +350,43 @@ export default function IvodDetail() {
               </div>
             )}
             
-            <div className="flex flex-wrap gap-3">
-              <a
-                href={data.ivod_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 transition-colors"
-              >
-                <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                  <path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z" />
-                  <path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z" />
-                </svg>
-                查看原始IVOD
-              </a>
-              <a
-                href={`https://dataly.openfun.app/collection/item/ivod/${data.ivod_id}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-md hover:bg-green-700 transition-colors"
-              >
-                <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                  <path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z" />
-                  <path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z" />
-                </svg>
-                在 Dataly 查看
-              </a>
+            <div>
+              <div className="flex flex-wrap gap-3">
+                <a
+                  href={data.ivod_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 transition-colors"
+                >
+                  <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z" />
+                    <path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z" />
+                  </svg>
+                  查看原始 IVOD
+                </a>
+                {data.video_url && (
+                  <VideoDownloader 
+                    videoUrl={data.video_url}
+                    fileName={`ivod-${data.ivod_id}-${formatIVODTitle(data.title, data.meeting_name, data.speaker_name).replace(/[/\\?%*:|"<>]/g, '-')}.mp4`}
+                    onProgressChange={setDownloadProgress}
+                  />
+                )}
+                <a
+                  href={`https://dataly.openfun.app/collection/item/ivod/${data.ivod_id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-md hover:bg-green-700 transition-colors"
+                >
+                  <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z" />
+                    <path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z" />
+                  </svg>
+                  在 Dataly 查看
+                </a>
+              </div>
+              
+              {/* Progress display - separated from buttons to avoid layout issues */}
+              <DownloadProgressDisplay progress={downloadProgress} />
             </div>
           </div>
 

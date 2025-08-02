@@ -338,7 +338,8 @@ describe('GET /api/search', () => {
     const mockFind = (prisma.iVODTranscript.findMany as unknown) as jest.Mock;
     mockFind.mockRejectedValue(new Error('Database error'));
 
-    await handler(req as NextApiRequest, res as NextApiResponse);
+    // Ensure the test waits for the async operation to complete
+    await expect(handler(req as NextApiRequest, res as NextApiResponse)).resolves.not.toThrow();
     
     expect(statusMock).toHaveBeenCalledWith(500);
     expect(jsonMock).toHaveBeenCalledWith({ 

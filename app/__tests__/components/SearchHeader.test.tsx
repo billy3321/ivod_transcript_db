@@ -28,7 +28,8 @@ describe('SearchHeader', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-  });
+  
+    jest.clearAllTimers();});
 
   it('renders main search input', () => {
     render(<SearchHeader {...defaultProps} />);

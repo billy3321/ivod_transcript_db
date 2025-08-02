@@ -18,13 +18,13 @@
 
 ## 範例 2：指定立委和委員會
 
-搜尋王鴻薇委員在財政委員會的發言。
+搜尋黃捷委員在財政委員會的發言。
 
 ```json
 {
   "tool": "search_transcripts",
   "arguments": {
-    "speakers": ["王鴻薇"],
+    "speakers": ["黃捷"],
     "committees": ["財政委員會"]
   }
 }

@@ -1,9 +1,9 @@
 import { 
   listResourceTemplates, 
-  getResourceTemplate, 
   parseTemplateUri, 
-  generateTemplateContent 
-} from '@/lib/mcp/resource-templates';
+  generateTemplateContent,
+  getResourceTemplate
+} from '@/lib/mcp/resources';
 
 jest.mock('@/lib/logger', () => ({
   logger: {

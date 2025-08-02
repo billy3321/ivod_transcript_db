@@ -127,7 +127,7 @@ describe('/api/mcp (rewritten from /mcp)', () => {
 
     expect(res.getHeaders()).toMatchObject({
       'access-control-allow-origin': '*',
-      'access-control-allow-methods': 'POST',
+      'access-control-allow-methods': 'POST, OPTIONS',
       'access-control-allow-headers': 'Content-Type'
     });
   });

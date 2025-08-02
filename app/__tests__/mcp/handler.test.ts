@@ -39,7 +39,7 @@ describe('MCPHandler', () => {
         id: 1,
         error: {
           code: -32600,
-          message: 'Invalid Request'
+          message: 'Invalid Request: jsonrpc must be "2.0"'
         }
       });
     });
@@ -83,11 +83,12 @@ describe('MCPHandler', () => {
         jsonrpc: '2.0',
         id: 1,
         result: {
-          protocolVersion: '2024-11-05',
+          protocolVersion: '2025-06-18',
           capabilities: {
             tools: {},
             resources: {},
-            prompts: {}
+            prompts: {},
+            logging: {}
           },
           serverInfo: {
             name: 'ivod-transcript-server',
@@ -223,7 +224,7 @@ describe('MCPHandler', () => {
       expect(response.id).toBe(1);
       expect(response.error).toBeDefined();
       expect(response.error?.code).toBe(-32601);
-      expect(response.error?.message).toBe("Tool 'unknown_tool' not found");
+      expect(response.error?.message).toBe("Method not found: Tool 'unknown_tool' does not exist");
     });
 
     it('should handle errors gracefully', async () => {
@@ -246,7 +247,7 @@ describe('MCPHandler', () => {
       expect(response.id).toBe(1);
       expect(response.error).toBeDefined();
       expect(response.error?.code).toBe(-32603);
-      expect(response.error?.message).toBe('Tool execution failed');
+      expect(response.error?.message).toBe('Internal error while executing tool \'search_transcripts\': Tool execution error');
     });
   });
 

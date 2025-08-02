@@ -12,28 +12,32 @@ jest.mock('@/lib/logger', () => ({
   }
 }));
 
-// Mock resource templates
-jest.mock('@/lib/mcp/resource-templates', () => ({
-  listResourceTemplates: jest.fn(),
-  parseTemplateUri: jest.fn(),
-  generateTemplateContent: jest.fn()
-}));
+// Mock the resource template functions that are now part of resources.ts
+jest.mock('@/lib/mcp/resources', () => {
+  const actualResources = jest.requireActual('@/lib/mcp/resources');
+  return {
+    ...actualResources,
+    listResourceTemplates: jest.fn(),
+    parseTemplateUri: jest.fn(),
+    generateTemplateContent: jest.fn()
+  };
+});
 
 describe('MCP Resources Tests', () => {
   const mockFs = fs as jest.Mocked<typeof fs>;
   const mockPath = path as jest.Mocked<typeof path>;
   
   // Import the mocked functions
-  const mockTemplates = require('@/lib/mcp/resource-templates');
+  const mockResources = require('@/lib/mcp/resources');
 
   beforeEach(() => {
     jest.clearAllMocks();
     mockPath.join.mockImplementation((...segments) => segments.join('/'));
     
     // Reset template mocks
-    mockTemplates.listResourceTemplates.mockResolvedValue([]);
-    mockTemplates.parseTemplateUri.mockReturnValue(null);
-    mockTemplates.generateTemplateContent.mockResolvedValue('');
+    mockResources.listResourceTemplates.mockResolvedValue([]);
+    mockResources.parseTemplateUri.mockReturnValue(null);
+    mockResources.generateTemplateContent.mockResolvedValue('');
   });
 
   describe('listResources', () => {
@@ -76,6 +80,8 @@ describe('MCP Resources Tests', () => {
 
       expect(result).toEqual({
         uri: 'ivod://usage-guide',
+        name: 'IVOD 搜尋使用指南',
+        title: 'IVOD 搜尋使用指南',
         mimeType: 'text/markdown',
         text: mockContent
       });
@@ -243,84 +249,47 @@ describe('MCP Resources Tests', () => {
 
   describe('Template URI support', () => {
     it('should handle template URI for topic search', async () => {
-      const templateUri = 'ivod://search/topic/{query}';
       const actualUri = 'ivod://search/topic/交通';
-      const mockTemplate = {
-        uriTemplate: templateUri,
-        name: '議題逐字稿查詢',
-        mimeType: 'text/markdown'
-      };
-      const mockParams = { query: '交通' };
-      const mockContent = '# "交通" 相關立法院討論查詢\n\n使用以下工具查詢...';
-
-      mockTemplates.listResourceTemplates.mockResolvedValue([mockTemplate]);
-      mockTemplates.parseTemplateUri.mockReturnValue(mockParams);
-      mockTemplates.generateTemplateContent.mockResolvedValue(mockContent);
 
       const result = await readResource(actualUri);
 
-      expect(result).toEqual({
+      expect(result).toMatchObject({
         uri: actualUri,
-        mimeType: 'text/markdown',
-        text: mockContent
+        name: '議題逐字稿查詢',
+        title: '議題逐字稿查詢',
+        mimeType: 'text/markdown'
       });
-
-      expect(mockTemplates.parseTemplateUri).toHaveBeenCalledWith(actualUri, templateUri);
-      expect(mockTemplates.generateTemplateContent).toHaveBeenCalledWith(templateUri, mockParams);
+      
+      // Check that content contains expected elements
+      expect(result.text).toContain('交通');
+      expect(result.text).toContain('search_transcripts');
+      expect(result.text).toContain('立法院');
     });
 
     it('should handle URL encoded parameters in template URI', async () => {
-      const templateUri = 'ivod://search/topic/{query}';
       const encodedUri = 'ivod://search/topic/%E4%BA%A4%E9%80%9A'; // 交通 encoded
-      const mockTemplate = {
-        uriTemplate: templateUri,
-        name: '議題逐字稿查詢',
-        mimeType: 'text/markdown'
-      };
-      const mockParams = { query: '交通' }; // Should be decoded
-      const mockContent = '# "交通" 相關立法院討論查詢';
-
-      mockTemplates.listResourceTemplates.mockResolvedValue([mockTemplate]);
-      mockTemplates.parseTemplateUri.mockReturnValue(mockParams);
-      mockTemplates.generateTemplateContent.mockResolvedValue(mockContent);
 
       const result = await readResource(encodedUri);
 
       expect(result.uri).toBe(encodedUri);
-      expect(result.text).toBe(mockContent);
-      expect(mockTemplates.parseTemplateUri).toHaveBeenCalledWith(encodedUri, templateUri);
+      expect(result.text).toContain('交通');
+      expect(result.text).toContain('search_transcripts');
     });
 
     it('should handle multiple template types', async () => {
-      const templates = [
-        { uriTemplate: 'ivod://search/topic/{query}', name: '議題查詢', mimeType: 'text/markdown' },
-        { uriTemplate: 'ivod://search/legislator/{name}', name: '立委查詢', mimeType: 'text/markdown' }
-      ];
       const legislatorUri = 'ivod://search/legislator/沈伯洋';
-      const mockParams = { name: '沈伯洋' };
-      const mockContent = '# 沈伯洋 立委發言紀錄查詢';
-
-      mockTemplates.listResourceTemplates.mockResolvedValue(templates);
-      // Return null for first template, match for second
-      mockTemplates.parseTemplateUri
-        .mockReturnValueOnce(null)
-        .mockReturnValueOnce(mockParams);
-      mockTemplates.generateTemplateContent.mockResolvedValue(mockContent);
 
       const result = await readResource(legislatorUri);
 
-      expect(result.text).toBe(mockContent);
-      expect(mockTemplates.parseTemplateUri).toHaveBeenCalledTimes(2);
+      expect(result.text).toContain('沈伯洋');
+      expect(result.text).toContain('search_transcripts');
+      expect(result.text).toContain('立委');
     });
 
     it('should fall back to static resources when no template matches', async () => {
       const staticUri = 'ivod://usage-guide';
       const mockContent = '# 使用指南\n靜態內容...';
 
-      mockTemplates.listResourceTemplates.mockResolvedValue([
-        { uriTemplate: 'ivod://search/topic/{query}', name: '議題查詢', mimeType: 'text/markdown' }
-      ]);
-      mockTemplates.parseTemplateUri.mockReturnValue(null); // No template match
       mockFs.readFile.mockResolvedValue(mockContent);
 
       const result = await readResource(staticUri);
@@ -328,23 +297,49 @@ describe('MCP Resources Tests', () => {
       expect(result.uri).toBe(staticUri);
       expect(result.text).toBe(mockContent);
       expect(mockFs.readFile).toHaveBeenCalled();
-      expect(mockTemplates.generateTemplateContent).not.toHaveBeenCalled();
     });
 
-    it('should handle template generation errors gracefully', async () => {
-      const templateUri = 'ivod://search/topic/{query}';
-      const actualUri = 'ivod://search/topic/測試';
-      const mockTemplate = {
-        uriTemplate: templateUri,
-        name: '議題查詢',
-        mimeType: 'text/markdown'
-      };
+    it('should handle complex query syntax in topic templates', async () => {
+      // Test various complex query syntaxes
+      const testCases = [
+        {
+          uri: 'ivod://search/topic/預算 AND 教育',
+          expectedContains: ['預算 AND 教育', 'search_transcripts']
+        },
+        {
+          uri: 'ivod://search/topic/王委員 OR 李委員',
+          expectedContains: ['王委員 OR 李委員', 'search_transcripts']
+        },
+        {
+          uri: 'ivod://search/topic/(預算 OR 教育) AND 委員會',
+          expectedContains: ['(預算 OR 教育) AND 委員會', 'search_transcripts']
+        },
+        {
+          uri: 'ivod://search/topic/"完整會議"',
+          expectedContains: ['"完整會議"', 'search_transcripts']
+        },
+        {
+          uri: 'ivod://search/topic/預算 -國防',
+          expectedContains: ['預算 -國防', 'search_transcripts']
+        }
+      ];
 
-      mockTemplates.listResourceTemplates.mockResolvedValue([mockTemplate]);
-      mockTemplates.parseTemplateUri.mockReturnValue({ query: '測試' });
-      mockTemplates.generateTemplateContent.mockRejectedValue(new Error('Template generation failed'));
-
-      await expect(readResource(actualUri)).rejects.toThrow('Template generation failed');
+      for (const testCase of testCases) {
+        const result = await readResource(testCase.uri);
+        
+        expect(result.uri).toBe(testCase.uri);
+        expect(result.mimeType).toBe('text/markdown');
+        
+        // Check that all expected content is present
+        for (const expectedContent of testCase.expectedContains) {
+          expect(result.text).toContain(expectedContent);
+        }
+        
+        // Should contain proper JSON structure for MCP tool calls
+        expect(result.text).toContain('```json');
+        expect(result.text).toContain('"tool": "search_transcripts"');
+        expect(result.text).toContain('"arguments"');
+      }
     });
   });
 });

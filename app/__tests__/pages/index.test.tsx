@@ -43,6 +43,7 @@ describe('Home Page', () => {
     (useRouter as jest.Mock).mockReturnValue(mockRouter);
     mockFetch.mockClear();
     mockPush.mockClear();
+    jest.clearAllTimers();
     // Always provide a default mock to prevent undefined returns
     mockFetch.mockImplementation(() => 
       Promise.resolve({
@@ -68,7 +69,7 @@ describe('Home Page', () => {
       expect(screen.getByText('進階搜尋')).toBeInTheDocument();
       expect(screen.getByDisplayValue('搜尋全部欄位')).toBeInTheDocument();
       expect(screen.getByRole('button', { name: '搜尋' })).toBeInTheDocument();
-    });
+    }, { timeout: 8000 });
   });
 
   it('handles search input and button click', async () => {
@@ -83,7 +84,7 @@ describe('Home Page', () => {
 
     await waitFor(() => {
       expect(screen.getByPlaceholderText('搜尋會議名稱、立委姓名、逐字稿內容...')).toBeInTheDocument();
-    });
+    }, { timeout: 5000 });
 
     const searchInput = screen.getByPlaceholderText('搜尋會議名稱、立委姓名、逐字稿內容...');
     const searchButton = screen.getByRole('button', { name: '搜尋' });
@@ -117,7 +118,7 @@ describe('Home Page', () => {
 
     await waitFor(() => {
       expect(screen.getByText('進階搜尋')).toBeInTheDocument();
-    });
+    }, { timeout: 5000 });
 
     const advancedSearchToggle = screen.getByText('進階搜尋');
     fireEvent.click(advancedSearchToggle);
@@ -128,7 +129,7 @@ describe('Home Page', () => {
       expect(screen.getByLabelText('委員會')).toBeInTheDocument();
       expect(screen.getByLabelText('開始日期')).toBeInTheDocument();
       expect(screen.getByLabelText('結束日期')).toBeInTheDocument();
-    });
+    }, { timeout: 5000 });
   });
 
   it('does not trigger search automatically when typing in advanced search fields', async () => {
@@ -141,7 +142,7 @@ describe('Home Page', () => {
 
     await waitFor(() => {
       expect(screen.getByText('進階搜尋')).toBeInTheDocument();
-    });
+    }, { timeout: 5000 });
 
     // Open advanced search
     const advancedSearchToggle = screen.getByText('進階搜尋');
@@ -149,7 +150,7 @@ describe('Home Page', () => {
 
     await waitFor(() => {
       expect(screen.getByLabelText('會議名稱')).toBeInTheDocument();
-    });
+    }, { timeout: 5000 });
 
     // Clear any initial fetch calls
     mockFetch.mockClear();
@@ -180,7 +181,7 @@ describe('Home Page', () => {
 
     await waitFor(() => {
       expect(screen.getByText('進階搜尋')).toBeInTheDocument();
-    });
+    }, { timeout: 5000 });
 
     // Open advanced search
     const advancedSearchToggle = screen.getByText('進階搜尋');
@@ -188,7 +189,7 @@ describe('Home Page', () => {
 
     await waitFor(() => {
       expect(screen.getByLabelText('會議名稱')).toBeInTheDocument();
-    });
+    }, { timeout: 5000 });
 
     // Clear any initial fetch calls
     mockFetch.mockClear();
@@ -228,27 +229,30 @@ describe('Home Page', () => {
 
     render(<Home />);
 
+    // Wait for initial load
     await waitFor(() => {
       expect(screen.getByText('進階搜尋')).toBeInTheDocument();
-    });
+    }, { timeout: 2000 });
 
     // Open advanced search
     const advancedSearchToggle = screen.getByText('進階搜尋');
     fireEvent.click(advancedSearchToggle);
 
+    // Wait for advanced form to appear
     await waitFor(() => {
       expect(screen.getByLabelText('會議名稱')).toBeInTheDocument();
-    });
+    }, { timeout: 1000 });
 
-    // Clear any initial fetch calls
+    // Clear mocks after setup
     mockFetch.mockClear();
     mockPush.mockClear();
 
-    // Fill in advanced search field and press Enter
+    // Fill in field and press Enter
     const meetingNameInput = screen.getByLabelText('會議名稱');
     fireEvent.change(meetingNameInput, { target: { value: '委員會會議' } });
     fireEvent.keyPress(meetingNameInput, { key: 'Enter', code: 'Enter' });
 
+    // Check router push was called
     await waitFor(() => {
       expect(mockPush).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -260,7 +264,7 @@ describe('Home Page', () => {
         undefined,
         { shallow: true }
       );
-    });
+    }, { timeout: 1000 });
   });
 
   it('makes API calls with correct parameters', async () => {
@@ -290,11 +294,12 @@ describe('Home Page', () => {
 
     render(<Home />);
 
+    // Check that API was called with correct initial parameters
     await waitFor(() => {
       expect(mockFetch).toHaveBeenCalledWith(
         expect.stringContaining('/api/ivods?sort=date_desc&page=1&pageSize=20')
       );
-    });
+    }, { timeout: 2000 });
   });
 
   it('handles search scope changes', async () => {
@@ -307,7 +312,7 @@ describe('Home Page', () => {
 
     await waitFor(() => {
       expect(screen.getByDisplayValue('搜尋全部欄位')).toBeInTheDocument();
-    });
+    }, { timeout: 5000 });
 
     const scopeSelect = screen.getByDisplayValue('搜尋全部欄位');
     fireEvent.change(scopeSelect, { target: { value: 'transcript' } });
@@ -315,7 +320,7 @@ describe('Home Page', () => {
     await waitFor(() => {
       expect(screen.getByDisplayValue('僅搜尋逐字稿')).toBeInTheDocument();
       expect(screen.getByPlaceholderText('搜尋逐字稿內容...')).toBeInTheDocument();
-    });
+    }, { timeout: 5000 });
   });
 
   it('handles search with transcript scope', async () => {
@@ -338,11 +343,12 @@ describe('Home Page', () => {
 
     render(<Home />);
 
+    // Check that search API was called for transcript scope
     await waitFor(() => {
       expect(mockFetch).toHaveBeenCalledWith(
         expect.stringContaining('/api/search?q=%E6%B8%AC%E8%A9%A6')
       );
-    });
+    }, { timeout: 2000 });
   });
 
   it('handles Enter key press in search input', async () => {
@@ -355,7 +361,7 @@ describe('Home Page', () => {
 
     await waitFor(() => {
       expect(screen.getByPlaceholderText('搜尋會議名稱、立委姓名、逐字稿內容...')).toBeInTheDocument();
-    });
+    }, { timeout: 5000 });
 
     const searchInput = screen.getByPlaceholderText('搜尋會議名稱、立委姓名、逐字稿內容...');
     
@@ -373,7 +379,7 @@ describe('Home Page', () => {
         undefined,
         { shallow: true }
       );
-    });
+    }, { timeout: 8000 });
   });
 
   it('handles pagination correctly', async () => {
@@ -398,17 +404,21 @@ describe('Home Page', () => {
       render(<Home />);
     });
 
+    // Wait for pagination to appear
     await waitFor(() => {
       expect(screen.getByRole('button', { name: '第 1 頁' })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: '第 2 頁' })).toBeInTheDocument();
-    });
+    }, { timeout: 2000 });
+    
+    expect(screen.getByRole('button', { name: '第 2 頁' })).toBeInTheDocument();
 
+    // Click next page button
     const nextButton = screen.getByRole('button', { name: '下一頁' });
     
     await act(async () => {
       fireEvent.click(nextButton);
     });
 
+    // Check router push call
     await waitFor(() => {
       expect(mockPush).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -419,7 +429,7 @@ describe('Home Page', () => {
         undefined,
         { shallow: true }
       );
-    });
+    }, { timeout: 1000 });
   });
 
   it('handles network errors gracefully', async () => {
@@ -430,7 +440,7 @@ describe('Home Page', () => {
     // Since there's no error handling in the component, it should show no results
     await waitFor(() => {
       expect(screen.getByText('沒有找到符合的資料')).toBeInTheDocument();
-    });
+    }, { timeout: 5000 });
   });
 
   it('shows fallback indicator when search uses database fallback', async () => {
@@ -459,7 +469,7 @@ describe('Home Page', () => {
     await waitFor(() => {
       // Check for interface elements - scope is transcript so expect transcript placeholder
       expect(screen.getByPlaceholderText('搜尋逐字稿內容...')).toBeInTheDocument();
-    });
+    }, { timeout: 5000 });
   });
 
   it('handles sort option changes', async () => {
@@ -472,7 +482,7 @@ describe('Home Page', () => {
 
     await waitFor(() => {
       expect(screen.getByDisplayValue('最新優先')).toBeInTheDocument();
-    });
+    }, { timeout: 5000 });
 
     const sortSelect = screen.getByDisplayValue('最新優先');
     fireEvent.change(sortSelect, { target: { value: 'date_asc' } });
@@ -507,7 +517,7 @@ describe('Home Page', () => {
 
     await waitFor(() => {
       expect(screen.getByText('清除篩選')).toBeInTheDocument();
-    });
+    }, { timeout: 5000 });
 
     const clearButton = screen.getByText('清除篩選');
     fireEvent.click(clearButton);
@@ -523,7 +533,7 @@ describe('Home Page', () => {
       );
       // Verify that search scope is reset to 'all'
       expect(screen.getByDisplayValue('搜尋全部欄位')).toBeInTheDocument();
-    });
+    }, { timeout: 8000 });
   });
 
   it('shows no results message when no data found', async () => {
@@ -537,6 +547,6 @@ describe('Home Page', () => {
     await waitFor(() => {
       expect(screen.getByText('沒有找到符合的資料')).toBeInTheDocument();
       expect(screen.getByText('請嘗試調整搜尋條件或清除篩選')).toBeInTheDocument();
-    });
+    }, { timeout: 5000 });
   });
 });

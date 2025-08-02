@@ -323,7 +323,7 @@ async function testURLEncoding() {
   const testCases = [
     { 
       encoded: '%E9%BB%83%E5%9C%8B%E6%98%8C', 
-      decoded: '黃國昌',
+      decoded: '沈伯洋',
       description: '中文姓名 URL 編碼'
     },
     {
@@ -353,8 +353,8 @@ async function testSpecificFieldSearch() {
     await prisma.$connect();
     
     // Test 1: Speaker search (URL decoded)
-    logInfo('測試 1: 發言人搜尋 (黃國昌)');
-    const speaker = '黃國昌';
+    logInfo('測試 1: 發言人搜尋 (沈伯洋)');
+    const speaker = '沈伯洋';
     
     try {
       const speakerResults = await prisma.iVODTranscript.findMany({
@@ -753,8 +753,8 @@ async function testURLEncodingScenarios() {
   
   const testCases = [
     {
-      params: { speaker: decodeURIComponent('%E9%BB%83%E5%9C%8B%E6%98%8C') }, // 黃國昌
-      description: 'URL 編碼：發言人 - 黃國昌 (從 %E9%BB%83%E5%9C%8B%E6%98%8C 解碼)',
+      params: { speaker: decodeURIComponent('%E9%BB%83%E5%9C%8B%E6%98%8C') }, // 沈伯洋
+      description: 'URL 編碼：發言人 - 沈伯洋 (從 %E9%BB%83%E5%9C%8B%E6%98%8C 解碼)',
       apiUrl: '/api/ivods'
     },
     {

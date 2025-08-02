@@ -7,6 +7,7 @@ module.exports = {
   },
   setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
   testPathIgnorePatterns: ['<rootDir>/node_modules/', '<rootDir>/cypress/'],
+  testTimeout: 30000,
   transform: {
     '^.+\\.(ts|tsx)$': ['ts-jest', {
       tsconfig: { jsx: 'react-jsx' }

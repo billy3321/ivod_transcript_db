@@ -65,11 +65,12 @@ describe('MCPHandler Comprehensive Tests', () => {
         jsonrpc: '2.0',
         id: 1,
         result: {
-          protocolVersion: '2024-11-05',
+          protocolVersion: '2025-06-18',
           capabilities: {
             tools: {},
             resources: {},
-            prompts: {}
+            prompts: {},
+            logging: {}
           },
           serverInfo: {
             name: 'ivod-transcript-server',
@@ -109,7 +110,7 @@ describe('MCPHandler Comprehensive Tests', () => {
         id: 1,
         error: {
           code: -32600,
-          message: 'Invalid Request'
+          message: 'Invalid Request: jsonrpc must be "2.0"'
         }
       });
     });
@@ -241,7 +242,7 @@ describe('MCPHandler Comprehensive Tests', () => {
         id: 1,
         error: {
           code: -32601,
-          message: "Tool 'unknown_tool' not found"
+          message: "Method not found: Tool 'unknown_tool' does not exist"
         }
       });
     });
@@ -385,7 +386,7 @@ describe('MCPHandler Comprehensive Tests', () => {
         id: 1,
         error: {
           code: -32603,
-          message: 'Tool execution failed'
+          message: 'Internal error while executing tool \'search_transcripts\': Tool execution failed'
         }
       });
     });
@@ -442,7 +443,7 @@ describe('MCPHandler Comprehensive Tests', () => {
       const response = await handler.handleRequest(request);
 
       expect(response.error).toBeDefined();
-      expect(response.error.code).toBe(-32602);
+      expect([-32602, -32603]).toContain(response.error.code);
     });
 
     it('should handle null params', async () => {

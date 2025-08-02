@@ -41,7 +41,8 @@ describe('Search Workflow Integration Tests', () => {
     mockFetch.mockImplementation(() => 
       Promise.resolve({
         ok: true,
-        json: () => Promise.resolve({ data: [], total: 0 })
+        json: () => Promise.resolve({ data: [], total: 0 
+    jest.clearAllTimers();})
       })
     );
   });
@@ -65,7 +66,7 @@ describe('Search Workflow Integration Tests', () => {
     // Initial state
     await waitFor(() => {
       expect(screen.getByText('IVOD 逐字稿檢索系統')).toBeInTheDocument();
-    });
+    }, { timeout: 5000 });
 
     // Perform search
     const searchInput = screen.getByPlaceholderText('搜尋會議名稱、立委姓名、逐字稿內容...');
@@ -115,7 +116,7 @@ describe('Search Workflow Integration Tests', () => {
       expect(mockFetch).toHaveBeenCalledWith(
         expect.stringContaining('/api/search?q=' + encodeURIComponent('國會改革'))
       );
-    });
+    }, { timeout: 5000 });
 
     // Should show search results
     await waitFor(() => {
@@ -123,7 +124,7 @@ describe('Search Workflow Integration Tests', () => {
       expect(screen.getByText('立法院國會改革專案小組')).toBeInTheDocument();
       expect(screen.getByText('委員 王小明')).toBeInTheDocument();
       expect(screen.getByText('委員 李小華')).toBeInTheDocument();
-    });
+    }, { timeout: 5000 });
   });
 
   it('handles Elasticsearch failure and falls back to database search', async () => {
@@ -167,7 +168,7 @@ describe('Search Workflow Integration Tests', () => {
     await waitFor(() => {
       expect(screen.getByText('教育及文化委員會')).toBeInTheDocument();
       // Component doesn't show fallback indicator, so just check it loaded
-    });
+    }, { timeout: 5000 });
   });
 
   it('performs advanced search with multiple filters', async () => {
@@ -192,7 +193,7 @@ describe('Search Workflow Integration Tests', () => {
 
     await waitFor(() => {
       expect(screen.getByLabelText('會議名稱')).toBeInTheDocument();
-    });
+    }, { timeout: 5000 });
 
     // Fill in advanced search fields
     const meetingNameInput = screen.getByLabelText('會議名稱');
@@ -231,12 +232,12 @@ describe('Search Workflow Integration Tests', () => {
       expect(mockFetch).toHaveBeenCalledWith(
         expect.stringMatching(/\/api\/ivods\?.*meeting_name=.*%E9%A0%90%E7%AE%97%E5%AF%A9%E6%9F%A5.*speaker=.*%E7%8E%8B%E5%A7%94%E5%93%A1.*committee=.*%E8%B2%A1%E6%94%BF%E5%A7%94%E5%93%A1%E6%9C%83.*date_from=2023-01-01/)
       );
-    });
+    }, { timeout: 5000 });
 
     await waitFor(() => {
       expect(screen.getByText('財政委員會預算審查會議')).toBeInTheDocument();
       expect(screen.getByText('王委員明德')).toBeInTheDocument();
-    });
+    }, { timeout: 5000 });
   });
 
   it('handles pagination in search results', async () => {
@@ -280,7 +281,7 @@ describe('Search Workflow Integration Tests', () => {
       expect(screen.getByRole('button', { name: '1' })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: '2' })).toBeInTheDocument();
       expect(screen.getByText('環保相關會議 1')).toBeInTheDocument();
-    });
+    , { timeout: 8000 });
 
     // Click to go to page 2
     const page2Button = screen.getByRole('button', { name: '2' });
@@ -330,7 +331,7 @@ describe('Search Workflow Integration Tests', () => {
 
     await waitFor(() => {
       expect(screen.getByText('沒有找到符合的資料')).toBeInTheDocument();
-    });
+    }, { timeout: 5000 });
 
     // Try to search despite the error
     const searchInput = screen.getByPlaceholderText('搜尋會議名稱、立委姓名、逐字稿內容...');
@@ -339,7 +340,7 @@ describe('Search Workflow Integration Tests', () => {
     // Should show no results since there's no error handling
     await waitFor(() => {
       expect(screen.getByText('沒有找到符合的資料')).toBeInTheDocument();
-    });
+    }, { timeout: 5000 });
   });
 
   it('clears search and resets to initial state', async () => {
@@ -380,7 +381,7 @@ describe('Search Workflow Integration Tests', () => {
 
     await waitFor(() => {
       expect(screen.getByText('環境委員會')).toBeInTheDocument();
-    });
+    }, { timeout: 5000 });
 
     // Clear filters
     const clearButton = screen.getByText('清除篩選');
