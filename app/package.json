@@ -58,6 +58,8 @@
     "@testing-library/jest-dom": "^5.16.5",
     "@testing-library/react": "^13.4.0",
     "@types/jest": "^29.2.1",
+    "@types/whatwg-fetch": "^0.0.33",
+    "cli-progress": "^3.12.0",
     "colors": "^1.4.0",
     "cypress": "^14.4.0",
     "eslint": "^8.0.0",
@@ -66,7 +68,6 @@
     "jest-environment-jsdom": "^29.4.3",
     "node-mocks-http": "^1.17.2",
     "ts-jest": "^29.0.5",
-    "whatwg-fetch": "^3.6.20",
-    "cli-progress": "^3.12.0"
+    "whatwg-fetch": "^3.6.20"
   }
 }

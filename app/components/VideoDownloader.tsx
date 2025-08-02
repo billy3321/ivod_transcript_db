@@ -158,7 +158,7 @@ const VideoDownloader: React.FC<VideoDownloaderProps> = ({
   };
 
   // 轉換 TS 為 MP4
-  const convertToMP4 = async (tsData: Uint8Array): Promise<Uint8Array> => {
+  const convertToMP4 = async (tsData: Uint8Array): Promise<Uint8Array | null> => {
     setIsConverting(true);
     setConversionProgress(0);
     

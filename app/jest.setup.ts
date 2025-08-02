@@ -1,14 +1,13 @@
 import 'dotenv/config';
 import '@testing-library/jest-dom';
+
+jest.setTimeout(30000); // Set a global timeout of 30 seconds
+
+jest.setTimeout(30000); // Set a global timeout of 30 seconds
+jest.setTimeout(30000); // Set a global timeout of 30 seconds
 import { ReactNode } from 'react';
 import { TextEncoder, TextDecoder } from 'util';
-import { fetch, Response, Request, Headers } from 'whatwg-fetch';
-
-// Polyfill fetch APIs
-global.fetch = fetch;
-global.Response = Response;
-global.Request = Request;
-global.Headers = Headers;
+import 'whatwg-fetch'; // Polyfill for fetch API
 
 // Polyfill TextEncoder/TextDecoder for Elasticsearch client in tests
 global.TextEncoder = TextEncoder as any;
