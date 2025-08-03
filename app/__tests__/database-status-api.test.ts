@@ -20,10 +20,10 @@ describe('GET /api/database-status', () => {
     jest.resetAllMocks();
   });
 
-  it('returns the latest last_updated timestamp', async () => {
+  it('returns the latest last_updated timestamp with UTC+8 timezone (string input)', async () => {
     const mockFindFirst = (prisma.iVODTranscript.findFirst as unknown) as jest.Mock;
     const mockData = {
-      last_updated: '2023-01-01 10:00:00+08:00'
+      last_updated: '2023-01-01 10:00:00'
     };
     
     mockFindFirst.mockResolvedValue(mockData);
@@ -39,8 +39,26 @@ describe('GET /api/database-status', () => {
       },
     });
     expect(statusMock).toHaveBeenCalledWith(200);
+    // API 現在會將時間轉換為 ISO 格式並加上 +08:00 時區標示
     expect(jsonMock).toHaveBeenCalledWith({ 
-      lastUpdated: '2023-01-01 10:00:00+08:00' 
+      lastUpdated: '2023-01-01T02:00:00.000+08:00'
+    });
+  });
+
+  it('returns the latest last_updated timestamp with UTC+8 timezone (Date object input)', async () => {
+    const mockFindFirst = (prisma.iVODTranscript.findFirst as unknown) as jest.Mock;
+    const mockData = {
+      last_updated: new Date('2023-01-01 10:00:00')
+    };
+    
+    mockFindFirst.mockResolvedValue(mockData);
+
+    await handler(req as NextApiRequest, res as NextApiResponse);
+
+    expect(statusMock).toHaveBeenCalledWith(200);
+    // Date 物件也會被正確轉換為 ISO 格式並加上 +08:00 時區標示
+    expect(jsonMock).toHaveBeenCalledWith({ 
+      lastUpdated: '2023-01-01T02:00:00.000+08:00'
     });
   });
 

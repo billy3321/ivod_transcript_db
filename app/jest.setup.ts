@@ -102,6 +102,20 @@ console.error = (...args) => {
   ) {
     return;
   }
+  
+  // Ignore expected test errors (these are intentional for testing error handling)
+  if (
+    typeof args[0] === 'string' &&
+    (args[0].includes('Failed to fetch IVOD data') ||
+     args[0].includes('Database status API returned error') ||
+     args[0].includes('HTTP error! status: 404') ||
+     args[0].includes('Network error'))
+  ) {
+    // 可選：顯示簡化的測試說明而不是錯誤
+    // console.log(`🧪 [TEST] Expected error handled: ${args[0].substring(0, 50)}...`);
+    return;
+  }
+  
   originalError(...args as any);
 };
 

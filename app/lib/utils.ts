@@ -122,7 +122,7 @@ export function normalizeTimestamp(timestamp: string | Date | null): string | nu
 
 /**
  * Format timestamp for display
- * Always displays time in Taiwan timezone (Asia/Taipei) to match server data
+ * Converts UTC+8 server timestamp to user's local timezone
  */
 export function formatTimestamp(timestamp: string | Date | null): string {
   if (!timestamp) return '';
@@ -133,7 +133,8 @@ export function formatTimestamp(timestamp: string | Date | null): string {
       return timestamp.toString();
     }
     
-    // 固定使用台灣時區 (Asia/Taipei) 顯示時間，與伺服器資料保持一致
+    // 轉換為使用者本地時區顯示
+    // API 已經明確標示為 UTC+8，瀏覽器會自動轉換到使用者的本地時區
     return date.toLocaleString('zh-TW', {
       year: 'numeric',
       month: '2-digit',
