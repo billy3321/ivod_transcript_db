@@ -118,9 +118,10 @@ const VideoDownloader: React.FC<VideoDownloaderProps> = ({
       
       // 設定轉換進度回調
       ffmpeg.on('progress', ({ progress }) => {
-        setConversionProgress(Math.round(progress * 100));
-        // 下載佔75%，轉換佔25%，所以轉換進度從75%開始
-        setProgress(75 + Math.round(progress * 25));
+        const conversionPercent = Math.round(progress * 100);
+        const totalPercent = 75 + Math.round(progress * 25);
+        setConversionProgress(conversionPercent);
+        setProgress(totalPercent);
       });
       
       // 生產環境優先使用可靠的 CDN 來源
@@ -174,7 +175,7 @@ const VideoDownloader: React.FC<VideoDownloaderProps> = ({
           });
           
           loadSuccess = true;
-          console.log('✅ [FFmpeg診斷] FFmpeg 載入完全成功!');
+          console.log('✅ [FFmpeg診斷] FFmpeg 載入成功!');
           break;
         } catch (err) {
           console.error(`❌ [FFmpeg診斷] CDN ${baseURL} 載入失敗:`, {
@@ -232,27 +233,24 @@ const VideoDownloader: React.FC<VideoDownloaderProps> = ({
   const convertToMP4 = async (tsData: Uint8Array): Promise<Uint8Array | null> => {
     setIsConverting(true);
     setConversionProgress(0);
+    // 設定初始進度為 75%，因為下載階段已完成
+    setProgress(75);
     
     try {
+      console.log('🔄 [轉換診斷] 開始轉換 MP4...');
       const ffmpeg = await loadFFmpeg();
       if (!ffmpeg) {
-        console.error('FFmpeg instance is null, cannot convert to MP4.');
+        console.error('❌ [轉換診斷] FFmpeg 載入失敗');
         return null;
       }
       
-      // 寫入輸入檔案
+      // 寫入輸入檔案並執行轉換
       await ffmpeg.writeFile('input.ts', tsData);
-      
-      // 執行轉換 (使用 copy 編解碼器避免重新編碼，速度較快)
-      await ffmpeg.exec([
-        '-i', 'input.ts',
-        '-c', 'copy',
-        '-movflags', 'frag_keyframe+empty_moov',
-        'output.mp4'
-      ]);
+      await ffmpeg.exec(['-i', 'input.ts', '-c', 'copy', '-movflags', 'frag_keyframe+empty_moov', 'output.mp4']);
       
       // 讀取輸出檔案
       const mp4Data = await ffmpeg.readFile('output.mp4');
+      console.log('✅ [轉換診斷] MP4 轉換成功');
       
       // 清理記憶體
       try {
@@ -268,7 +266,7 @@ const VideoDownloader: React.FC<VideoDownloaderProps> = ({
     } catch (error) {
       setIsConverting(false);
       setConversionProgress(0);
-      console.error('MP4 轉換失敗:', error);
+      console.error('❌ [轉換診斷] MP4 轉換失敗:', error);
       
       // 提供更具體的錯誤訊息
       let errorMessage = '影片轉換失敗。';
@@ -415,17 +413,24 @@ const VideoDownloader: React.FC<VideoDownloaderProps> = ({
       
       let finalBuffer = mergedBuffer;
       let fileType = 'video/mp4';
-      let finalFileName = fileName.replace('.ts', '.mp4');
+      let finalFileName = fileName;
+      
+      // 準備檔名：移除現有副檔名，準備添加正確的副檔名
+      const baseFileName = fileName.replace(/\.(mp4|ts)$/i, '');
       
       const mp4Buffer = await convertToMP4(mergedBuffer);
       if (mp4Buffer) {
         finalBuffer = mp4Buffer;
-        console.log('MP4 轉換成功');
+        fileType = 'video/mp4';
+        finalFileName = baseFileName + '.mp4';
+        console.log('✅ MP4 轉換成功，檔名:', finalFileName);
       } else {
-        console.warn('MP4 轉換失敗，改為下載原始 TS 格式');
+        console.warn('❌ MP4 轉換失敗，下載 TS 格式');
         // 轉換失敗時，下載原始 TS 格式
+        finalBuffer = mergedBuffer;
         fileType = 'video/mp2t';
-        finalFileName = fileName; // 保持原始 .ts 副檔名
+        finalFileName = baseFileName + '.ts';
+        console.log('📁 TS 下載，檔名:', finalFileName);
         
         // 根據不同情況提供適當的錯誤訊息
         if (isLocalhost) {
@@ -505,7 +510,7 @@ const VideoDownloader: React.FC<VideoDownloaderProps> = ({
         {isDownloading ? (
           <>
             <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-            {isConverting ? `轉換中... ${conversionProgress}%` : `下載中... ${Math.round(progress)}%`}
+            {isConverting ? `轉換中... ${Math.round(progress)}% (長影片需較多時間)` : `下載中... ${Math.round(progress)}%`}
           </>
         ) : (
           <>
