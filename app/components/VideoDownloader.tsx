@@ -75,7 +75,7 @@ const VideoDownloader: React.FC<VideoDownloaderProps> = ({
         }
       });
     } catch (err) {
-      throw new Error('無法解析M3U8播放列表');
+      throw new Error('無法解析 M3U8 播放列表');
     }
   };
 
@@ -122,14 +122,12 @@ const VideoDownloader: React.FC<VideoDownloaderProps> = ({
             const response = await fetch(url);
             
             if (!response.ok) {
-              console.warn(`跳過片段 ${globalIndex + 1}: HTTP ${response.status}`);
               return null;
             }
 
             // 使用串流讀取響應，避免一次性載入大塊記憶體
             const reader = response.body?.getReader();
             if (!reader) {
-              console.warn(`跳過片段 ${globalIndex + 1}: 無法讀取響應體`);
               return null;
             }
 
@@ -164,7 +162,6 @@ const VideoDownloader: React.FC<VideoDownloaderProps> = ({
             return { index: globalIndex, data: segmentBuffer };
             
           } catch (err) {
-            console.warn(`跳過損壞的片段 ${globalIndex + 1}:`, err);
             return null;
           }
         });
@@ -211,7 +208,6 @@ const VideoDownloader: React.FC<VideoDownloaderProps> = ({
       const finalBuffer = mergedBuffer;
       const fileType = 'video/mp2t';
       
-      console.log('📁 TS 下載準備完成，檔名:', finalFileName);
 
       // 創建 Blob 並觸發下載
       const blob = new Blob([finalBuffer], { type: fileType });
@@ -252,7 +248,7 @@ const VideoDownloader: React.FC<VideoDownloaderProps> = ({
     }
     
     if (!videoUrl.includes('.m3u8')) {
-      setError('僅支援M3U8格式的影片下載');
+      setError('僅支援 M3U8 格式的影片下載');
       return;
     }
 
