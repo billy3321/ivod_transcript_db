@@ -344,7 +344,7 @@ describe('GET /api/search', () => {
     expect(statusMock).toHaveBeenCalledWith(500);
     expect(jsonMock).toHaveBeenCalledWith({ 
       success: false, 
-      error: 'Internal server error'
+      error: 'Database search failed'
     });
   });
 

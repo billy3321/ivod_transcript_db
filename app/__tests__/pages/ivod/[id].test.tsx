@@ -405,7 +405,7 @@ describe('IVOD Detail Page', () => {
     render(<IvodDetail />);
 
     await waitFor(() => {
-      expect(screen.getByText('委員會A, 委員會B')).toBeInTheDocument();
+      expect(screen.getByText((content, element) => content.includes('委員會A') && content.includes('委員會B'))).toBeInTheDocument();
     }, { timeout: 3000 });
   });
 

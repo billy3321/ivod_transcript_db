@@ -294,9 +294,9 @@ function printSummary(testResults, failures, exitCode) {
   
   if (failures.length > 0) {
     console.log('\n🔧 建議動作：'.cyan.bold);
-    console.log('1. 複製上面的失敗項目清單');
+    console.log('1. 複製上面的測試失敗清單');
     console.log('2. 貼給 Claude 請求修正');
-    console.log('3. 運行 npm run test:failures 查看詳細錯誤');
+    console.log('3. 若需要更詳細的錯誤訊息，可執行 npm run test:failures 查看詳細錯誤');
   }
 }
 

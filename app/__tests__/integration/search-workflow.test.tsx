@@ -41,10 +41,10 @@ describe('Search Workflow Integration Tests', () => {
     mockFetch.mockImplementation(() => 
       Promise.resolve({
         ok: true,
-        json: () => Promise.resolve({ data: [], total: 0 
-    jest.clearAllTimers();})
+        json: () => Promise.resolve({ data: [], total: 0 })
       })
     );
+    jest.clearAllTimers();
   });
 
   it('performs complete search workflow with Elasticsearch and database fallback', async () => {
@@ -281,7 +281,7 @@ describe('Search Workflow Integration Tests', () => {
       expect(screen.getByRole('button', { name: '1' })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: '2' })).toBeInTheDocument();
       expect(screen.getByText('環保相關會議 1')).toBeInTheDocument();
-    , { timeout: 8000 });
+    }, { timeout: 8000 });
 
     // Click to go to page 2
     const page2Button = screen.getByRole('button', { name: '2' });

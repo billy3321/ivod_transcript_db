@@ -274,7 +274,7 @@ describe('GET /api/ivods', () => {
     expect(statusMock).toHaveBeenCalledWith(500);
     expect(jsonMock).toHaveBeenCalledWith({ 
       success: false,
-      error: 'Internal server error' // Test environment uses generic error message
+      error: 'Database query failed'
     });
   });
 

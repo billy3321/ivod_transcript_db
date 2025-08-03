@@ -93,16 +93,34 @@ const VideoDownloader: React.FC<VideoDownloaderProps> = ({
   const loadFFmpeg = async () => {
     if (typeof window === 'undefined') return null;
     
+    // 假設1：瀏覽器環境檢測失敗
+    console.log('🔍 [FFmpeg診斷] 開始載入診斷...');
+    console.log('🔍 [FFmpeg診斷] 瀏覽器環境檢查:', {
+      userAgent: navigator.userAgent,
+      webAssemblySupported: typeof WebAssembly !== 'undefined',
+      sharedArrayBufferSupported: typeof SharedArrayBuffer !== 'undefined',
+      crossOriginIsolated: window.crossOriginIsolated,
+      isSecureContext: window.isSecureContext,
+      location: window.location.href
+    });
+    
     try {
-      // 動態載入 @ffmpeg/ffmpeg
+      // 假設2：動態模組載入問題
+      console.log('🔍 [FFmpeg診斷] 嘗試載入 @ffmpeg/ffmpeg 模組...');
       const { FFmpeg } = await import('@ffmpeg/ffmpeg');
+      console.log('✅ [FFmpeg診斷] @ffmpeg/ffmpeg 模組載入成功');
+      
+      console.log('🔍 [FFmpeg診斷] 嘗試載入 @ffmpeg/util 模組...');
       const { toBlobURL } = await import('@ffmpeg/util');
+      console.log('✅ [FFmpeg診斷] @ffmpeg/util 模組載入成功');
       
       const ffmpeg = new FFmpeg();
       
       // 設定轉換進度回調
       ffmpeg.on('progress', ({ progress }) => {
         setConversionProgress(Math.round(progress * 100));
+        // 下載佔75%，轉換佔25%，所以轉換進度從75%開始
+        setProgress(75 + Math.round(progress * 25));
       });
       
       // 生產環境優先使用可靠的 CDN 來源
@@ -120,37 +138,90 @@ const VideoDownloader: React.FC<VideoDownloaderProps> = ({
       
       for (const baseURL of cdnUrls) {
         try {
-          console.log(`嘗試載入 FFmpeg from: ${baseURL}`);
-          await ffmpeg.load({
-            coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
-            wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
+          console.log(`🔍 [FFmpeg診斷] 嘗試載入 FFmpeg from: ${baseURL}`);
+          
+          // 假設3：CDN資源載入問題 - 詳細檢測每個檔案
+          console.log('🔍 [FFmpeg診斷] 檢查 ffmpeg-core.js 可達性...');
+          const coreResponse = await fetch(`${baseURL}/ffmpeg-core.js`);
+          console.log('🔍 [FFmpeg診斷] ffmpeg-core.js 響應:', {
+            url: `${baseURL}/ffmpeg-core.js`,
+            status: coreResponse.status,
+            statusText: coreResponse.statusText,
+            headers: Object.fromEntries(coreResponse.headers.entries()),
+            contentType: coreResponse.headers.get('content-type')
           });
+          
+          console.log('🔍 [FFmpeg診斷] 檢查 ffmpeg-core.wasm 可達性...');
+          const wasmResponse = await fetch(`${baseURL}/ffmpeg-core.wasm`);
+          console.log('🔍 [FFmpeg診斷] ffmpeg-core.wasm 響應:', {
+            url: `${baseURL}/ffmpeg-core.wasm`,
+            status: wasmResponse.status,
+            statusText: wasmResponse.statusText,
+            headers: Object.fromEntries(wasmResponse.headers.entries()),
+            contentType: wasmResponse.headers.get('content-type'),
+            contentLength: wasmResponse.headers.get('content-length')
+          });
+          
+          console.log('🔍 [FFmpeg診斷] 嘗試轉換為 Blob URLs...');
+          const coreURL = await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript');
+          const wasmURL = await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm');
+          console.log('✅ [FFmpeg診斷] Blob URLs 創建成功:', { coreURL, wasmURL });
+          
+          console.log('🔍 [FFmpeg診斷] 開始 FFmpeg 載入...');
+          await ffmpeg.load({
+            coreURL,
+            wasmURL,
+          });
+          
           loadSuccess = true;
-          console.log('FFmpeg 載入成功');
+          console.log('✅ [FFmpeg診斷] FFmpeg 載入完全成功!');
           break;
         } catch (err) {
-          console.warn(`CDN ${baseURL} 載入失敗:`, err);
+          console.error(`❌ [FFmpeg診斷] CDN ${baseURL} 載入失敗:`, {
+            error: err,
+            message: err instanceof Error ? err.message : String(err),
+            stack: err instanceof Error ? err.stack : 'N/A',
+            name: err instanceof Error ? err.name : 'Unknown'
+          });
           lastError = err;
           continue;
         }
       }
       
       if (!loadSuccess) {
+        console.error('❌ [FFmpeg診斷] 所有 CDN 來源都載入失敗');
         throw lastError || new Error('所有 CDN 來源都無法載入');
       }
       
       return ffmpeg;
     } catch (error) {
-      console.error('FFmpeg 載入失敗:', error);
+      console.error('❌ [FFmpeg診斷] 最終載入失敗:', {
+        error: error,
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : 'N/A',
+        name: error instanceof Error ? error.name : 'Unknown'
+      });
       
-      // 提供更具體的錯誤訊息
+      // 根據錯誤類型提供具體建議
       let errorMessage = '影片轉換功能暫時無法使用。';
       const errorMsg = error instanceof Error ? error.message : String(error);
-      if (errorMsg.includes('Failed to fetch')) {
-        errorMessage += '網路連線問題，';
-      } else if (errorMsg.includes('WebAssembly')) {
-        errorMessage += '瀏覽器相容性問題，';
+      
+      if (errorMsg.includes('Failed to fetch') || errorMsg.includes('NetworkError')) {
+        errorMessage += '網路連線問題或 CDN 無法訪問，';
+        console.error('🔧 [FFmpeg診斷] 建議：檢查網路連線或嘗試VPN');
+      } else if (errorMsg.includes('WebAssembly') || errorMsg.includes('wasm')) {
+        errorMessage += '瀏覽器 WebAssembly 支援問題，';
+        console.error('🔧 [FFmpeg診斷] 建議：更新瀏覽器或啟用 WebAssembly');
+      } else if (errorMsg.includes('SharedArrayBuffer') || errorMsg.includes('crossOriginIsolated')) {
+        errorMessage += '跨域隔離設定問題，';
+        console.error('🔧 [FFmpeg診斷] 建議：檢查 HTTPS 和 Cross-Origin-Isolation headers');
+      } else if (errorMsg.includes('import') || errorMsg.includes('module')) {
+        errorMessage += 'ES6 模組載入問題，';
+        console.error('🔧 [FFmpeg診斷] 建議：檢查瀏覽器模組支援或構建配置');
+      } else {
+        console.error('🔧 [FFmpeg診斷] 未知錯誤類型，需要進一步調查');
       }
+      
       errorMessage += '將改為下載 TS 格式。';
       console.error(errorMessage);
       return null;
@@ -292,6 +363,12 @@ const VideoDownloader: React.FC<VideoDownloaderProps> = ({
               offset += chunk.length;
             }
 
+            // 每個片段下載完成立即更新進度
+            successCount++;
+            totalBytes += segmentBuffer.length;
+            setDownloadedSize(totalBytes);
+            setProgress((successCount / segmentUrls.length) * 75);
+
             return { index: globalIndex, data: segmentBuffer };
             
           } catch (err) {
@@ -303,14 +380,10 @@ const VideoDownloader: React.FC<VideoDownloaderProps> = ({
         // 等待當前批次完成
         const batchResults = await Promise.all(batchPromises);
         
-        // 處理批次結果
+        // 儲存批次結果到正確位置
         for (const result of batchResults) {
           if (result) {
             allChunks[result.index] = result.data;
-            successCount++;
-            totalBytes += result.data.length;
-            setDownloadedSize(totalBytes);
-            setProgress((successCount / segmentUrls.length) * 50); // 下載佔50%，轉換佔50%
           }
         }
         
@@ -338,7 +411,7 @@ const VideoDownloader: React.FC<VideoDownloaderProps> = ({
       }
 
       // 嘗試轉換為 MP4 格式，失敗時提供 TS 下載
-      setProgress(50); // 下載完成，開始轉換
+      setProgress(75); // 下載完成，開始轉換
       
       let finalBuffer = mergedBuffer;
       let fileType = 'video/mp4';

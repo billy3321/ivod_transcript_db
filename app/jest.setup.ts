@@ -37,6 +37,15 @@ afterEach(() => {
   document.body.innerHTML = '';
 });
 
+jest.mock('next/router', () => ({
+  useRouter: () => ({
+    pathname: '/',
+    route: '/',
+    query: {},
+    asPath: '/',
+  }),
+}));
+
 jest.mock('next/link', () => {
   return ({ children }: { children: ReactNode }) => children;
 });

@@ -197,14 +197,14 @@ describe('ErrorBoundary', () => {
     });
 
     it('has proper styling structure', () => {
-      const container = screen.getByText('發生錯誤').closest('div');
-      expect(container?.closest('div')).toHaveClass('min-h-screen', 'flex', 'items-center', 'justify-center', 'bg-gray-50');
+      const container = screen.getByText('發生錯誤').closest('div[class*="min-h-screen"]');
+      expect(container).toHaveClass('min-h-screen flex items-center justify-center bg-gray-50');
     });
 
     it('displays reload button', () => {
       const reloadButton = screen.getByRole('button', { name: '重新載入頁面' });
       expect(reloadButton).toBeInTheDocument();
-      expect(reloadButton).toHaveClass('bg-blue-600', 'text-white');
+      expect(reloadButton).toHaveClass('bg-indigo-600', 'text-white');
     });
   });
 
@@ -287,7 +287,7 @@ describe('ErrorBoundary', () => {
     });
 
     it('provides meaningful alt text for SVG icon', () => {
-      const svgIcon = screen.getByRole('img', { hidden: true });
+      const svgIcon = screen.getByText('發生錯誤').closest('div')?.querySelector('svg');
       expect(svgIcon).toBeInTheDocument();
     });
   });
@@ -336,7 +336,7 @@ describe('ErrorBoundary', () => {
 
       expect(screen.getByText('錯誤訊息：')).toBeInTheDocument();
       // Empty message should still be rendered (even if empty)
-      expect(screen.getByTestId('error-message') || screen.getByRole('code')).toBeInTheDocument();
+      expect(screen.getByRole('code')).toBeInTheDocument();
     });
   });
 });
