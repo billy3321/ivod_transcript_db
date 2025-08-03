@@ -3,8 +3,6 @@ import React from 'react';
 interface DownloadProgress {
   isDownloading: boolean;
   progress: number;
-  conversionProgress: number;
-  isConverting: boolean;
   downloadedSize: number;
   totalSegments: number;
   error: string | null;
@@ -18,7 +16,7 @@ interface DownloadProgressDisplayProps {
 const DownloadProgressDisplay: React.FC<DownloadProgressDisplayProps> = ({ progress, onDismissError }) => {
   if (!progress) return null;
 
-  const { isDownloading, progress: downloadProgress, conversionProgress, isConverting, downloadedSize, totalSegments, error } = progress;
+  const { isDownloading, progress: downloadProgress, downloadedSize, totalSegments, error } = progress;
 
   return (
     <div className="mt-2">
@@ -32,8 +30,8 @@ const DownloadProgressDisplay: React.FC<DownloadProgressDisplayProps> = ({ progr
           </div>
           <div className="flex justify-between text-xs text-gray-600 mt-1">
             <span>
-              {isConverting ? `正在轉換為 MP4... ${Math.round(downloadProgress)}%` : `正在下載影片片段... ${Math.round(downloadProgress)}%`}
-              {totalSegments > 0 && !isConverting && ` (${Math.round(downloadProgress * totalSegments / 50)}/${totalSegments})`}
+              正在下載影片片段... {Math.round(downloadProgress)}%
+              {totalSegments > 0 && ` (${Math.round(downloadProgress * totalSegments / 100)}/${totalSegments})`}
             </span>
             {downloadedSize > 0 && (
               <span>
