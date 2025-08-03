@@ -103,6 +103,26 @@ const VideoDownloader: React.FC<VideoDownloaderProps> = ({
       isSecureContext: window.isSecureContext,
       location: window.location.href
     });
+
+    // 測試 WebAssembly 基本功能
+    try {
+      console.log('🔍 [FFmpeg診斷] 測試 WebAssembly 功能...');
+      const testWasm = new WebAssembly.Module(new Uint8Array([0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00]));
+      console.log('✅ [FFmpeg診斷] WebAssembly 基本測試通過');
+    } catch (wasmError) {
+      console.error('❌ [FFmpeg診斷] WebAssembly 基本測試失敗:', wasmError);
+    }
+
+    // 測試 SharedArrayBuffer 實際功能
+    try {
+      console.log('🔍 [FFmpeg診斷] 測試 SharedArrayBuffer 功能...');
+      const testBuffer = new SharedArrayBuffer(1024);
+      const testView = new Int32Array(testBuffer);
+      testView[0] = 42;
+      console.log('✅ [FFmpeg診斷] SharedArrayBuffer 測試通過, 值:', testView[0]);
+    } catch (sabError) {
+      console.error('❌ [FFmpeg診斷] SharedArrayBuffer 測試失敗:', sabError);
+    }
     
     try {
       // 假設2：動態模組載入問題
@@ -169,10 +189,67 @@ const VideoDownloader: React.FC<VideoDownloaderProps> = ({
           console.log('✅ [FFmpeg診斷] Blob URLs 創建成功:', { coreURL, wasmURL });
           
           console.log('🔍 [FFmpeg診斷] 開始 FFmpeg 載入...');
-          await ffmpeg.load({
-            coreURL,
-            wasmURL,
-          });
+          
+          // 設定載入監控
+          const loadStartTime = Date.now();
+          let loadProgress = 0;
+          
+          // 監控載入過程和記憶體使用
+          const loadMonitor = setInterval(() => {
+            loadProgress++;
+            const elapsed = Date.now() - loadStartTime;
+            
+            // 檢查記憶體使用（如果支援）
+            let memoryInfo = 'N/A';
+            if ('memory' in performance) {
+              const mem = (performance as any).memory;
+              memoryInfo = `${Math.round(mem.usedJSHeapSize / 1024 / 1024)}MB / ${Math.round(mem.jsHeapSizeLimit / 1024 / 1024)}MB`;
+            }
+            
+            console.log(`⏰ [FFmpeg診斷] 載入進行中... ${Math.round(elapsed / 1000)}秒 (嘗試 ${loadProgress}), 記憶體: ${memoryInfo}`);
+            
+            // 如果載入超過 60 秒，給出建議
+            if (elapsed > 60000) {
+              console.warn('⚠️ [FFmpeg診斷] 載入時間過長，可能的問題:');
+              console.warn('  1. 網路連線緢慢或不穩定');
+              console.warn('  2. 瀏覽器記憶體不足');
+              console.warn('  3. FFmpeg WASM 檔案下載問題');
+            }
+          }, 10000); // 每10秒報告一次
+          
+          try {
+            // 嘗試載入 FFmpeg 並添加錯誤監聽
+            ffmpeg.on('log', ({ type, message }) => {
+              if (type === 'error') {
+                console.error('📝 [FFmpeg Error Log]:', message);
+              }
+            });
+
+            // 設定載入配置，在生產環境使用更保守的設定
+            const loadConfig = {
+              coreURL,
+              wasmURL,
+              // 在生產環境添加額外配置
+              ...(window.location.hostname !== 'localhost' && {
+                // 生產環境可能需要更長的超時時間
+                wasmLoaderPath: wasmURL,
+                workerLoadTimeout: 30000,
+              })
+            };
+
+            console.log('🔍 [FFmpeg診斷] 載入配置:', loadConfig);
+            await ffmpeg.load(loadConfig);
+            clearInterval(loadMonitor);
+          } catch (loadError) {
+            clearInterval(loadMonitor);
+            console.error('❌ [FFmpeg診斷] FFmpeg 載入詳細錯誤:', {
+              error: loadError,
+              message: loadError instanceof Error ? loadError.message : String(loadError),
+              stack: loadError instanceof Error ? loadError.stack : 'N/A',
+              timestamp: new Date().toISOString()
+            });
+            throw loadError;
+          }
           
           loadSuccess = true;
           console.log('✅ [FFmpeg診斷] FFmpeg 載入成功!');
@@ -510,7 +587,7 @@ const VideoDownloader: React.FC<VideoDownloaderProps> = ({
         {isDownloading ? (
           <>
             <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-            {isConverting ? `轉換中... ${Math.round(progress)}% (長影片需較多時間)` : `下載中... ${Math.round(progress)}%`}
+            {isConverting ? `轉換中…… (長影片需較多時間)` : `下載中……`}
           </>
         ) : (
           <>

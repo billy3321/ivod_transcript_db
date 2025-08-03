@@ -44,13 +44,14 @@ describe('DownloadProgressDisplay', () => {
     it('shows conversion progress when converting', () => {
       const convertingProgress = {
         ...mockProgress,
+        progress: 80, // 轉換時應該顯示總體進度（75-100%）
         isConverting: true,
-        conversionProgress: 75,
+        conversionProgress: 20, // FFmpeg 內部進度（0-100%）
       };
       
       render(<DownloadProgressDisplay progress={convertingProgress} />);
       
-      expect(screen.getByText(/正在轉換為 MP4... 75%/)).toBeInTheDocument();
+      expect(screen.getByText(/正在轉換為 MP4... 80%/)).toBeInTheDocument();
     });
 
     it('displays segment count during download', () => {

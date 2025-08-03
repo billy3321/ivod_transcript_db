@@ -32,7 +32,7 @@ const DownloadProgressDisplay: React.FC<DownloadProgressDisplayProps> = ({ progr
           </div>
           <div className="flex justify-between text-xs text-gray-600 mt-1">
             <span>
-              {isConverting ? `正在轉換為 MP4... ${conversionProgress}%` : `正在下載影片片段... ${Math.round(downloadProgress)}%`}
+              {isConverting ? `正在轉換為 MP4... ${Math.round(downloadProgress)}%` : `正在下載影片片段... ${Math.round(downloadProgress)}%`}
               {totalSegments > 0 && !isConverting && ` (${Math.round(downloadProgress * totalSegments / 50)}/${totalSegments})`}
             </span>
             {downloadedSize > 0 && (
