@@ -13,8 +13,6 @@ import Link from 'next/link';
 interface DownloadProgress {
   isDownloading: boolean;
   progress: number;
-  conversionProgress: number;
-  isConverting: boolean;
   downloadedSize: number;
   totalSegments: number;
   error: string | null;
@@ -367,7 +365,7 @@ export default function IvodDetail() {
                 {data.video_url && (
                   <VideoDownloader 
                     videoUrl={data.video_url}
-                    fileName={`ivod-${data.ivod_id}-${formatIVODTitle(data.title, data.meeting_name, data.speaker_name).replace(/[/\\?%*:|"<>]/g, '-')}.mp4`}
+                    fileName={`ivod-${data.ivod_id}-${formatIVODTitle(data.title, data.meeting_name, data.speaker_name).replace(/[/\\?%*:|"<>]/g, '-')}.ts`}
                     onProgressChange={setDownloadProgress}
                   />
                 )}
