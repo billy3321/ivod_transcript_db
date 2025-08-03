@@ -25,7 +25,7 @@ describe('VideoDownloader Unit Tests', () => {
   describe('Rendering', () => {
     it('renders download button with correct text', () => {
       render(<VideoDownloader videoUrl={validM3U8Url} />);
-      expect(screen.getByRole('button', { name: /下載IVOD影片/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /下載.*IVOD.*影片/i })).toBeInTheDocument();
     });
 
     it('applies custom className', () => {
@@ -51,7 +51,7 @@ describe('VideoDownloader Unit Tests', () => {
     it('validates M3U8 format requirement', () => {
       render(<VideoDownloader videoUrl={invalidUrl} />);
       fireEvent.click(screen.getByRole('button'));
-      expect(screen.getByText(/僅支援M3U8格式的影片下載/i)).toBeInTheDocument();
+      expect(screen.getByText('僅支援 M3U8 格式的影片下載')).toBeInTheDocument();
     });
 
     it('calls onProgressChange callback when provided', () => {
@@ -78,7 +78,7 @@ describe('VideoDownloader Unit Tests', () => {
 
     it('shows download text when not downloading', () => {
       render(<VideoDownloader videoUrl={validM3U8Url} />);
-      expect(screen.getByText(/下載IVOD影片/i)).toBeInTheDocument();
+      expect(screen.getByText('下載 IVOD 影片')).toBeInTheDocument();
     });
   });
 

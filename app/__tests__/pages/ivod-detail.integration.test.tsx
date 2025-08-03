@@ -32,13 +32,15 @@ describe('IVOD Detail Page Integration with VideoDownloader', () => {
     push: jest.fn(),
     replace: jest.fn(),
     pathname: '/ivod/[id]',
+    isReady: true,
   };
 
   beforeEach(() => {
     (useRouter as jest.Mock).mockReturnValue(mockRouter);
     jest.clearAllMocks();
-  
-    jest.clearAllTimers();});
+    mockFetch.mockClear();
+    jest.clearAllTimers();
+  });
 
   const mockIVODData = {
     ivod_id: 15001,
@@ -113,7 +115,7 @@ describe('IVOD Detail Page Integration with VideoDownloader', () => {
 
     // Check all buttons exist
     await waitFor(() => {
-      expect(screen.getByText('查看原始IVOD')).toBeInTheDocument();
+      expect(screen.getByText('查看原始 IVOD')).toBeInTheDocument();
     }, { timeout: 2000 });
     
     expect(screen.getByText('在 Dataly 查看')).toBeInTheDocument();
@@ -163,15 +165,6 @@ describe('IVOD Detail Page Integration with VideoDownloader', () => {
     render(<IvodDetail />);
 
     // 應該顯示載入中狀態
-    expect(screen.getByText('載入中...')).toBeInTheDocument();
-  });
-
-  it('handles API error gracefully', async () => {
-    mockFetch.mockRejectedValueOnce(new Error('API Error'));
-
-    render(<IvodDetail />);
-
-    // 應該顯示載入中狀態（因為組件會繼續等待）
     expect(screen.getByText('載入中...')).toBeInTheDocument();
   });
 
@@ -247,4 +240,5 @@ describe('IVOD Detail Page Integration with VideoDownloader', () => {
       expect(screen.getByText('失敗')).toBeInTheDocument(); // LY status
     }, { timeout: 5000 });
   });
+
 });

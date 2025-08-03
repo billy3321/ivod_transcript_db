@@ -164,6 +164,10 @@ describe('Footer Component', () => {
   })
 
   it('displays error message when API fails with network error', async () => {
+    // Suppress console.error for this test
+    const originalConsoleError = console.error;
+    console.error = jest.fn();
+
     (fetch as jest.Mock).mockRejectedValue(new Error('Network Error'));
 
     await act(async () => {
@@ -177,10 +181,17 @@ describe('Footer Component', () => {
 
     expect(screen.queryByText(/本資料庫最後更新時間為：/)).not.toBeInTheDocument();
     expect(screen.getByText('無法連接資料庫')).toBeInTheDocument();
+
+    // Restore console.error
+    console.error = originalConsoleError;
     expect(fetch).toHaveBeenCalledTimes(1);
   })
 
   it('displays error message when API returns 500 status', async () => {
+    // Suppress console.error for this test
+    const originalConsoleError = console.error;
+    console.error = jest.fn();
+
     (fetch as jest.Mock).mockResolvedValue({
       ok: false,
       status: 500
@@ -198,9 +209,16 @@ describe('Footer Component', () => {
     expect(screen.queryByText(/本資料庫最後更新時間為：/)).not.toBeInTheDocument();
     expect(screen.getByText('資料庫連線異常 (500)')).toBeInTheDocument();
     expect(fetch).toHaveBeenCalledTimes(1);
+
+    // Restore console.error
+    console.error = originalConsoleError;
   })
 
   it('displays error message when API returns 404 status', async () => {
+    // Suppress console.error for this test
+    const originalConsoleError = console.error;
+    console.error = jest.fn();
+
     (fetch as jest.Mock).mockResolvedValue({
       ok: false,
       status: 404
@@ -218,5 +236,8 @@ describe('Footer Component', () => {
     expect(screen.queryByText(/本資料庫最後更新時間為：/)).not.toBeInTheDocument();
     expect(screen.getByText('資料庫連線異常 (404)')).toBeInTheDocument();
     expect(fetch).toHaveBeenCalledTimes(1);
+
+    // Restore console.error
+    console.error = originalConsoleError;
   })
 })

@@ -179,10 +179,7 @@ describe('SearchResults', () => {
       />);
       
       expect(screen.getByText('沒有找到符合的資料')).toBeInTheDocument();
-      expect(screen.getByText('請嘗試：')).toBeInTheDocument();
-      expect(screen.getByText('• 使用更簡單的關鍵字')).toBeInTheDocument();
-      expect(screen.getByText('• 檢查拼字是否正確')).toBeInTheDocument();
-      expect(screen.getByText('• 嘗試不同的搜尋條件')).toBeInTheDocument();
+      expect(screen.getByText('請嘗試調整搜尋條件或清除篩選')).toBeInTheDocument();
     });
 
     it('does not show no results message when data is null', () => {
@@ -235,8 +232,8 @@ describe('SearchResults', () => {
     it('shows loading spinner with correct styling', () => {
       render(<SearchResults {...defaultProps} loading={true} />);
       
-      const spinner = screen.getByRole('status');
-      expect(spinner).toHaveClass('animate-spin', 'rounded-full', 'h-4', 'w-4', 'border-b-2', 'border-blue-600');
+      const spinner = screen.getByText('搜尋中...');
+      expect(spinner.parentElement?.querySelector('.animate-spin')).toHaveClass('animate-spin', 'rounded-full', 'h-4', 'w-4', 'border-b-2', 'border-blue-600');
     });
 
     it('has proper semantic structure', () => {

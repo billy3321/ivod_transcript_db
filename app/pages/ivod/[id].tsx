@@ -28,7 +28,12 @@ export default function IvodDetail() {
   useEffect(() => {
     if (!router.isReady || !id) return;
     fetch(`/api/ivods/${id}`)
-      .then(res => res.json())
+      .then(res => {
+        if (!res.ok) {
+          throw new Error(`HTTP error! status: ${res.status}`);
+        }
+        return res.json();
+      })
       .then(json => {
         setData(json.data);
         // Set default tab based on available transcripts - prioritize ly_transcript
@@ -39,6 +44,10 @@ export default function IvodDetail() {
             setActiveTab('ai');
           }
         }
+      })
+      .catch(error => {
+        console.error("Failed to fetch IVOD data:", error);
+        // Optionally, set an error state here to show a message to the user
       });
   }, [router.isReady, id]);
 

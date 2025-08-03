@@ -69,37 +69,37 @@ class TestDateRange:
         start = date(2024, 1, 1)
         end = date(2024, 1, 1)
         
-        result = list(date_range(start, end))
+        result = list(date_range(start.isoformat(), end.isoformat()))
         
         assert len(result) == 1
-        assert result[0] == date(2024, 1, 1)
+        assert result[0] == '2024-01-01'
     
     def test_date_range_multiple_days(self):
         """Test date range for multiple days"""
         start = date(2024, 1, 1)
         end = date(2024, 1, 3)
         
-        result = list(date_range(start, end))
+        result = list(date_range(start.isoformat(), end.isoformat()))
         
         assert len(result) == 3
-        assert result[0] == date(2024, 1, 1)
-        assert result[1] == date(2024, 1, 2)
-        assert result[2] == date(2024, 1, 3)
+        assert result[0] == '2024-01-01'
+        assert result[1] == '2024-01-02'
+        assert result[2] == '2024-01-03'
     
     def test_date_range_string_input(self):
         """Test date range with string input"""
         result = list(date_range("2024-01-01", "2024-01-02"))
         
         assert len(result) == 2
-        assert result[0] == date(2024, 1, 1)
-        assert result[1] == date(2024, 1, 2)
+        assert result[0] == '2024-01-01'
+        assert result[1] == '2024-01-02'
     
     def test_date_range_reverse_order(self):
         """Test date range with end date before start date"""
         start = date(2024, 1, 3)
         end = date(2024, 1, 1)
         
-        result = list(date_range(start, end))
+        result = list(date_range(start.isoformat(), end.isoformat()))
         
         # Should return empty list or handle gracefully
         assert len(result) == 0
@@ -118,14 +118,14 @@ class TestMakeBrowser:
         
         assert result == mock_browser
         mock_browser.set_handle_robots.assert_called_once_with(False)
-        mock_browser.set_handle_redirect.assert_called_once_with(True)
         mock_browser.set_handle_refresh.assert_called_once_with(False)
+        mock_browser.set_handle_gzip.assert_called_once_with(True)
         
         # Check headers were added
         assert mock_browser.addheaders == HEADERS
     
     @patch('ivod.crawler.mechanize.Browser')
-    @patch('ivod.crawler.ssl.create_default_context')
+    @patch('ivod.crawler.ssl._create_unverified_context')
     def test_make_browser_with_ssl_skip(self, mock_ssl_context, mock_browser_class):
         """Test browser creation with SSL skip"""
         mock_browser = Mock()
@@ -136,9 +136,7 @@ class TestMakeBrowser:
         result = make_browser(skip_ssl=True)
         
         assert result == mock_browser
-        mock_ssl_context.assert_called_once()
-        assert mock_context.check_hostname is False
-        assert mock_context.verify_mode == ssl.CERT_NONE
+        mock_ssl_context.assert_called_once_with(cert_reqs=ssl.CERT_NONE)
     
     @patch('ivod.crawler.mechanize.Browser')
     def test_make_browser_ssl_context_creation_failure(self, mock_browser_class):
@@ -169,80 +167,95 @@ class TestFetchLatestDate:
         assert result == date(2024, 1, 15)
     
     def test_fetch_latest_date_fallback(self):
-        """Test fallback when primary method fails"""
+        """Test fallback when browser fails"""
         mock_browser = Mock()
+        mock_browser.open.side_effect = Exception("Browser failed")
         
-        with patch('ivod.crawler.fetch_latest_date_primary') as mock_primary, \
-             patch('ivod.crawler.fetch_latest_date_fallback') as mock_fallback:
-            mock_primary.return_value = None
-            mock_fallback.return_value = date(2024, 1, 15)
+        with patch('ivod.crawler.get_requests_session') as mock_get_session:
+            mock_session = Mock()
+            mock_response = Mock()
+            mock_response.text = '{"ivods": [{"日期": "2024-01-15"}]}'
+            mock_session.get.return_value = mock_response
+            mock_get_session.return_value = mock_session
             
             result = fetch_latest_date(mock_browser)
             
             assert result == date(2024, 1, 15)
-            mock_primary.assert_called_once_with(mock_browser)
-            mock_fallback.assert_called_once_with(mock_browser)
+            mock_browser.open.assert_called_once()
+            mock_get_session.assert_called_once()
+            mock_session.get.assert_called_once()
     
     def test_fetch_latest_date_both_methods_fail(self):
-        """Test when both primary and fallback methods fail"""
+        """Test when both browser and requests fail"""
         mock_browser = Mock()
+        mock_browser.open.side_effect = Exception("Browser failed")
         
-        with patch('ivod.crawler.fetch_latest_date_primary') as mock_primary, \
-             patch('ivod.crawler.fetch_latest_date_fallback') as mock_fallback:
-            mock_primary.return_value = None
-            mock_fallback.return_value = None
+        with patch('ivod.crawler.get_requests_session') as mock_get_session:
+            mock_session = Mock()
+            mock_session.get.side_effect = Exception("Requests failed")
+            mock_get_session.return_value = mock_session
             
-            result = fetch_latest_date(mock_browser)
+            with pytest.raises(Exception):
+                fetch_latest_date(mock_browser)
             
-            assert result is None
+            mock_browser.open.assert_called_once()
+            mock_get_session.assert_called_once()
+            mock_session.get.assert_called_once()
 
 
 class TestFetchIvodList:
     """Test IVOD list fetching functionality"""
     
-    def test_fetch_ivod_list_primary_success(self):
-        """Test successful primary IVOD list fetch"""
+    def test_fetch_ivod_list_success(self):
+        """Test successful IVOD list fetch"""
         mock_browser = Mock()
+        mock_response = Mock()
         test_date = date(2024, 1, 15)
-        expected_ivods = [{"IVOD_ID": "123"}, {"IVOD_ID": "456"}]
+        test_data = {
+            "ivods": [
+                {"IVOD_ID": "123"},
+                {"IVOD_ID": "456"}
+            ]
+        }
+        mock_response.read.return_value = json.dumps(test_data).encode('utf-8')
+        mock_browser.open.return_value = mock_response
         
-        with patch('ivod.crawler.fetch_ivod_list_primary') as mock_primary:
-            mock_primary.return_value = expected_ivods
-            
-            result = fetch_ivod_list(mock_browser, test_date)
-            
-            assert result == expected_ivods
-            mock_primary.assert_called_once_with(mock_browser, test_date)
+        result = fetch_ivod_list(mock_browser, test_date.isoformat())
+        
+        assert result == [123, 456]
+        mock_browser.open.assert_called_once()
     
     def test_fetch_ivod_list_fallback_on_failure(self):
-        """Test fallback when primary method fails"""
+        """Test fallback when browser fails"""
         mock_browser = Mock()
         test_date = date(2024, 1, 15)
-        expected_ivods = [{"IVOD_ID": "789"}]
+        mock_browser.open.side_effect = Exception("Browser failed")
         
-        with patch('ivod.crawler.fetch_ivod_list_primary') as mock_primary, \
-             patch('ivod.crawler.fetch_ivod_list_fallback') as mock_fallback:
-            mock_primary.side_effect = Exception("Primary failed")
-            mock_fallback.return_value = expected_ivods
+        with patch('ivod.crawler.get_requests_session') as mock_get_session:
+            mock_session = Mock()
+            mock_response = Mock()
+            test_data = {"ivods": [{"IVOD_ID": "789"}]}
+            mock_response.text = json.dumps(test_data)
+            mock_session.get.return_value = mock_response
+            mock_get_session.return_value = mock_session
             
-            result = fetch_ivod_list(mock_browser, test_date)
+            result = fetch_ivod_list(mock_browser, test_date.isoformat())
             
-            assert result == expected_ivods
-            mock_fallback.assert_called_once_with(mock_browser, test_date)
+            assert result == [789]
+            mock_get_session.assert_called_once()
     
-    def test_fetch_ivod_list_both_methods_fail(self):
-        """Test when both methods fail"""
+    def test_fetch_ivod_list_empty_result(self):
+        """Test when API returns no IVODs"""
         mock_browser = Mock()
+        mock_response = Mock()
         test_date = date(2024, 1, 15)
+        test_data = {"ivods": []}
+        mock_response.read.return_value = json.dumps(test_data).encode('utf-8')
+        mock_browser.open.return_value = mock_response
         
-        with patch('ivod.crawler.fetch_ivod_list_primary') as mock_primary, \
-             patch('ivod.crawler.fetch_ivod_list_fallback') as mock_fallback:
-            mock_primary.side_effect = Exception("Primary failed")
-            mock_fallback.side_effect = Exception("Fallback failed")
-            
-            result = fetch_ivod_list(mock_browser, test_date)
-            
-            assert result == []
+        result = fetch_ivod_list(mock_browser, test_date.isoformat())
+        
+        assert result == []
 
 
 class TestFetchIvodInfo:
@@ -251,36 +264,42 @@ class TestFetchIvodInfo:
     def test_fetch_ivod_info_success(self):
         """Test successful IVOD info fetch"""
         mock_browser = Mock()
-        ivod_id = "123456"
-        expected_info = {
-            "title": "Test Meeting",
-            "meeting_name": "Test Committee",
-            "speaker_name": "Test Speaker"
+        mock_response = Mock()
+        ivod_id = 123456
+        test_data = {
+            "data": {
+                "title": "Test Meeting",
+                "meeting_name": "Test Committee",
+                "speaker_name": "Test Speaker"
+            }
         }
+        mock_response.read.return_value = json.dumps(test_data).encode('utf-8')
+        mock_browser.open.return_value = mock_response
         
-        with patch('ivod.crawler.fetch_ivod_info_primary') as mock_primary:
-            mock_primary.return_value = expected_info
-            
-            result = fetch_ivod_info(mock_browser, ivod_id)
-            
-            assert result == expected_info
-            mock_primary.assert_called_once_with(mock_browser, ivod_id)
+        result = fetch_ivod_info(mock_browser, ivod_id)
+        
+        assert result == test_data["data"]
+        mock_browser.open.assert_called_once()
     
     def test_fetch_ivod_info_fallback(self):
-        """Test IVOD info fetch fallback"""
+        """Test IVOD info fetch fallback to requests"""
         mock_browser = Mock()
-        ivod_id = "123456"
-        expected_info = {"title": "Fallback Title"}
+        ivod_id = 123456
+        mock_browser.open.side_effect = Exception("Browser failed")
         
-        with patch('ivod.crawler.fetch_ivod_info_primary') as mock_primary, \
-             patch('ivod.crawler.fetch_ivod_info_fallback') as mock_fallback:
-            mock_primary.side_effect = Exception("Primary failed")
-            mock_fallback.return_value = expected_info
+        with patch('ivod.crawler.get_requests_session') as mock_get_session:
+            mock_session = Mock()
+            mock_response = Mock()
+            test_data = {"data": {"title": "Fallback Title"}}
+            mock_response.text = json.dumps(test_data)
+            mock_response.raise_for_status.return_value = None
+            mock_session.get.return_value = mock_response
+            mock_get_session.return_value = mock_session
             
             result = fetch_ivod_info(mock_browser, ivod_id)
             
-            assert result == expected_info
-            mock_fallback.assert_called_once_with(mock_browser, ivod_id)
+            assert result == test_data["data"]
+            mock_get_session.assert_called_once()
 
 
 class TestFetchAI:
@@ -288,93 +307,101 @@ class TestFetchAI:
     
     def test_fetch_ai_success(self):
         """Test successful AI transcript fetch"""
-        mock_browser = Mock()
-        ivod_id = "123456"
-        rec = {"ai_transcript": "", "ai_status": "pending", "ai_retries": 0}
+        js = {
+            "transcript": {
+                "whisperx": [
+                    {"text": "First part "},
+                    {"text": "Second part"}
+                ]
+            }
+        }
+        rec = {"ai_transcript": "", "ai_status": "pending", "ai_retries": 0, "ivod_id": "123456"}
         
-        with patch('ivod.crawler.fetch_ai_transcript') as mock_fetch:
-            mock_fetch.return_value = "AI transcript content"
-            
-            fetch_ai(mock_browser, rec, ivod_id, None)
-            
-            assert rec["ai_transcript"] == "AI transcript content"
-            assert rec["ai_status"] == "success"
-            assert rec["ai_retries"] == 0
+        fetch_ai(js, rec, None, None)
+        
+        assert rec["ai_transcript"] == "First part Second part"
+        assert rec["ai_status"] == "success"
+        assert rec["ai_retries"] == 0
     
     def test_fetch_ai_failure(self):
         """Test AI transcript fetch failure"""
-        mock_browser = Mock()
-        ivod_id = "123456"
-        rec = {"ai_transcript": "", "ai_status": "pending", "ai_retries": 0}
+        js = {"transcript": {}}  # Missing whisperx data
+        rec = {"ai_transcript": "", "ai_status": "pending", "ai_retries": 0, "ivod_id": "123456"}
         
-        with patch('ivod.crawler.fetch_ai_transcript') as mock_fetch:
-            mock_fetch.side_effect = Exception("Fetch failed")
-            
-            fetch_ai(mock_browser, rec, ivod_id, None)
-            
-            assert rec["ai_transcript"] == ""
-            assert rec["ai_status"] == "failed"
-            assert rec["ai_retries"] == 1
+        fetch_ai(js, rec, None, None)
+        
+        assert rec["ai_transcript"] == ""
+        assert rec["ai_status"] == "failed"
+        assert rec["ai_retries"] == 1
     
     def test_fetch_ai_empty_result(self):
-        """Test AI transcript fetch with empty result"""
-        mock_browser = Mock()
-        ivod_id = "123456"
-        rec = {"ai_transcript": "", "ai_status": "pending", "ai_retries": 0}
+        """Test AI transcript fetch with empty transcript data"""
+        js = {}  # No transcript data
+        rec = {"ai_transcript": "", "ai_status": "pending", "ai_retries": 0, "ivod_id": "123456"}
         
-        with patch('ivod.crawler.fetch_ai_transcript') as mock_fetch:
-            mock_fetch.return_value = ""
-            
-            fetch_ai(mock_browser, rec, ivod_id, None)
-            
-            assert rec["ai_transcript"] == ""
-            assert rec["ai_status"] == "failed"
-            assert rec["ai_retries"] == 1
+        fetch_ai(js, rec, None, None)
+        
+        assert rec["ai_transcript"] == ""
+        assert rec["ai_status"] == "failed"
+        assert rec["ai_retries"] == 1
 
 
 class TestFetchLY:
     """Test LY transcript fetching functionality"""
     
-    def test_fetch_ly_success(self):
-        """Test successful LY transcript fetch"""
-        mock_browser = Mock()
-        ivod_id = "123456"
-        rec = {"ly_transcript": "", "ly_status": "pending", "ly_retries": 0}
+    def test_fetch_ly_success_with_gazette(self):
+        """Test successful LY transcript fetch with gazette data"""
+        js = {
+            "gazette": {
+                "blocks": [
+                    ["First block line 1", "First block line 2"],
+                    ["Second block line 1"]
+                ]
+            }
+        }
+        rec = {"ly_transcript": "", "ly_status": "pending", "ly_retries": 0, "ivod_id": "123456"}
+        
+        fetch_ly(js, rec, None, None)
+        
+        expected = "First block line 1\nFirst block line 2\n\nSecond block line 1"
+        assert rec["ly_transcript"] == expected
+        assert rec["ly_status"] == "success"
+        assert rec["ly_retries"] == 0
+    
+    def test_fetch_ly_success_with_speech(self):
+        """Test successful LY transcript fetch with speech fallback"""
+        js = {}  # No gazette data
+        rec = {"ly_transcript": "", "ly_status": "pending", "ly_retries": 0, "ivod_id": "123456"}
         
         with patch('ivod.crawler.fetch_ly_speech') as mock_fetch:
-            mock_fetch.return_value = "LY transcript content"
+            mock_fetch.return_value = "LY speech content"
             
-            fetch_ly(mock_browser, rec, ivod_id, None)
+            fetch_ly(js, rec, None, None)
             
-            assert rec["ly_transcript"] == "LY transcript content"
+            assert rec["ly_transcript"] == "LY speech content"
             assert rec["ly_status"] == "success"
             assert rec["ly_retries"] == 0
     
     def test_fetch_ly_failure(self):
         """Test LY transcript fetch failure"""
-        mock_browser = Mock()
-        ivod_id = "123456"
-        rec = {"ly_transcript": "", "ly_status": "pending", "ly_retries": 0}
+        js = {"gazette": {}}  # Invalid gazette structure
+        rec = {"ly_transcript": "", "ly_status": "pending", "ly_retries": 0, "ivod_id": "123456"}
         
-        with patch('ivod.crawler.fetch_ly_speech') as mock_fetch:
-            mock_fetch.side_effect = Exception("Fetch failed")
-            
-            fetch_ly(mock_browser, rec, ivod_id, None)
-            
-            assert rec["ly_transcript"] == ""
-            assert rec["ly_status"] == "failed"
-            assert rec["ly_retries"] == 1
+        fetch_ly(js, rec, None, None)
+        
+        assert rec["ly_transcript"] == ""
+        assert rec["ly_status"] == "failed"
+        assert rec["ly_retries"] == 1
     
     def test_fetch_ly_empty_result(self):
         """Test LY transcript fetch with empty result"""
-        mock_browser = Mock()
-        ivod_id = "123456"
-        rec = {"ly_transcript": "", "ly_status": "pending", "ly_retries": 0}
+        js = {}  # No gazette data
+        rec = {"ly_transcript": "", "ly_status": "pending", "ly_retries": 0, "ivod_id": "123456"}
         
         with patch('ivod.crawler.fetch_ly_speech') as mock_fetch:
-            mock_fetch.return_value = ""
+            mock_fetch.return_value = ""  # Empty speech result
             
-            fetch_ly(mock_browser, rec, ivod_id, None)
+            fetch_ly(js, rec, None, None)
             
             assert rec["ly_transcript"] == ""
             assert rec["ly_status"] == "failed"
@@ -433,10 +460,12 @@ class TestFetchAvailableDates:
         mock_browser = Mock()
         mock_browser.open.side_effect = Exception("Network error")
         
-        with patch('ivod.crawler.requests.get') as mock_requests:
+        with patch('ivod.crawler.get_requests_session') as mock_get_session:
+            mock_session = Mock()
             mock_response = Mock()
             mock_response.text = json.dumps({"aggs": []})
-            mock_requests.return_value = mock_response
+            mock_session.get.return_value = mock_response
+            mock_get_session.return_value = mock_session
             
             result = fetch_available_dates(mock_browser)
             
@@ -457,44 +486,51 @@ class TestFetchAvailableDates:
 class TestFetchLySpeech:
     """Test LY speech fetching functionality"""
     
-    @patch('ivod.crawler.requests.get')
-    def test_fetch_ly_speech_success(self, mock_get):
+    @patch('ivod.crawler.subprocess.run')
+    @patch('ivod.crawler.random_sleep')
+    def test_fetch_ly_speech_success(self, mock_sleep, mock_run):
         """Test successful LY speech fetch"""
-        mock_response = Mock()
-        mock_response.content = b"Test speech content"
-        mock_response.raise_for_status.return_value = None
-        mock_get.return_value = mock_response
+        mock_result = Mock()
+        mock_result.returncode = 0
+        mock_result.stdout = "Test speech content<br />with breaks"
+        mock_run.return_value = mock_result
         
         result = fetch_ly_speech("123456")
         
-        assert result == "Test speech content"
-        mock_get.assert_called_once()
+        assert result == "Test speech content\nwith breaks"
+        mock_run.assert_called_once()
+        mock_sleep.assert_called_once()
     
-    @patch('ivod.crawler.requests.get')
-    def test_fetch_ly_speech_http_error(self, mock_get):
-        """Test LY speech fetch with HTTP error"""
-        mock_response = Mock()
-        mock_response.raise_for_status.side_effect = Exception("HTTP error")
-        mock_get.return_value = mock_response
+    @patch('ivod.crawler.subprocess.run')
+    @patch('ivod.crawler.random_sleep')
+    def test_fetch_ly_speech_non_zero_return(self, mock_sleep, mock_run):
+        """Test LY speech fetch with non-zero return code"""
+        mock_result = Mock()
+        mock_result.returncode = 1
+        mock_run.return_value = mock_result
         
-        with pytest.raises(Exception):
-            fetch_ly_speech("123456")
-    
-    @patch('ivod.crawler.requests.get')
-    def test_fetch_ly_speech_request_exception(self, mock_get):
-        """Test LY speech fetch with request exception"""
-        mock_get.side_effect = Exception("Request failed")
+        result = fetch_ly_speech("123456")
         
-        with pytest.raises(Exception):
-            fetch_ly_speech("123456")
+        assert result == ""
     
-    @patch('ivod.crawler.requests.get')
-    def test_fetch_ly_speech_empty_content(self, mock_get):
+    @patch('ivod.crawler.subprocess.run')
+    @patch('ivod.crawler.random_sleep')
+    def test_fetch_ly_speech_exception(self, mock_sleep, mock_run):
+        """Test LY speech fetch with subprocess exception"""
+        mock_run.side_effect = Exception("Subprocess failed")
+        
+        result = fetch_ly_speech("123456")
+        
+        assert result == ""
+    
+    @patch('ivod.crawler.subprocess.run')
+    @patch('ivod.crawler.random_sleep')
+    def test_fetch_ly_speech_empty_content(self, mock_sleep, mock_run):
         """Test LY speech fetch with empty content"""
-        mock_response = Mock()
-        mock_response.content = b""
-        mock_response.raise_for_status.return_value = None
-        mock_get.return_value = mock_response
+        mock_result = Mock()
+        mock_result.returncode = 0
+        mock_result.stdout = "   "  # Whitespace only
+        mock_run.return_value = mock_result
         
         result = fetch_ly_speech("123456")
         
@@ -521,7 +557,7 @@ class TestExceptionHandling:
     def test_timeout_error_handling(self):
         """Test timeout error exception handling"""
         with pytest.raises(IVODTimeoutError):
-            raise IVODTimeoutError("Timeout", url="test://url", timeout=30)
+            raise IVODTimeoutError("Timeout", url="test://url", timeout_duration=30)
     
     def test_parsing_error_handling(self):
         """Test parsing error exception handling"""

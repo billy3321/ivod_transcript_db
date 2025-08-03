@@ -10,8 +10,6 @@ import DownloadProgressDisplay from '@/components/DownloadProgressDisplay';
 interface DownloadProgress {
   isDownloading: boolean;
   progress: number;
-  conversionProgress: number;
-  isConverting: boolean;
   downloadedSize: number;
   totalSegments: number;
   error: string | null;
@@ -21,8 +19,6 @@ describe('DownloadProgressDisplay', () => {
   const mockProgress: DownloadProgress = {
     isDownloading: true,
     progress: 50,
-    conversionProgress: 25,
-    isConverting: false,
     downloadedSize: 1024 * 1024 * 5, // 5MB
     totalSegments: 10,
     error: null,
@@ -41,35 +37,12 @@ describe('DownloadProgressDisplay', () => {
       expect(screen.getByText(/5.0 MB/)).toBeInTheDocument();
     });
 
-    it('shows conversion progress when converting', () => {
-      const convertingProgress = {
-        ...mockProgress,
-        progress: 80, // 轉換時應該顯示總體進度（75-100%）
-        isConverting: true,
-        conversionProgress: 20, // FFmpeg 內部進度（0-100%）
-      };
-      
-      render(<DownloadProgressDisplay progress={convertingProgress} />);
-      
-      expect(screen.getByText(/正在轉換為 MP4... 80%/)).toBeInTheDocument();
-    });
 
     it('displays segment count during download', () => {
       render(<DownloadProgressDisplay progress={mockProgress} />);
       
-      // Should show segment progress: (50% * 10 segments / 50) = 10 segments, so 10/10
-      expect(screen.getByText(/\(10\/10\)/)).toBeInTheDocument();
-    });
-
-    it('hides segment count during conversion', () => {
-      const convertingProgress = {
-        ...mockProgress,
-        isConverting: true,
-      };
-      
-      render(<DownloadProgressDisplay progress={convertingProgress} />);
-      
-      expect(screen.queryByText(/\(\d+\/\d+\)/)).not.toBeInTheDocument();
+      // Should show segment progress: (50% * 10 segments / 100) = 5 segments, so 5/10
+      expect(screen.getByText(/\(5\/10\)/)).toBeInTheDocument();
     });
   });
 

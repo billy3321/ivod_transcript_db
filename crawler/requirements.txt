@@ -9,3 +9,4 @@ beautifulsoup4
 cryptography
 PyMySQL
 elasticsearch>=7.0.0
+pytz

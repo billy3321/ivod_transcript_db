@@ -185,9 +185,9 @@ describe('ErrorBoundary', () => {
     });
 
     it('displays error icon', () => {
-      const errorIcon = screen.getByRole('img', { hidden: true });
-      expect(errorIcon).toBeInTheDocument();
-      expect(errorIcon).toHaveClass('h-12', 'w-12', 'text-red-500');
+      const svgIcon = document.querySelector('svg');
+      expect(svgIcon).toBeInTheDocument();
+      expect(svgIcon).toHaveClass('h-12', 'w-12', 'text-red-500');
     });
 
     it('displays error message in proper container', () => {
@@ -287,7 +287,7 @@ describe('ErrorBoundary', () => {
     });
 
     it('provides meaningful alt text for SVG icon', () => {
-      const svgIcon = screen.getByText('發生錯誤').closest('div')?.querySelector('svg');
+      const svgIcon = document.querySelector('svg');
       expect(svgIcon).toBeInTheDocument();
     });
   });
@@ -336,7 +336,8 @@ describe('ErrorBoundary', () => {
 
       expect(screen.getByText('錯誤訊息：')).toBeInTheDocument();
       // Empty message should still be rendered (even if empty)
-      expect(screen.getByRole('code')).toBeInTheDocument();
+      const codeElement = screen.getByText('錯誤訊息：').closest('div')?.querySelector('code');
+      expect(codeElement).toBeInTheDocument();
     });
   });
 });

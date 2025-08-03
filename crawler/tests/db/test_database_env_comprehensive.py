@@ -76,7 +76,7 @@ class TestDatabaseConfiguration:
         monkeypatch.setenv("DB_BACKEND", "sqlite")
         monkeypatch.setenv("SQLITE_PATH", "/prod/db.sqlite")
         
-        config = get_database_config(DatabaseEnvironment.PRODUCTION)
+        config = get_database_config('production')
         
         assert config["backend"] == "sqlite"
         assert config["path"] == "/prod/db.sqlite"
@@ -86,7 +86,7 @@ class TestDatabaseConfiguration:
         monkeypatch.setenv("DB_BACKEND", "sqlite")
         monkeypatch.setenv("DEV_SQLITE_PATH", "/dev/db.sqlite")
         
-        config = get_database_config(DatabaseEnvironment.DEVELOPMENT)
+        config = get_database_config('development')
         
         assert config["backend"] == "sqlite"
         assert config["path"] == "/dev/db.sqlite"
@@ -96,7 +96,7 @@ class TestDatabaseConfiguration:
         monkeypatch.setenv("DB_BACKEND", "sqlite")
         monkeypatch.setenv("TEST_SQLITE_PATH", "/test/db.sqlite")
         
-        config = get_database_config(DatabaseEnvironment.TESTING)
+        config = get_database_config('testing')
         
         assert config["backend"] == "sqlite"
         assert config["path"] == "/test/db.sqlite"
@@ -110,13 +110,13 @@ class TestDatabaseConfiguration:
         monkeypatch.setenv("PG_PASS", "prod_pass")
         monkeypatch.setenv("PG_DB", "prod_db")
         
-        config = get_database_config(DatabaseEnvironment.PRODUCTION)
+        config = get_database_config('production')
         
         assert config["backend"] == "postgresql"
         assert config["host"] == "prod-host"
         assert config["port"] == 5432
         assert config["user"] == "prod_user"
-        assert config["password"] == "prod_pass"
+        assert config["pass"] == "prod_pass"
         assert config["database"] == "prod_db"
     
     def test_get_database_config_postgresql_development(self, monkeypatch):
@@ -128,7 +128,7 @@ class TestDatabaseConfiguration:
         monkeypatch.setenv("PG_PASS", "dev_pass")
         monkeypatch.setenv("PG_DEV_DB", "dev_db")
         
-        config = get_database_config(DatabaseEnvironment.DEVELOPMENT)
+        config = get_database_config('development')
         
         assert config["database"] == "dev_db"
     
@@ -141,7 +141,7 @@ class TestDatabaseConfiguration:
         monkeypatch.setenv("PG_PASS", "test_pass")
         monkeypatch.setenv("PG_TEST_DB", "test_db")
         
-        config = get_database_config(DatabaseEnvironment.TESTING)
+        config = get_database_config('testing')
         
         assert config["database"] == "test_db"
     
@@ -154,13 +154,13 @@ class TestDatabaseConfiguration:
         monkeypatch.setenv("MYSQL_PASS", "mysql_pass")
         monkeypatch.setenv("MYSQL_DB", "mysql_db")
         
-        config = get_database_config(DatabaseEnvironment.PRODUCTION)
+        config = get_database_config('production')
         
         assert config["backend"] == "mysql"
         assert config["host"] == "mysql-prod"
         assert config["port"] == 3306
         assert config["user"] == "mysql_user"
-        assert config["password"] == "mysql_pass"
+        assert config["pass"] == "mysql_pass"
         assert config["database"] == "mysql_db"
     
     def test_get_database_config_mysql_development(self, monkeypatch):
@@ -172,7 +172,7 @@ class TestDatabaseConfiguration:
         monkeypatch.setenv("MYSQL_PASS", "mysql_pass")
         monkeypatch.setenv("MYSQL_DEV_DB", "mysql_dev_db")
         
-        config = get_database_config(DatabaseEnvironment.DEVELOPMENT)
+        config = get_database_config('development')
         
         assert config["database"] == "mysql_dev_db"
     
@@ -185,7 +185,7 @@ class TestDatabaseConfiguration:
         monkeypatch.setenv("MYSQL_PASS", "mysql_pass")
         monkeypatch.setenv("MYSQL_TEST_DB", "mysql_test_db")
         
-        config = get_database_config(DatabaseEnvironment.TESTING)
+        config = get_database_config('testing')
         
         assert config["database"] == "mysql_test_db"
     
@@ -197,30 +197,49 @@ class TestDatabaseConfiguration:
             get_database_config()
     
     def test_get_database_config_missing_sqlite_env_vars(self, monkeypatch):
-        """Test missing SQLite environment variables"""
+        """Test SQLite default values when environment variables are missing"""
         monkeypatch.setenv("DB_BACKEND", "sqlite")
         monkeypatch.delenv("SQLITE_PATH", False)
         monkeypatch.delenv("DEV_SQLITE_PATH", False)
         monkeypatch.delenv("TEST_SQLITE_PATH", False)
         
-        with pytest.raises(ValueError, match="Missing required environment variables"):
-            get_database_config(DatabaseEnvironment.PRODUCTION)
+        config = get_database_config('production')
+        assert config["backend"] == "sqlite"
+        assert config["path"] == "../db/ivod_local.db"
     
     def test_get_database_config_missing_postgresql_env_vars(self, monkeypatch):
-        """Test missing PostgreSQL environment variables"""
+        """Test PostgreSQL default values when environment variables are missing"""
         monkeypatch.setenv("DB_BACKEND", "postgresql")
         monkeypatch.delenv("PG_HOST", False)
+        monkeypatch.delenv("PG_PORT", False)
+        monkeypatch.delenv("PG_USER", False)
+        monkeypatch.delenv("PG_PASS", False)
+        monkeypatch.delenv("PG_DB", False)
         
-        with pytest.raises(ValueError, match="Missing required environment variables"):
-            get_database_config()
+        config = get_database_config('production')
+        assert config["backend"] == "postgresql"
+        assert config["host"] == "localhost"
+        assert config["port"] == 5432
+        assert config["user"] == "ivod_user"
+        assert config["pass"] == "ivod_password"
+        assert config["database"] == "ivod_db"
     
     def test_get_database_config_missing_mysql_env_vars(self, monkeypatch):
-        """Test missing MySQL environment variables"""
+        """Test MySQL default values when environment variables are missing"""
         monkeypatch.setenv("DB_BACKEND", "mysql")
         monkeypatch.delenv("MYSQL_HOST", False)
+        monkeypatch.delenv("MYSQL_PORT", False)
+        monkeypatch.delenv("MYSQL_USER", False)
+        monkeypatch.delenv("MYSQL_PASS", False)
+        monkeypatch.delenv("MYSQL_DB", False)
         
-        with pytest.raises(ValueError, match="Missing required environment variables"):
-            get_database_config()
+        config = get_database_config('production')
+        assert config["backend"] == "mysql"
+        assert config["host"] == "localhost"
+        assert config["port"] == 3306
+        assert config["user"] == "ivod_user"
+        assert config["pass"] == "ivod_password"
+        assert config["database"] == "ivod_db"
 
 
 class TestElasticsearchConfiguration:
@@ -235,7 +254,7 @@ class TestElasticsearchConfiguration:
         monkeypatch.setenv("ES_USER", "es_user")
         monkeypatch.setenv("ES_PASS", "es_pass")
         
-        config = get_elasticsearch_config(DatabaseEnvironment.PRODUCTION)
+        config = get_elasticsearch_config('production')
         
         assert config["host"] == "es-prod"
         assert config["port"] == 9200
@@ -251,7 +270,7 @@ class TestElasticsearchConfiguration:
         monkeypatch.setenv("ES_SCHEME", "http")
         monkeypatch.setenv("ES_DEV_INDEX", "dev_index")
         
-        config = get_elasticsearch_config(DatabaseEnvironment.DEVELOPMENT)
+        config = get_elasticsearch_config('development')
         
         assert config["host"] == "es-dev"
         assert config["index"] == "dev_index"
@@ -263,7 +282,7 @@ class TestElasticsearchConfiguration:
         monkeypatch.setenv("ES_SCHEME", "http")
         monkeypatch.setenv("ES_TEST_INDEX", "test_index")
         
-        config = get_elasticsearch_config(DatabaseEnvironment.TESTING)
+        config = get_elasticsearch_config('testing')
         
         assert config["host"] == "es-test"
         assert config["index"] == "test_index"
@@ -333,16 +352,16 @@ class TestConfigurationEdgeCases:
         es_config = get_elasticsearch_config()
         assert es_config["host"] == "localhost"  # Should use default
         
-        # Should raise error for required missing values
-        with pytest.raises(ValueError):
-            get_database_config()
+        # Should use defaults for empty DB_BACKEND
+        config = get_database_config()
+        assert config["backend"] == "sqlite"  # Should use default
     
     def test_whitespace_in_environment_variables(self, monkeypatch):
         """Test handling of whitespace in environment variables"""
         monkeypatch.setenv("DB_BACKEND", " sqlite ")
         monkeypatch.setenv("SQLITE_PATH", " /path/to/db.sqlite ")
         
-        with patch('ivod.database_env.get_environment', return_value="production"):
+        with patch('ivod.database_env.get_database_environment', return_value="production"):
             config = get_database_config()
             
             # Should strip whitespace
@@ -350,25 +369,25 @@ class TestConfigurationEdgeCases:
             assert config["path"] == "/path/to/db.sqlite"
     
     def test_database_fallback_to_production_config(self, monkeypatch):
-        """Test fallback to production config when env-specific config missing"""
+        """Test development config uses default when env-specific config missing"""
         monkeypatch.setenv("DB_BACKEND", "sqlite")
         monkeypatch.setenv("SQLITE_PATH", "/prod/db.sqlite")
         # Don't set DEV_SQLITE_PATH
         
-        config = get_database_config(DatabaseEnvironment.DEVELOPMENT)
+        config = get_database_config('development')
         
-        # Should fallback to production config
-        assert config["path"] == "/prod/db.sqlite"
+        # Should use development default, not production config
+        assert config["path"] == "../db/ivod_dev.db"
     
     def test_elasticsearch_fallback_to_production_config(self, monkeypatch):
-        """Test Elasticsearch fallback to production config"""
+        """Test Elasticsearch development config uses default when env-specific config missing"""
         monkeypatch.setenv("ES_INDEX", "prod_index")
         # Don't set ES_DEV_INDEX
         
-        config = get_elasticsearch_config(DatabaseEnvironment.DEVELOPMENT)
+        config = get_elasticsearch_config('development')
         
-        # Should fallback to production config
-        assert config["index"] == "prod_index"
+        # Should use development default, not production config
+        assert config["index"] == "ivod_dev_transcripts"
 
 
 if __name__ == "__main__":

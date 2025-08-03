@@ -37,6 +37,11 @@ describe('IVOD Detail Page', () => {
   beforeEach(() => {
     (useRouter as jest.Mock).mockReturnValue(mockRouter);
     (fetch as jest.Mock).mockClear();
+    (fetch as jest.Mock).mockReset();
+    (fetch as jest.Mock).mockResolvedValue({
+      ok: true, // Add ok: true for a successful response
+      json: () => Promise.resolve({ data: null })
+    });
     mockPush.mockClear();
     // Clear all timers
     jest.clearAllTimers();
@@ -255,6 +260,7 @@ describe('IVOD Detail Page', () => {
     };
 
     (fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
       json: () => Promise.resolve(mockData),
     });
 
@@ -278,6 +284,7 @@ describe('IVOD Detail Page', () => {
     };
 
     (fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
       json: () => Promise.resolve(mockData),
     });
 
@@ -341,14 +348,22 @@ describe('IVOD Detail Page', () => {
   });
 
   it('handles network errors gracefully', async () => {
-    (fetch as jest.Mock).mockRejectedValue(new Error('Network error'));
+    // Mock console.error to suppress error output in tests
+    const originalConsoleError = console.error;
+    console.error = jest.fn();
+
+    // Simulate a network error
+    (fetch as jest.Mock).mockRejectedValueOnce(new Error('Network error'));
 
     render(<IvodDetail />);
 
-    // Component doesn't handle errors, so it will stay in loading state  
+    // The component is expected to not handle the error and remain in the loading state.
     await waitFor(() => {
       expect(screen.getByText('載入中...')).toBeInTheDocument();
     }, { timeout: 5000 });
+
+    // Restore console.error
+    console.error = originalConsoleError;
   });
 
   it('waits for router to be ready before making API call', () => {
@@ -380,6 +395,9 @@ describe('IVOD Detail Page', () => {
   });
 
   it('shows committee names correctly when data is string format', async () => {
+    // Clear any existing mocks to ensure clean state
+    (fetch as jest.Mock).mockClear();
+    
     const mockData = {
       data: {
         ivod_id: 123,
@@ -426,6 +444,7 @@ describe('IVOD Detail Page', () => {
     };
 
     (fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
       json: () => Promise.resolve(mockData),
     });
 

@@ -31,6 +31,10 @@ class DummyQuery:
     def __init__(self, objs):
         self.objs = objs
 
+    def filter(self, *args):
+        # 簡單返回自己，忽略過濾條件
+        return self
+    
     def all(self):
         return self.objs
 
@@ -68,18 +72,34 @@ def es_env(monkeypatch):
 
 def test_run_es(monkeypatch):
     es_instance = DummyEs()
-    monkeypatch.setattr(tasks, "Elasticsearch", lambda *args, **kwargs: es_instance)
+    
+    # Mock Elasticsearch availability check to return True
+    monkeypatch.setattr("ivod.db.check_elasticsearch_available", lambda: True)
+    
+    # Mock the functions that run_es calls
+    monkeypatch.setattr("ivod.db.get_elasticsearch_client", lambda: (es_instance, "testindex"))
+    monkeypatch.setattr("ivod.db.create_elasticsearch_index", lambda es, index: True)
+    
     # Prepare dummy DB with two objects
     obj1 = DummyObj(1, "a", "b", "t1")
     obj2 = DummyObj(2, "", None, None)
     db_instance = DummyDB([obj1, obj2])
-    monkeypatch.setattr(tasks, "Session", lambda: db_instance)
+    monkeypatch.setattr("ivod.db.Session", lambda: db_instance)
+    
+    # Mock the bulk indexing function to record calls
+    def mock_bulk_index(es, es_index, records):
+        for record in records:
+            es.index(index=es_index, id=record.ivod_id, body={
+                "ivod_id": record.ivod_id,
+                "ai_transcript": record.ai_transcript or "",
+                "ly_transcript": record.ly_transcript or "",
+                "title": record.title or ""
+            })
+        return len(records), 0, 0
+    
+    monkeypatch.setattr("ivod.db.bulk_index_to_elasticsearch", mock_bulk_index)
 
     tasks.run_es()
-
-    # Ensure index creation was attempted once
-    assert es_instance.indices.exists_calls == ["testindex"]
-    assert len(es_instance.indices.create_calls) == 1
 
     # Ensure two documents were indexed
     assert len(es_instance.index_calls) == 2

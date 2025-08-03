@@ -35,7 +35,7 @@ def get_database_config(env: DatabaseEnvironment = None) -> Dict[str, Any]:
     if env is None:
         env = get_database_environment()
     
-    db_backend = os.getenv("DB_BACKEND", "sqlite").lower()
+    db_backend = (os.getenv("DB_BACKEND", "sqlite") or "sqlite").strip().lower()
     
     if db_backend == "sqlite":
         return get_sqlite_config(env)
@@ -44,20 +44,21 @@ def get_database_config(env: DatabaseEnvironment = None) -> Dict[str, Any]:
     elif db_backend == "mysql":
         return get_mysql_config(env)
     else:
-        raise ValueError(f"Unsupported DB_BACKEND: {db_backend}")
+        raise ValueError(f"Unsupported database backend: {db_backend}")
 
 def get_sqlite_config(env: DatabaseEnvironment) -> Dict[str, Any]:
     """SQLite 環境設定"""
     base_path = "../db"
     
     if env == 'testing':
-        path = os.getenv("TEST_SQLITE_PATH", f"{base_path}/ivod_test.db")
+        path = os.getenv("TEST_SQLITE_PATH", f"{base_path}/ivod_test.db").strip()
     elif env == 'development':
-        path = os.getenv("DEV_SQLITE_PATH", f"{base_path}/ivod_dev.db")
+        path = os.getenv("DEV_SQLITE_PATH", f"{base_path}/ivod_dev.db").strip()
     else:  # production
-        path = os.getenv("SQLITE_PATH", f"{base_path}/ivod_local.db")
+        path = os.getenv("SQLITE_PATH", f"{base_path}/ivod_local.db").strip()
     
     return {
+        "backend": "sqlite",
         "path": path,
         "url": f"sqlite:///{path}"
     }
@@ -66,7 +67,7 @@ def get_postgresql_config(env: DatabaseEnvironment) -> Dict[str, Any]:
     """PostgreSQL 環境設定"""
     base_config = {
         "host": os.getenv("PG_HOST", "localhost"),
-        "port": os.getenv("PG_PORT", "5432"),
+        "port": int(os.getenv("PG_PORT", "5432")),
         "user": os.getenv("PG_USER", "ivod_user"),
         "pass": os.getenv("PG_PASS", "ivod_password")
     }
@@ -79,6 +80,7 @@ def get_postgresql_config(env: DatabaseEnvironment) -> Dict[str, Any]:
         database = os.getenv("PG_DB", "ivod_db")
     
     return {
+        "backend": "postgresql",
         "database": database,
         "url": f"postgresql://{base_config['user']}:{base_config['pass']}@{base_config['host']}:{base_config['port']}/{database}",
         **base_config
@@ -88,7 +90,7 @@ def get_mysql_config(env: DatabaseEnvironment) -> Dict[str, Any]:
     """MySQL 環境設定"""
     base_config = {
         "host": os.getenv("MYSQL_HOST", "localhost"),
-        "port": os.getenv("MYSQL_PORT", "3306"),
+        "port": int(os.getenv("MYSQL_PORT", "3306")),
         "user": os.getenv("MYSQL_USER", "ivod_user"),
         "pass": os.getenv("MYSQL_PASS", "ivod_password")
     }
@@ -101,6 +103,7 @@ def get_mysql_config(env: DatabaseEnvironment) -> Dict[str, Any]:
         database = os.getenv("MYSQL_DB", "ivod_db")
     
     return {
+        "backend": "mysql",
         "database": database,
         "url": f"mysql+pymysql://{base_config['user']}:{base_config['pass']}@{base_config['host']}:{base_config['port']}/{database}?charset=utf8mb4",
         **base_config
@@ -111,10 +114,15 @@ def get_elasticsearch_config(env: DatabaseEnvironment = None) -> Dict[str, Any]:
     if env is None:
         env = get_database_environment()
     
+    try:
+        port = int(os.getenv("ES_PORT", "9200") or "9200")
+    except ValueError:
+        raise ValueError("Invalid ES_PORT: must be a valid integer")
+    
     base_config = {
-        "host": os.getenv("ES_HOST", "localhost"),
-        "port": int(os.getenv("ES_PORT", 9200)),
-        "scheme": os.getenv("ES_SCHEME", "http"),
+        "host": os.getenv("ES_HOST", "localhost") or "localhost",
+        "port": port,
+        "scheme": os.getenv("ES_SCHEME", "http") or "http",
         "user": os.getenv("ES_USER"),
         "password": os.getenv("ES_PASS")
     }

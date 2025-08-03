@@ -25,7 +25,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.mysql import LONGTEXT
 from sqlalchemy.dialects.postgresql import TEXT as PG_TEXT
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import declarative_base
 from sqlalchemy.orm import sessionmaker
 
 engine = create_engine(DB_URL, echo=False)
@@ -146,7 +146,10 @@ def check_elasticsearch_available():
     auth = (es_config["user"], es_config["password"]) if es_config["user"] and es_config["password"] else None
     
     try:
-        es = Elasticsearch([{"host": es_config["host"], "port": es_config["port"], "scheme": es_config["scheme"]}], http_auth=auth)
+        if auth:
+            es = Elasticsearch([{"host": es_config["host"], "port": es_config["port"], "scheme": es_config["scheme"]}], basic_auth=auth)
+        else:
+            es = Elasticsearch([{"host": es_config["host"], "port": es_config["port"], "scheme": es_config["scheme"]}])
         
         # 測試連線
         if es.ping():
@@ -175,7 +178,10 @@ def get_elasticsearch_client():
     auth = (es_config["user"], es_config["password"]) if es_config["user"] and es_config["password"] else None
     
     try:
-        es = Elasticsearch([{"host": es_config["host"], "port": es_config["port"], "scheme": es_config["scheme"]}], http_auth=auth)
+        if auth:
+            es = Elasticsearch([{"host": es_config["host"], "port": es_config["port"], "scheme": es_config["scheme"]}], basic_auth=auth)
+        else:
+            es = Elasticsearch([{"host": es_config["host"], "port": es_config["port"], "scheme": es_config["scheme"]}])
         
         # 測試連線
         if not es.ping():
@@ -348,10 +354,9 @@ def run_elasticsearch_indexing(ivod_ids=None, full_mode=False):
     返回:
     - bool: 是否成功執行（無錯誤）
     """
-    # Check if Elasticsearch is explicitly disabled
-    es_enabled = os.getenv("ENABLE_ELASTICSEARCH", "true").lower() != "false"
-    if not es_enabled:
-        logger.info("ℹ️  Elasticsearch 已被 ENABLE_ELASTICSEARCH=false 停用，跳過索引更新")
+    # Check if Elasticsearch is available
+    if not check_elasticsearch_available():
+        logger.info("ℹ️  Elasticsearch 不可用，跳過索引更新")
         return True  # Return True since this is expected behavior, not an error
     
     # 建立 Elasticsearch 連線

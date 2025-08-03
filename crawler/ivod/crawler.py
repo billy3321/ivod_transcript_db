@@ -150,7 +150,12 @@ def fetch_available_dates(br: mechanize.Browser, session=3):
         # Fallback to requests for JSON endpoints to avoid mechanize gzip issues
         req_session = get_requests_session()
         raw = req_session.get(url).text
-    js = json.loads(raw)
+    
+    try:
+        js = json.loads(raw)
+    except json.JSONDecodeError:
+        return []
+    
     aggs = js.get('aggs', [])
     dates = []
     if len(aggs):

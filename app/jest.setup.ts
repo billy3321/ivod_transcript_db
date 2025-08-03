@@ -47,11 +47,26 @@ jest.mock('next/router', () => ({
 }));
 
 jest.mock('next/link', () => {
-  return ({ children }: { children: ReactNode }) => children;
+  const React = require('react');
+  return ({ children, href, className, suppressHydrationWarning, ...props }: { 
+    children: ReactNode; 
+    href: string; 
+    className?: string;
+    suppressHydrationWarning?: boolean;
+    [key: string]: any;
+  }) => React.createElement('a', { href, className, ...props }, children);
+});
+
+// Mock ClientOnly to always render children immediately in tests
+jest.mock('@/components/ClientOnly', () => {
+  return ({ children }: { children: any }) => children;
 });
 
 // Suppress deprecated act() warnings from ReactDOMTestUtils
 const originalError = console.error;
+const originalLog = console.log;
+const originalWarn = console.warn;
+
 console.error = (...args) => {
   if (
     typeof args[0] === 'string' &&
@@ -59,5 +74,59 @@ console.error = (...args) => {
   ) {
     return;
   }
+  // Ignore useErrorHandler test console.error calls
+  if (
+    typeof args[0] === 'string' &&
+    (args[0] === 'Unknown: String error message' ||
+     args[0] === 'Unknown: Test error' ||
+     args[0] === 'Unknown: Async error' ||
+     args[0] === 'Unknown: Handler error' ||
+     args[0] === 'Unknown: Async handler error')
+  ) {
+    return;
+  }
+  // Ignore React act() warnings from async hooks in tests
+  if (
+    typeof args[0] === 'string' &&
+    args[0].includes('Warning: An update to') &&
+    args[0].includes('inside a test was not wrapped in act(...)')
+  ) {
+    return;
+  }
+  // Ignore HLS related warnings in tests
+  if (
+    typeof args[0] === 'string' &&
+    (args[0].includes('HLS is not supported in this browser') ||
+     args[0].includes('HLS error:') ||
+     args[0].includes('HLS manifest parsed'))
+  ) {
+    return;
+  }
   originalError(...args as any);
+};
+
+console.log = (...args) => {
+  // Ignore HLS related log messages in tests
+  if (
+    typeof args[0] === 'string' &&
+    (args[0].includes('HLS manifest parsed') ||
+     args[0].includes('HLS is') ||
+     args[0].includes('HLS error'))
+  ) {
+    return;
+  }
+  originalLog(...args as any);
+};
+
+console.warn = (...args) => {
+  // Ignore HLS related warning messages in tests
+  if (
+    typeof args[0] === 'string' &&
+    (args[0].includes('HLS is not supported') ||
+     args[0].includes('HLS error:') ||
+     args[0].includes('HLS manifest'))
+  ) {
+    return;
+  }
+  originalWarn(...args as any);
 };

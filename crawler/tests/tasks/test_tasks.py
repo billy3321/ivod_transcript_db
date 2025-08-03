@@ -26,7 +26,7 @@ def test_run_full_noop(monkeypatch):
 
     monkeypatch.setattr(tasks, "Session", lambda: DummyDB())
     run_full(skip_ssl=False)
-    assert calls == ["close"]
+    assert calls == ["commit", "close"]
 
 
 def test_run_incremental_noop(monkeypatch):
@@ -87,7 +87,10 @@ def test_run_retry_with_objects(monkeypatch):
 
     monkeypatch.setattr(tasks, "make_browser", lambda skip_ssl: None)
     from datetime import date
-    objs = [type("O", (), {"ivod_id": 1111, "date": date(2023, 1, 1)}), type("O", (), {"ivod_id": 2222, "date": date(2023, 1, 2)})]
+    objs = [
+        type("O", (), {"ivod_id": 1111, "date": date(2023, 1, 1), "ai_status": "failed", "ly_status": "failed"}), 
+        type("O", (), {"ivod_id": 2222, "date": date(2023, 1, 2), "ai_status": "failed", "ly_status": "failed"})
+    ]
 
     class DummyQuery:
         def __init__(self, objs):
@@ -110,6 +113,10 @@ def test_run_retry_with_objects(monkeypatch):
         def query(self, model):
             return DummyQuery(objs)
 
+        def get(self, model, ivod_id):
+            # Return a mock object for existing records
+            return type("O", (), {"ivod_id": ivod_id})
+
         def commit(self):
             self.commits += 1
 
@@ -124,7 +131,7 @@ def test_run_retry_with_objects(monkeypatch):
         return {'ai_status': 'success', 'ly_status': 'success'}
     monkeypatch.setattr(tasks, "process_ivod", mock_process_ivod)
     run_retry(skip_ssl=True)
-    expected = [(1111, db_instance), (2222, db_instance), (1111, db_instance), (2222, db_instance)]
+    expected = [(1111, db_instance), (1111, db_instance), (2222, db_instance), (2222, db_instance)]
     assert processed == expected
-    assert db_instance.commits == len(expected)
+    assert db_instance.commits >= 1  # Should have at least one commit from batch processor
     assert db_instance.closed

@@ -10,6 +10,7 @@ import logging
 from datetime import datetime, timedelta
 import os
 from pathlib import Path
+import pytz
 
 from tqdm import tqdm
 try:
@@ -66,14 +67,14 @@ class BatchProcessor:
                         if obj:
                             for k, v in record_data.items():
                                 setattr(obj, k, v)
-                            obj.last_updated = datetime.now()
+                            obj.last_updated = datetime.now(pytz.timezone('Asia/Taipei'))
                         else:
                             # Record doesn't exist, create new one
-                            record_data["last_updated"] = datetime.now()
+                            record_data["last_updated"] = datetime.now(pytz.timezone('Asia/Taipei'))
                             self.db.add(IVODTranscript(**record_data))
                     else:
                         # New record
-                        record_data["last_updated"] = datetime.now()
+                        record_data["last_updated"] = datetime.now(pytz.timezone('Asia/Taipei'))
                         self.db.add(IVODTranscript(**record_data))
                     
                     self.total_processed += 1
@@ -117,7 +118,7 @@ def log_failed_ivod(ivod_id, error_type="general"):
     error_dir = Path(error_log_path).parent
     error_dir.mkdir(exist_ok=True)
     
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    timestamp = datetime.now(pytz.timezone('Asia/Taipei')).strftime("%Y-%m-%d %H:%M:%S")
     with open(error_log_path, "a", encoding="utf-8") as f:
         f.write(f"{ivod_id},{error_type},{timestamp}\n")
 
@@ -127,7 +128,7 @@ def setup_logging():
     log_dir = Path(log_path)
     log_dir.mkdir(exist_ok=True)
     
-    log_file = log_dir / f"crawler_{datetime.now().strftime('%Y%m%d')}.log"
+    log_file = log_dir / f"crawler_{datetime.now(pytz.timezone('Asia/Taipei')).strftime('%Y%m%d')}.log"
     
     # 清除現有的handlers以避免重複設置
     for handler in logging.root.handlers[:]:
@@ -174,7 +175,7 @@ def run_full(skip_ssl: bool = True, start_date: str = None, end_date: str = None
 
     # 預設起始和結束日期
     default_start = "2024-02-01"
-    today = datetime.now().strftime("%Y-%m-%d")
+    today = datetime.now(pytz.timezone('Asia/Taipei')).strftime("%Y-%m-%d")
     
     # 驗證和設定實際使用的日期範圍
     actual_start = _validate_date_range(start_date, end_date, default_start, today)
@@ -225,7 +226,8 @@ def run_full(skip_ssl: bool = True, start_date: str = None, end_date: str = None
         
     except Exception as e:
         logger.error(f"批次處理過程中發生錯誤: {e}", exc_info=True)
-        raise
+        db.rollback()
+        return False
     finally:
         db.close()
     logger.info("全量拉取完成。")
@@ -260,7 +262,7 @@ def run_incremental(skip_ssl: bool = True):
     br = make_browser(skip_ssl=skip_ssl)
     db = Session()
 
-    today = datetime.now().date()
+    today = datetime.now(pytz.timezone('Asia/Taipei')).date()
     two_weeks_ago = today - timedelta(days=14)
     ids = set()
     for d in date_range(two_weeks_ago.isoformat(), today.isoformat()):
@@ -737,7 +739,7 @@ def run_backup(backup_file=None):
     try:
         # 自動生成備份檔案名
         if not backup_file:
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            timestamp = datetime.now(pytz.timezone('Asia/Taipei')).strftime("%Y%m%d_%H%M%S")
             backup_file = f"backup/ivod_backup_{timestamp}.json"
         
         # 確保備份目錄存在
@@ -759,7 +761,7 @@ def run_backup(backup_file=None):
         # 轉換為可序列化的格式
         backup_data = {
             "metadata": {
-                "backup_time": datetime.now().isoformat(),
+                "backup_time": datetime.now(pytz.timezone('Asia/Taipei')).isoformat(),
                 "db_backend": DB_BACKEND,
                 "record_count": record_count,
                 "version": "1.0"

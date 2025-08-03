@@ -21,13 +21,13 @@ describe('VideoDownloader Simple Tests', () => {
 
   it('renders correctly', () => {
     render(<VideoDownloader videoUrl={validUrl} />);
-    expect(screen.getByText('下載IVOD影片')).toBeInTheDocument();
+    expect(screen.getByText('下載 IVOD 影片')).toBeInTheDocument();
   });
 
   it('validates URL format', () => {
     render(<VideoDownloader videoUrl={invalidUrl} />);
     fireEvent.click(screen.getByRole('button'));
-    expect(screen.getByText(/僅支援M3U8格式的影片下載/)).toBeInTheDocument();
+    expect(screen.getByText('僅支援 M3U8 格式的影片下載')).toBeInTheDocument();
   });
 
   it('handles empty URL', () => {

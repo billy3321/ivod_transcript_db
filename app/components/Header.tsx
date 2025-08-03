@@ -20,6 +20,7 @@ const Header: FC<HeaderProps> = ({ onMenuClick }) => {
       {/* Logo and Brand */}
       <div className="flex items-center">
         <button
+          type="button"
           onClick={onMenuClick}
           className="text-gray-500 focus:outline-none lg:hidden mr-4"
         >
