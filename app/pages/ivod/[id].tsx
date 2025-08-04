@@ -7,7 +7,7 @@ import StructuredData from '@/components/StructuredData';
 import HLSPlayer from '@/components/HLSPlayer';
 import VideoDownloader from '@/components/VideoDownloader';
 import DownloadProgressDisplay from '@/components/DownloadProgressDisplay';
-import { formatCommitteeNames, formatIVODTitle, formatVideoTime, formatVideoType, formatTimestamp } from '@/lib/utils';
+import { formatCommitteeNames, formatIVODTitle, formatVideoTime, formatVideoType, formatTimestamp, formatTaiwanDateTime } from '@/lib/utils';
 import Link from 'next/link';
 
 interface DownloadProgress {
@@ -55,13 +55,13 @@ export default function IvodDetail() {
     if (!data) return null;
     
     const formattedTitle = formatIVODTitle(data.title, data.meeting_name, data.speaker_name);
-    const title = `${formattedTitle} - ${formatTimestamp(data.date)} - IVOD 逐字稿檢索系統`;
+    const title = `${formattedTitle} - ${formatTaiwanDateTime(data.date)} - IVOD 逐字稿檢索系統`;
     
     // Create rich description with transcript excerpt
     const transcriptContent = data.ly_transcript || data.ai_transcript || '';
     const transcriptExcerpt = transcriptContent ? transcriptContent.slice(0, 150).replace(/\s+/g, ' ').trim() + '...' : '';
     
-    const description = `${formattedTitle}，${formatTimestamp(data.date)}${data.video_type ? `，${formatVideoType(data.video_type)}` : ''}。台灣立法院IVOD影片與逐字稿檢索，提供完整會議記錄。${data.meeting_name ? ` 會議：${data.meeting_name}` : ''}${data.committee_names ? `，委員會：${formatCommitteeNames(data.committee_names)}` : ''}${transcriptExcerpt ? ` 內容摘要：${transcriptExcerpt}` : ''}`;
+    const description = `${formattedTitle}，${formatTaiwanDateTime(data.date)}${data.video_type ? `，${formatVideoType(data.video_type)}` : ''}。台灣立法院IVOD影片與逐字稿檢索，提供完整會議記錄。${data.meeting_name ? ` 會議：${data.meeting_name}` : ''}${data.committee_names ? `，委員會：${formatCommitteeNames(data.committee_names)}` : ''}${transcriptExcerpt ? ` 內容摘要：${transcriptExcerpt}` : ''}`;
     
     const keywords = `立法院,IVOD,逐字稿,會議記錄,${data.title || ''},${data.meeting_name || ''},${data.speaker_name || ''},台灣政治,立法委員,國會監督,${data.committee_names ? formatCommitteeNames(data.committee_names) : ''},${data.video_type || ''},${data.category || ''}`;
     const canonicalUrl = `${process.env.NEXT_PUBLIC_SITE_URL || 'https://ivod-search.g0v.tw'}/ivod/${data.ivod_id}`;
@@ -132,7 +132,7 @@ export default function IvodDetail() {
         <meta name="government.country" content="台灣" />
         <meta name="parliament.session" content="第11屆" />
         <meta name="meeting.type" content={data.video_type || ''} />
-        <meta name="meeting.date" content={formatTimestamp(data.date)} />
+        <meta name="meeting.date" content={formatTaiwanDateTime(data.date)} />
         {data.committee_names && <meta name="committee" content={formatCommitteeNames(data.committee_names)} />}
         
         {/* Schema.org structured data will be handled by StructuredData component */}
@@ -196,7 +196,7 @@ export default function IvodDetail() {
               </svg>
               <div>
                 <span className="font-medium">日期：</span>
-                <span className="ml-1">{formatTimestamp(data.date)}</span>
+                <span className="ml-1">{formatTaiwanDateTime(data.date)}</span>
               </div>
             </div>
             
@@ -295,7 +295,7 @@ export default function IvodDetail() {
                 </svg>
                 <div>
                   <span className="font-medium">會議時間：</span>
-                  <span className="ml-1">{formatTimestamp(data.meeting_time)}</span>
+                  <span className="ml-1">{formatTaiwanDateTime(data.meeting_time)}</span>
                 </div>
               </div>
             )}

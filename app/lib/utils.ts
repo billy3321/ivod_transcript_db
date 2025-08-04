@@ -150,6 +150,41 @@ export function formatTimestamp(timestamp: string | Date | null): string {
 }
 
 /**
+ * Format Taiwan datetime for display without timezone conversion
+ * For meeting_time and date fields which are already in Taiwan local time
+ */
+export function formatTaiwanDateTime(datetime: string | Date | null): string {
+  if (!datetime) return '';
+  
+  try {
+    let dateStr = '';
+    if (datetime instanceof Date) {
+      // Format Date object to ISO string and extract local part
+      dateStr = datetime.toISOString().replace('T', ' ').replace(/\.\d{3}Z$/, '');
+    } else {
+      // Handle string input - clean up timezone info if present
+      dateStr = datetime.replace(/[+-]\d{2}:?\d{2}$|Z$/, '');
+    }
+    
+    // Parse as local time (no timezone conversion)
+    const [datePart, timePart] = dateStr.split(/[T\s]/);
+    if (!datePart) return datetime.toString();
+    
+    // Format as YYYY/MM/DD HH:mm:ss
+    const [year, month, day] = datePart.split('-');
+    const timeFormatted = timePart ? timePart.replace(/(\d{2}):(\d{2}):(\d{2})/, '$1:$2:$3') : '';
+    
+    if (timeFormatted) {
+      return `${year}/${month}/${day} ${timeFormatted}`;
+    } else {
+      return `${year}/${month}/${day}`;
+    }
+  } catch {
+    return datetime?.toString() || '';
+  }
+}
+
+/**
  * Create database-specific contains condition for search queries
  * Handles different field types and database backends properly
  */

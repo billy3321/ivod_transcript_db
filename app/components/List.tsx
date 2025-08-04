@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import DOMPurify from 'dompurify';
 import { IVOD } from '@/types';
-import { formatCommitteeNames, formatIVODTitle, formatVideoTime, formatVideoType, formatTimestamp } from '@/lib/utils';
+import { formatCommitteeNames, formatIVODTitle, formatVideoTime, formatVideoType, formatTaiwanDateTime } from '@/lib/utils';
 import Icon from './Icon';
 
 interface ListProps {
@@ -59,7 +59,7 @@ export default function List({ items, loading = false }: ListProps) {
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-sm text-gray-600">
                 <div className="flex items-center">
                   <Icon type="calendar" className="w-4 h-4 mr-1 text-gray-400" />
-                  <span>{formatTimestamp(item.date)}</span>
+                  <span>{formatTaiwanDateTime(item.date)}</span>
                 </div>
                 
                 {item.speaker_name && (
