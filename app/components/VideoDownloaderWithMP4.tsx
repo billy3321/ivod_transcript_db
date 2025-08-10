@@ -243,7 +243,7 @@ const VideoDownloaderWithMP4: React.FC<VideoDownloaderWithMP4Props> = ({
         finalFileName = `${fileName}.mp4`;
       }
 
-      // 創建並下載檔案
+      // 建立並下載檔案
       const mimeType = outputFormat === 'mp4' ? 'video/mp4' : 'video/mp2t';
       const blob = new Blob([finalBuffer], { type: mimeType });
       const url = URL.createObjectURL(blob);

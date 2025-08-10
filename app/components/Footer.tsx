@@ -63,7 +63,7 @@ const Footer: FC = () => {
           console.error('Database status API returned error:', response.status);
         }
       } catch (error) {
-        // 處理網絡錯誤或其他異常
+        // 處理網路錯誤或其他異常
         const errorText = '無法連接資料庫';
         databaseStatusCache.error = errorText;
         databaseStatusCache.lastUpdated = null;

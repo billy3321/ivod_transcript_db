@@ -1,32 +1,32 @@
-# 數據庫表格設定修復指南
+# 資料庫表格設定修復指南
 
 ## 問題診斷
 
-當設定 MySQL/PostgreSQL 後，發現數據庫中沒有表格的原因：
+當設定 MySQL/PostgreSQL 後，發現資料庫中沒有表格的原因：
 
 1. **Crawler 和 App 使用不同的 ORM 系統**
    - Crawler: SQLAlchemy（Python）
    - App: Prisma（Node.js）
 
 2. **Schema 同步問題**
-   - 兩個系統對同一個數據庫有不同的 schema 定義
+   - 兩個系統對同一個資料庫有不同的 schema 定義
    - 需要確保 schema 一致性
 
-3. **缺少數據庫遷移步驟**
-   - Prisma 需要手動執行遷移來創建表格
+3. **缺少資料庫遷移步驟**
+   - Prisma 需要手動執行遷移來建立表格
 
 ## 修復方案
 
-### 方案一：使用 Crawler 創建表格（推薦）
+### 方案一：使用 Crawler 建立表格（推薦）
 
-由於 Crawler 的 SQLAlchemy 會自動創建表格，我們可以先運行 Crawler 來初始化數據庫。
+由於 Crawler 的 SQLAlchemy 會自動建立表格，我們可以先運行 Crawler 來初始化資料庫。
 
 #### 1. 配置 Crawler 環境變數
 
 **編輯 `crawler/.env`：**
 
 ```bash
-# 數據庫配置（MySQL 範例）
+# 資料庫配置（MySQL 範例）
 DB_BACKEND=mysql
 MYSQL_HOST=localhost
 MYSQL_PORT=3306
@@ -45,11 +45,11 @@ MYSQL_PASS=your_password
 # SSL 設定（如果需要）
 SKIP_SSL=True
 
-# 測試數據庫
+# 測試資料庫
 TEST_SQLITE_PATH=../db/ivod_test.db
 ```
 
-#### 2. 測試 Crawler 數據庫連線
+#### 2. 測試 Crawler 資料庫連線
 
 ```bash
 cd crawler
@@ -57,12 +57,12 @@ cd crawler
 # 安裝依賴
 pip install -r requirements.txt
 
-# 測試數據庫連線和表格創建
+# 測試資料庫連線和表格建立
 python -c "
 from ivod.db import get_session, IVODTranscript
 session = get_session()
-print('數據庫連線成功！')
-print(f'表格已創建: {IVODTranscript.__tablename__}')
+print('資料庫連線成功！')
+print(f'表格已建立: {IVODTranscript.__tablename__}')
 session.close()
 "
 ```
@@ -84,7 +84,7 @@ print('初始化完成！')
 "
 ```
 
-#### 4. 檢查表格是否創建成功
+#### 4. 檢查表格是否建立成功
 
 **MySQL:**
 ```bash
@@ -105,7 +105,7 @@ psql -h localhost -U ivod_user -d ivod_db -c "\d ivod_transcripts"
 **編輯 `app/.env`：**
 
 ```bash
-# 數據庫配置（與 crawler/.env 保持一致）
+# 資料庫配置（與 crawler/.env 保持一致）
 DB_BACKEND=mysql
 DATABASE_URL="mysql://ivod_user:your_password@localhost:3306/ivod_db"
 
@@ -136,20 +136,20 @@ cat prisma/schema.prisma
 # 生成 Prisma client
 npm run prisma:generate
 
-# 推送 schema 到數據庫（會創建表格）
+# 推送 schema 到資料庫（會建立表格）
 npx prisma db push
 
 # 或者使用遷移（更正式的方式）
 npx prisma migrate dev --name init
 ```
 
-#### 4. 驗證表格創建
+#### 4. 驗證表格建立
 
 ```bash
 # 使用 Prisma Studio 檢查
 npx prisma studio
 
-# 或者直接查詢數據庫
+# 或者直接查詢資料庫
 npx prisma db execute --stdin <<EOF
 SELECT table_name FROM information_schema.tables 
 WHERE table_schema = 'ivod_db';
@@ -160,9 +160,9 @@ EOF
 
 為了避免未來的不一致問題，建議統一兩個系統的 schema 定義。
 
-#### 1. 創建共用的 SQL 遷移文件
+#### 1. 建立共用的 SQL 遷移文件
 
-**創建 `database_schema.sql`：**
+**建立 `database_schema.sql`：**
 
 ```sql
 -- 適用於 MySQL 和 PostgreSQL 的統一 Schema
@@ -215,22 +215,22 @@ psql -h localhost -U ivod_user -d ivod_db -f database_schema.sql
 
 ### 問題 1: "Table doesn't exist" 錯誤
 
-**原因**: 表格尚未創建
-**解決**: 按照上述方案一或二執行表格創建
+**原因**: 表格尚未建立
+**解決**: 按照上述方案一或二執行表格建立
 
 ### 問題 2: "Column count doesn't match" 錯誤
 
 **原因**: Crawler 和 App 的 schema 定義不一致
-**解決**: 使用方案三統一 schema，或者刪除表格重新創建
+**解決**: 使用方案三統一 schema，或者刪除表格重新建立
 
 ### 問題 3: 資料類型不匹配
 
-**原因**: 不同數據庫對 JSON、ARRAY 等類型支援不同
+**原因**: 不同資料庫對 JSON、ARRAY 等類型支援不同
 **解決**: 統一使用 TEXT 類型存儲 JSON 字符串
 
 ### 問題 4: 權限問題
 
-**原因**: 數據庫用戶沒有創建表格的權限
+**原因**: 資料庫用戶沒有建立表格的權限
 **解決**: 
 ```sql
 -- MySQL
@@ -303,7 +303,7 @@ test();
 
 ## 建議的部署流程
 
-1. **首先設定 Crawler**（會自動創建表格）
+1. **首先設定 Crawler**（會自動建立表格）
 2. **然後設定 App**（使用現有表格）
 3. **定期執行數據同步檢查**
 

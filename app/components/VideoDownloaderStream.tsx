@@ -72,13 +72,13 @@ const VideoDownloaderStream: React.FC<VideoDownloaderStreamProps> = ({
 
       setTotalSegments(segmentUrls.length);
 
-      // 創建一個 TransformStream 來處理數據流
+      // 建立一個 TransformStream 來處理數據流
       const { readable, writable } = new TransformStream();
       
       // 立即開始寫入流程
       const writer = writable.getWriter();
       
-      // 創建下載流程
+      // 建立下載流程
       const downloadPromise = (async () => {
         let totalBytes = 0;
         let successCount = 0;
@@ -156,7 +156,7 @@ const VideoDownloaderStream: React.FC<VideoDownloaderStreamProps> = ({
         offset += chunk.length;
       }
 
-      // 創建Blob並觸發下載
+      // 建立Blob並觸發下載
       const blob = new Blob([mergedBuffer], { type: 'video/mp2t' });
       const url = URL.createObjectURL(blob);
       

@@ -134,13 +134,13 @@ def setup_logging():
     for handler in logging.root.handlers[:]:
         logging.root.removeHandler(handler)
     
-    # 創建文件handler，記錄所有級別的日誌
+    # 建立文件handler，記錄所有級別的日誌
     file_handler = logging.FileHandler(log_file, encoding='utf-8')
     file_handler.setLevel(logging.INFO)
     file_formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s")
     file_handler.setFormatter(file_formatter)
     
-    # 創建控制台handler，只顯示ERROR和WARNING級別
+    # 建立控制台handler，只顯示ERROR和WARNING級別
     console_handler = logging.StreamHandler()
     console_handler.setLevel(logging.WARNING)
     console_formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s")

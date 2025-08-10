@@ -209,7 +209,7 @@ const VideoDownloader: React.FC<VideoDownloaderProps> = ({
       const fileType = 'video/mp2t';
       
 
-      // 創建 Blob 並觸發下載
+      // 建立 Blob 並觸發下載
       const blob = new Blob([finalBuffer], { type: fileType });
       const url = URL.createObjectURL(blob);
       

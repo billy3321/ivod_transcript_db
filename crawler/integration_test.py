@@ -76,7 +76,7 @@ def main():
             print(f"⚠️ 即將重置資料庫（刪除所有現有記錄）")
             print(f"⚠️ 資料庫: {bind.engine.url}")
             
-            # 要求用戶確認
+            # 要求使用者確認
             while True:
                 confirm = input("確定要重置資料庫嗎？(y/N): ").strip().lower()
                 if confirm in ['y', 'yes']:

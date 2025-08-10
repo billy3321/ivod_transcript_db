@@ -28,7 +28,7 @@ export class RateLimiter {
 
   /**
    * 檢查請求是否被速率限制
-   * @param identifier 客戶端識別符（IP、用戶ID等）
+   * @param identifier 客戶端識別符（IP、使用者ID等）
    * @returns { allowed: boolean, remaining: number, resetTime: number }
    */
   checkLimit(identifier: string): {
@@ -59,7 +59,7 @@ export class RateLimiter {
       }
     }
 
-    // 如果沒有記錄或已過期，創建新記錄
+    // 如果沒有記錄或已過期，建立新記錄
     if (!entry || now >= entry.resetTime) {
       const newEntry: RateLimitEntry = {
         count: 1,

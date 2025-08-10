@@ -103,9 +103,9 @@ def check_and_create_database_tables():
         tables = inspector.get_table_names()
         
         if 'ivod_transcripts' not in tables:
-            logger.info("⚠️  ivod_transcripts 表格不存在，正在創建...")
+            logger.info("⚠️  ivod_transcripts 表格不存在，正在建立...")
             Base.metadata.create_all(engine)
-            logger.info("✅ 表格創建成功")
+            logger.info("✅ 表格建立成功")
         else:
             logger.info("✅ ivod_transcripts 表格已存在")
             
@@ -224,12 +224,12 @@ def create_elasticsearch_index(es, es_index):
     try:
         if not es.indices.exists(index=es_index):
             es.indices.create(index=es_index, body=index_body)
-            logger.info(f"✅ 已創建 Elasticsearch 索引: {es_index}")
+            logger.info(f"✅ 已建立 Elasticsearch 索引: {es_index}")
         else:
             logger.info(f"✅ Elasticsearch 索引已存在: {es_index}")
         return True
     except Exception as e:
-        logger.error(f"❌ 創建索引失敗: {e}")
+        logger.error(f"❌ 建立索引失敗: {e}")
         return False
 
 def compare_es_document(es, es_index, db_obj):

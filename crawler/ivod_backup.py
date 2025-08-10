@@ -155,7 +155,7 @@ def main():
             list_backup_files(args.backup_dir)
             
     except KeyboardInterrupt:
-        print("\n⚠️  用戶中斷操作")
+        print("\n⚠️  使用者中斷操作")
         sys.exit(130)
     except Exception as e:
         print(f"❌ 未預期的錯誤: {e}", file=sys.stderr)
