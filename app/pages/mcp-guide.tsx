@@ -64,7 +64,7 @@ await mcpClient.connect();
 
 // 搜尋逐字稿
 const searchResult = await mcpClient.callTool('search_transcripts', {
-  speakers: ['黃國昌'],
+  speakers: ['沈伯洋'],
   query: '數位發展',
   transcription_source: 'ly_only'
 });`;
@@ -284,13 +284,13 @@ const searchResult = await mcpClient.callTool('search_transcripts', {
                     <h4 className="text-lg font-medium text-gray-700 mb-2">使用範例</h4>
                     <div className="bg-gray-50 rounded p-3 text-sm">
                       <div className="mb-2"><strong>搜尋立委發言:</strong></div>
-                      <code className="text-xs">speakers: ["黃國昌"], query: "數位發展"</code>
+                      <code className="text-xs">speakers: [&quot;沈伯洋&quot;], query: &quot;數位發展&quot;</code>
                       
                       <div className="mt-3 mb-2"><strong>委員會會議:</strong></div>
-                      <code className="text-xs">committees: ["交通委員會"], query: "交通建設"</code>
+                      <code className="text-xs">committees: [&quot;交通委員會&quot;], query: &quot;交通建設&quot;</code>
                       
                       <div className="mt-3 mb-2"><strong>日期範圍:</strong></div>
-                      <code className="text-xs">date_from: "2024-01-01", date_to: "2024-12-31"</code>
+                      <code className="text-xs">date_from: &quot;2024-01-01&quot;, date_to: &quot;2024-12-31&quot;</code>
                     </div>
                   </div>
                 </div>
@@ -320,10 +320,10 @@ const searchResult = await mcpClient.callTool('search_transcripts', {
                     <h4 className="text-lg font-medium text-gray-700 mb-2">使用範例</h4>
                     <div className="bg-gray-50 rounded p-3 text-sm">
                       <div className="mb-2"><strong>取得完整逐字稿:</strong></div>
-                      <code className="text-xs">ivod_id: 123456, transcript_type: "auto"</code>
+                      <code className="text-xs">ivod_id: 123456, transcript_type: &quot;auto&quot;</code>
                       
                       <div className="mt-3 mb-2"><strong>僅官方版本:</strong></div>
-                      <code className="text-xs">ivod_id: 123456, transcript_type: "ly_only"</code>
+                      <code className="text-xs">ivod_id: 123456, transcript_type: &quot;ly_only&quot;</code>
                     </div>
                   </div>
                 </div>
@@ -339,7 +339,7 @@ const searchResult = await mcpClient.callTool('search_transcripts', {
               <div>
                 <h3 className="text-lg font-medium text-blue-700 mb-2">效能建議</h3>
                 <ul className="space-y-2 text-blue-700 text-sm">
-                  <li>• 使用 <code>transcription_source: "ly_only"</code> 獲得最精確的結果</li>
+                  <li>• 使用 <code>transcription_source: &quot;ly_only&quot;</code> 獲得最精確的結果</li>
                   <li>• 搜尋立委發言時建議結合姓名和關鍵字條件</li>
                   <li>• 大量查詢時適當設定 <code>max_results</code> 限制</li>
                   <li>• 利用分頁功能處理大量結果集</li>
