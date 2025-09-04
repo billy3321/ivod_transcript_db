@@ -35,6 +35,7 @@ app/
 ├── pages/
 │   ├── index.tsx              # 🆕 主搜尋頁面（580→110行，使用模組化組件）
 │   ├── ivod/[id].tsx          # 🆕 IVOD詳細頁面（已強化SEO和顯示邏輯）
+│   ├── mcp-guide.tsx          # 🆕 MCP 服務設定指南頁面（完整設定說明）
 │   └── api/
 │       ├── ivods.ts           # 🆕 使用統一中介軟體的列表API
 │       ├── ivods/[id].ts      # 🆕 使用統一中介軟體的詳細API
@@ -174,9 +175,13 @@ LOG_LEVEL=info                    # 日誌級別：error, warn, info, debug
 LOG_PATH=logs                     # 日誌檔案目錄
 ADMIN_TOKEN=your_secure_admin_token_here  # 管理員日誌介面存取金鑰
 
+# MCP 伺服器設定（用於 MCP 設定指南頁面）
+# 設定您的公開可存取 HTTPS URL，用於生成 MCP 客戶端設定檔
+SERVER_URL=https://your-domain.com
+
 # Google Analytics 設定（可選）
 # 新增您的 Google Analytics 4 測量 ID 以啟用追蹤
-# NEXT_PUBLIC_GA_MEASUREMENT_ID=G-XXXXXXXXXX
+GA_MEASUREMENT_ID=G-XXXXXXXXXX
 ```
 
 ## 6. 本地開發
@@ -1910,7 +1915,7 @@ sudo tail -f /var/log/nginx/error.log
 
 ### 12.2 功能特色
 
-- **條件式載入**：只有設定 `NEXT_PUBLIC_GA_MEASUREMENT_ID` 時才載入 GA 腳本
+- **條件式載入**：只有設定 `GA_MEASUREMENT_ID` 時才載入 GA 腳本
 - **Next.js 優化**：使用 Next.js `Script` 組件的 `afterInteractive` 策略
 - **自動頁面追蹤**：自動追蹤頁面瀏覽和導航
 - **TypeScript 支援**：包含 gtag 全域函數的型別宣告
@@ -1929,7 +1934,7 @@ sudo tail -f /var/log/nginx/error.log
 
 在您的 `.env` 檔案中加入：
 ```bash
-NEXT_PUBLIC_GA_MEASUREMENT_ID=G-XXXXXXXXXX  # 替換為您的實際測量 ID
+GA_MEASUREMENT_ID=G-XXXXXXXXXX  # 替換為您的實際測量 ID
 ```
 
 #### 3. 重新啟動應用程式
@@ -2021,6 +2026,18 @@ A: 是的，建議為不同環境建立不同的 GA4 資源和測量 ID。
 ### 13.1 概述
 
 本應用程式整合了完整的 MCP (Model Context Protocol) 伺服器功能，讓 AI 服務（如 OpenAI Assistant、Claude 等）能夠直接存取和搜尋台灣立法院 IVOD 逐字稿資料。MCP 伺服器提供標準化的介面，支援 Tools、Resources 和 Prompts 三大核心功能。
+
+#### 🎯 MCP 設定指南頁面
+
+應用程式提供完整的 MCP 設定指南頁面 (`/mcp-guide`)，包含：
+
+- **三種 AI 客戶端設定**：Claude Desktop、ChatGPT (GPTs)、Google Gemini
+- **互動式配置產生**：根據您的伺服器 URL 自動產生設定檔
+- **一鍵複製功能**：快速複製設定檔內容到剪貼簿
+- **詳細測試說明**：包含 cURL 和 MCP Inspector 測試方法
+- **完整參數文檔**：所有 MCP 工具的參數說明和使用範例
+
+訪問 `http://localhost:3000/mcp-guide` 查看完整的設定指南。
 
 ### 13.2 MCP 功能特色
 
