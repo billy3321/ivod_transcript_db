@@ -6,7 +6,13 @@ import Layout from '@/components/Layout'
 import ErrorBoundary from '@/components/ErrorBoundary'
 import GoogleAnalytics from '@/components/GoogleAnalytics'
 
-export default function MyApp({ Component, pageProps }: AppProps) {
+interface CustomAppProps extends AppProps {
+  pageProps: AppProps['pageProps'] & {
+    gaId?: string
+  }
+}
+
+export default function MyApp({ Component, pageProps }: CustomAppProps) {
   const [queryClient] = useState(() => new QueryClient({
     defaultOptions: {
       queries: {
@@ -16,7 +22,7 @@ export default function MyApp({ Component, pageProps }: AppProps) {
     },
   }))
 
-  const gaId = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID
+  const gaId = pageProps.gaId || process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID
   
   return (
     <ErrorBoundary>

@@ -12,6 +12,7 @@ const Header: FC<HeaderProps> = ({ onMenuClick }) => {
   
   const navItems = [
     { label: '首頁', href: '/' },
+    { label: 'MCP 設定指南', href: '/mcp-guide' },
     { label: '關於我們', href: '/about' },
   ] as const
   
