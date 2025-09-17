@@ -146,21 +146,35 @@ def check_elasticsearch_available():
     auth = (es_config["user"], es_config["password"]) if es_config["user"] and es_config["password"] else None
     
     try:
-        if auth:
-            es = Elasticsearch([{"host": es_config["host"], "port": es_config["port"], "scheme": es_config["scheme"]}], basic_auth=auth)
-        else:
-            es = Elasticsearch([{"host": es_config["host"], "port": es_config["port"], "scheme": es_config["scheme"]}])
-        
-        # 測試連線
-        if es.ping():
-            logger.info(f"✅ Elasticsearch 可用: {es_config['host']}:{es_config['port']}")
-            return True
-        else:
-            logger.info(f"ℹ️  無法連線到 Elasticsearch: {es_config['host']}:{es_config['port']}，跳過 ES 索引更新")
-            return False
-            
+        # 禁用 Elasticsearch 和 urllib3 的錯誤日誌以避免連線失敗時的大量錯誤輸出
+        import logging
+        es_logger = logging.getLogger('elastic_transport')
+        urllib3_logger = logging.getLogger('urllib3')
+        original_es_level = es_logger.level
+        original_urllib3_level = urllib3_logger.level
+        es_logger.setLevel(logging.CRITICAL)
+        urllib3_logger.setLevel(logging.CRITICAL)
+
+        try:
+            if auth:
+                es = Elasticsearch([{"host": es_config["host"], "port": es_config["port"], "scheme": es_config["scheme"]}], basic_auth=auth)
+            else:
+                es = Elasticsearch([{"host": es_config["host"], "port": es_config["port"], "scheme": es_config["scheme"]}])
+
+            # 測試連線
+            if es.ping():
+                logger.info(f"✅ Elasticsearch 可用: {es_config['host']}:{es_config['port']}")
+                return True
+            else:
+                logger.info(f"ℹ️  無法連線到 Elasticsearch: {es_config['host']}:{es_config['port']}，跳過 ES 索引更新")
+                return False
+        finally:
+            # 恢復原來的日誌級別
+            es_logger.setLevel(original_es_level)
+            urllib3_logger.setLevel(original_urllib3_level)
+
     except Exception as e:
-        logger.info(f"ℹ️  Elasticsearch 連線失敗: {e}，跳過 ES 索引更新")
+        logger.info(f"ℹ️  Elasticsearch 連線失敗，跳過 ES 索引更新")
         return False
 
 def get_elasticsearch_client():
@@ -178,21 +192,35 @@ def get_elasticsearch_client():
     auth = (es_config["user"], es_config["password"]) if es_config["user"] and es_config["password"] else None
     
     try:
-        if auth:
-            es = Elasticsearch([{"host": es_config["host"], "port": es_config["port"], "scheme": es_config["scheme"]}], basic_auth=auth)
-        else:
-            es = Elasticsearch([{"host": es_config["host"], "port": es_config["port"], "scheme": es_config["scheme"]}])
-        
-        # 測試連線
-        if not es.ping():
-            logger.error(f"❌ 無法連線到 Elasticsearch: {es_config['host']}:{es_config['port']}")
-            return None, None
-            
-        logger.info(f"✅ 已連線到 Elasticsearch: {es_config['host']}:{es_config['port']}")
-        return es, es_config["index"]
-        
+        # 禁用 Elasticsearch 和 urllib3 的錯誤日誌以避免連線失敗時的大量錯誤輸出
+        import logging
+        es_logger = logging.getLogger('elastic_transport')
+        urllib3_logger = logging.getLogger('urllib3')
+        original_es_level = es_logger.level
+        original_urllib3_level = urllib3_logger.level
+        es_logger.setLevel(logging.CRITICAL)
+        urllib3_logger.setLevel(logging.CRITICAL)
+
+        try:
+            if auth:
+                es = Elasticsearch([{"host": es_config["host"], "port": es_config["port"], "scheme": es_config["scheme"]}], basic_auth=auth)
+            else:
+                es = Elasticsearch([{"host": es_config["host"], "port": es_config["port"], "scheme": es_config["scheme"]}])
+
+            # 測試連線
+            if not es.ping():
+                logger.error(f"❌ 無法連線到 Elasticsearch: {es_config['host']}:{es_config['port']}")
+                return None, None
+
+            logger.info(f"✅ 已連線到 Elasticsearch: {es_config['host']}:{es_config['port']}")
+            return es, es_config["index"]
+        finally:
+            # 恢復原來的日誌級別
+            es_logger.setLevel(original_es_level)
+            urllib3_logger.setLevel(original_urllib3_level)
+
     except Exception as e:
-        logger.error(f"❌ Elasticsearch 連線失敗: {e}")
+        logger.error(f"❌ Elasticsearch 連線失敗")
         return None, None
 
 def create_elasticsearch_index(es, es_index):
