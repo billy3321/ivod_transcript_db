@@ -27,6 +27,9 @@
     "clean:hard": "rm -rf .next node_modules/.cache .cache && npm run prisma:generate",
     "fresh-start": "npm run clean:all && npm install && npm run prisma:generate"
   },
+  "overrides": {
+    "simple-swizzle": "0.2.2"
+  },
   "dependencies": {
     "@elastic/elasticsearch": "^8.8.0",
     "@ffmpeg/ffmpeg": "^0.12.15",
