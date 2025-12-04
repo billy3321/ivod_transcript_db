@@ -34,7 +34,7 @@ describe('List', () => {
 
     expect(screen.getByText('Test Meeting（Test Speaker 發言）')).toBeInTheDocument();
     expect(screen.getByText('委員會A, 委員會B')).toBeInTheDocument();
-    expect(screen.getByText('2022/01/01 08:00:00')).toBeInTheDocument();
+    expect(screen.getByText('2022/01/01')).toBeInTheDocument();
     expect(screen.getByText('時長: 10:00')).toBeInTheDocument();
     expect(screen.getByText('發言')).toBeInTheDocument();
   });
