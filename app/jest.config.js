@@ -4,7 +4,8 @@ module.exports = {
   testEnvironment: 'jsdom',
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/$1',
-    '\.svg$': '<rootDir>/__mocks__/svg.js'
+    '\.svg$': '<rootDir>/__mocks__/svg.js',
+    '\\.(css|less|scss|sass)$': '<rootDir>/__mocks__/styleMock.js'
   },
   setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
   testPathIgnorePatterns: ['<rootDir>/node_modules/', '<rootDir>/cypress/'],
