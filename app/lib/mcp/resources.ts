@@ -185,32 +185,60 @@ export async function getResourceTemplate(uriTemplate: string): Promise<MCPResou
 // 解析 URI 模板中的參數
 export function parseTemplateUri(uri: string, uriTemplate: string): Record<string, string> | null {
   // 將 URI template 轉換為正則表達式
+  // 為了避免 template 中其他字元被當成 regex metacharacter，先 escape，再把 \{name\} 替換成 capture group
   const paramPattern = /\{([^}]+)\}/g;
   const paramNames: string[] = [];
-  
+
   // 提取參數名稱
   let match;
   while ((match = paramPattern.exec(uriTemplate)) !== null) {
     paramNames.push(match[1]);
   }
-  
-  // 構建匹配正則表達式
-  const regexPattern = uriTemplate.replace(paramPattern, '([^/]+)');
+
+  // 1) 先把整個 template escape 成 regex literal
+  const escapedTemplate = uriTemplate.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  // 2) 把 escape 後的 \{name\} 還原成 capture group
+  const regexPattern = escapedTemplate.replace(/\\\{[^}]+\\\}/g, '([^/]+)');
   const regex = new RegExp(`^${regexPattern}$`);
-  
+
   // 匹配實際 URI
   const uriMatch = uri.match(regex);
   if (!uriMatch) {
     return null;
   }
-  
+
   // 構建參數對象
   const params: Record<string, string> = {};
   paramNames.forEach((name, index) => {
-    params[name] = decodeURIComponent(uriMatch[index + 1]);
+    try {
+      params[name] = decodeURIComponent(uriMatch[index + 1]);
+    } catch {
+      // decodeURIComponent 失敗時（malformed URI），保留 raw 值
+      params[name] = uriMatch[index + 1];
+    }
   });
-  
+
   return params;
+}
+
+// 將任意字串安全嵌入 markdown 中（剝除可能破壞輸出結構的字元）
+function sanitizeForMarkdown(value: string): string {
+  return String(value)
+    // 移除反引號避免跳出 code block
+    .replace(/`/g, '')
+    // 移除控制字元
+    .replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, '')
+    // 防止把 markdown header / 區塊破壞掉
+    .replace(/\n+/g, ' ')
+    .trim()
+    .slice(0, 200);
+}
+
+// 將字串安全嵌入 JSON 字串字面值內（去掉外層引號）
+function sanitizeForJsonString(value: string): string {
+  const safe = sanitizeForMarkdown(value);
+  // 用 JSON.stringify 處理特殊字元（引號、反斜線等），再去掉外層 ""
+  return JSON.stringify(safe).slice(1, -1);
 }
 
 // 根據模板和參數生成內容
@@ -246,21 +274,35 @@ export async function generateTemplateContent(
 
 // 專注於立法院逐字稿查詢的內容生成函數
 async function generateTopicSearch(topic: string): Promise<string> {
-  return `# "${topic}" 相關立法院討論查詢\n\n使用以下工具查詢「${topic}」在立法院的相關討論：\n\n\`\`\`json\n{\n  "tool": "search_transcripts",\n  "arguments": {\n    "query": "${topic}",\n    "transcription_source": "ly_only",\n    "mode": "keyword_all_fields"\n  }\n}\n\`\`\`\n\n## 進階查詢選項\n\n### 限定特定委員會討論\n\`\`\`json\n{\n  "tool": "search_transcripts",\n  "arguments": {\n    "query": "${topic}",\n    "committees": ["相關委員會名稱"],\n    "transcription_source": "ly_only"\n  }\n}\n\`\`\`\n\n### 限定時間範圍\n\`\`\`json\n{\n  "tool": "search_transcripts",\n  "arguments": {\n    "query": "${topic}",\n    "date_from": "2025-04-01",\n    "date_to": "2025-06-30",\n    "transcription_source": "ly_only"\n  }\n}\n\`\`\`\n\n**說明**: 此查詢將返回立法院中所有與「${topic}」相關的發言和討論逐字稿，讓 AI 能基於實際的立法院記錄回答問題。`;
+  const md = sanitizeForMarkdown(topic);
+  const js = sanitizeForJsonString(topic);
+  return `# "${md}" 相關立法院討論查詢\n\n使用以下工具查詢「${md}」在立法院的相關討論：\n\n\`\`\`json\n{\n  "tool": "search_transcripts",\n  "arguments": {\n    "query": "${js}",\n    "transcription_source": "ly_only",\n    "mode": "keyword_all_fields"\n  }\n}\n\`\`\`\n\n## 進階查詢選項\n\n### 限定特定委員會討論\n\`\`\`json\n{\n  "tool": "search_transcripts",\n  "arguments": {\n    "query": "${js}",\n    "committees": ["相關委員會名稱"],\n    "transcription_source": "ly_only"\n  }\n}\n\`\`\`\n\n### 限定時間範圍\n\`\`\`json\n{\n  "tool": "search_transcripts",\n  "arguments": {\n    "query": "${js}",\n    "date_from": "2025-04-01",\n    "date_to": "2025-06-30",\n    "transcription_source": "ly_only"\n  }\n}\n\`\`\`\n\n**說明**: 此查詢將返回立法院中所有與「${md}」相關的發言和討論逐字稿，讓 AI 能基於實際的立法院記錄回答問題。`;
 }
 
 async function generateLegislatorSearch(name: string): Promise<string> {
-  return `# ${name} 立委發言紀錄查詢\n\n使用以下工具查詢 ${name} 立委的發言紀錄：\n\n\`\`\`json\n{\n  "tool": "search_transcripts",\n  "arguments": {\n    "speakers": ["${name}"],\n    "transcription_source": "ly_only"\n  }\n}\n\`\`\`\n\n## 特定議題發言查詢\n\n### 查詢特定議題的發言\n\`\`\`json\n{\n  "tool": "search_transcripts",\n  "arguments": {\n    "speakers": ["${name}"],\n    "query": "議題關鍵字",\n    "transcription_source": "ly_only"\n  }\n}\n\`\`\`\n\n### 查詢特定時期發言\n\`\`\`json\n{\n  "tool": "search_transcripts",\n  "arguments": {\n    "speakers": ["${name}"],\n    "date_from": "2025-04-01",\n    "date_to": "2025-06-30",\n    "transcription_source": "ly_only"\n  }\n}\n\`\`\`\n\n**說明**: 此查詢將返回 ${name} 立委在立法院的所有發言逐字稿，讓 AI 能基於實際發言記錄回答關於該立委的問題。`;
+  const md = sanitizeForMarkdown(name);
+  const js = sanitizeForJsonString(name);
+  return `# ${md} 立委發言紀錄查詢\n\n使用以下工具查詢 ${md} 立委的發言紀錄：\n\n\`\`\`json\n{\n  "tool": "search_transcripts",\n  "arguments": {\n    "speakers": ["${js}"],\n    "transcription_source": "ly_only"\n  }\n}\n\`\`\`\n\n## 特定議題發言查詢\n\n### 查詢特定議題的發言\n\`\`\`json\n{\n  "tool": "search_transcripts",\n  "arguments": {\n    "speakers": ["${js}"],\n    "query": "議題關鍵字",\n    "transcription_source": "ly_only"\n  }\n}\n\`\`\`\n\n### 查詢特定時期發言\n\`\`\`json\n{\n  "tool": "search_transcripts",\n  "arguments": {\n    "speakers": ["${js}"],\n    "date_from": "2025-04-01",\n    "date_to": "2025-06-30",\n    "transcription_source": "ly_only"\n  }\n}\n\`\`\`\n\n**說明**: 此查詢將返回 ${md} 立委在立法院的所有發言逐字稿，讓 AI 能基於實際發言記錄回答關於該立委的問題。`;
 }
 
 async function generateMeetingSearch(meetingName: string): Promise<string> {
-  return `# "${meetingName}" 會議逐字稿查詢\n\n使用以下工具查詢「${meetingName}」相關的會議逐字稿：\n\n\`\`\`json\n{\n  "tool": "search_transcripts",\n  "arguments": {\n    "meeting_name": "${meetingName}",\n    "transcription_source": "ly_only"\n  }\n}\n\`\`\`\n\n## 結合其他條件查詢\n\n### 特定議題的會議討論\n\`\`\`json\n{\n  "tool": "search_transcripts",\n  "arguments": {\n    "meeting_name": "${meetingName}",\n    "query": "議題關鍵字",\n    "transcription_source": "ly_only"\n  }\n}\n\`\`\`\n\n### 特定時間範圍的會議\n\`\`\`json\n{\n  "tool": "search_transcripts",\n  "arguments": {\n    "meeting_name": "${meetingName}",\n    "date_from": "2025-04-01",\n    "date_to": "2025-06-30",\n    "transcription_source": "ly_only"\n  }\n}\n\`\`\`\n\n**說明**: 此查詢將返回所有「${meetingName}」類型會議的逐字稿，讓 AI 能基於實際會議記錄回答相關問題。`;
+  const md = sanitizeForMarkdown(meetingName);
+  const js = sanitizeForJsonString(meetingName);
+  return `# "${md}" 會議逐字稿查詢\n\n使用以下工具查詢「${md}」相關的會議逐字稿：\n\n\`\`\`json\n{\n  "tool": "search_transcripts",\n  "arguments": {\n    "meeting_name": "${js}",\n    "transcription_source": "ly_only"\n  }\n}\n\`\`\`\n\n## 結合其他條件查詢\n\n### 特定議題的會議討論\n\`\`\`json\n{\n  "tool": "search_transcripts",\n  "arguments": {\n    "meeting_name": "${js}",\n    "query": "議題關鍵字",\n    "transcription_source": "ly_only"\n  }\n}\n\`\`\`\n\n### 特定時間範圍的會議\n\`\`\`json\n{\n  "tool": "search_transcripts",\n  "arguments": {\n    "meeting_name": "${js}",\n    "date_from": "2025-04-01",\n    "date_to": "2025-06-30",\n    "transcription_source": "ly_only"\n  }\n}\n\`\`\`\n\n**說明**: 此查詢將返回所有「${md}」類型會議的逐字稿，讓 AI 能基於實際會議記錄回答相關問題。`;
 }
 
 async function generateCommitteeSearch(committee: string): Promise<string> {
-  return `# ${committee} 會議逐字稿查詢\n\n使用以下工具查詢 ${committee} 的會議討論逐字稿：\n\n\`\`\`json\n{\n  "tool": "search_transcripts",\n  "arguments": {\n    "committees": ["${committee}"],\n    "transcription_source": "ly_only"\n  }\n}\n\`\`\`\n\n## 特定議題查詢\n\n### 查詢委員會對特定議題的討論\n\`\`\`json\n{\n  "tool": "search_transcripts",\n  "arguments": {\n    "committees": ["${committee}"],\n    "query": "議題關鍵字",\n    "transcription_source": "ly_only"\n  }\n}\n\`\`\`\n\n### 查詢特定立委在委員會的發言\n\`\`\`json\n{\n  "tool": "search_transcripts",\n  "arguments": {\n    "committees": ["${committee}"],\n    "speakers": ["立委姓名"],\n    "transcription_source": "ly_only"\n  }\n}\n\`\`\`\n\n**說明**: 此查詢將返回 ${committee} 所有會議的逐字稿，讓 AI 能基於實際委員會討論記錄回答問題。`;
+  const md = sanitizeForMarkdown(committee);
+  const js = sanitizeForJsonString(committee);
+  return `# ${md} 會議逐字稿查詢\n\n使用以下工具查詢 ${md} 的會議討論逐字稿：\n\n\`\`\`json\n{\n  "tool": "search_transcripts",\n  "arguments": {\n    "committees": ["${js}"],\n    "transcription_source": "ly_only"\n  }\n}\n\`\`\`\n\n## 特定議題查詢\n\n### 查詢委員會對特定議題的討論\n\`\`\`json\n{\n  "tool": "search_transcripts",\n  "arguments": {\n    "committees": ["${js}"],\n    "query": "議題關鍵字",\n    "transcription_source": "ly_only"\n  }\n}\n\`\`\`\n\n### 查詢特定立委在委員會的發言\n\`\`\`json\n{\n  "tool": "search_transcripts",\n  "arguments": {\n    "committees": ["${js}"],\n    "speakers": ["立委姓名"],\n    "transcription_source": "ly_only"\n  }\n}\n\`\`\`\n\n**說明**: 此查詢將返回 ${md} 所有會議的逐字稿，讓 AI 能基於實際委員會討論記錄回答問題。`;
 }
 
 async function generateFullTranscript(ivodId: string): Promise<string> {
-  return `# 完整會議逐字稿 (IVOD ID: ${ivodId})\n\n使用以下工具取得完整的會議逐字稿：\n\n\`\`\`json\n{\n  "tool": "get_meeting_transcript",\n  "arguments": {\n    "ivod_id": ${ivodId},\n    "transcript_type": "ly_only"\n  }\n}\n\`\`\`\n\n## 其他版本選項\n\n### 自動選擇最佳版本 (優先立法院版)\n\`\`\`json\n{\n  "tool": "get_meeting_transcript",\n  "arguments": {\n    "ivod_id": ${ivodId},\n    "transcript_type": "auto"\n  }\n}\n\`\`\`\n\n### 僅取得AI處理版本\n\`\`\`json\n{\n  "tool": "get_meeting_transcript",\n  "arguments": {\n    "ivod_id": ${ivodId},\n    "transcript_type": "ai_only"\n  }\n}\n\`\`\`\n\n**說明**: 此工具將返回完整的會議逐字稿內容，包含所有發言人的完整發言記錄，讓 AI 能基於完整的會議內容回答詳細問題。\n\n**建議**: 使用 \`ly_only\` 可取得最精確的立法院官方逐字稿。`;
+  // ivod_id 必須是正整數，否則拒絕（避免把任意字串內插進 JSON）
+  const parsed = parseInt(String(ivodId), 10);
+  if (!Number.isInteger(parsed) || parsed <= 0 || String(parsed) !== String(ivodId).trim()) {
+    throw new Error(`Invalid ivod_id: must be a positive integer, got "${ivodId}"`);
+  }
+  const safeId = parsed;
+  return `# 完整會議逐字稿 (IVOD ID: ${safeId})\n\n使用以下工具取得完整的會議逐字稿：\n\n\`\`\`json\n{\n  "tool": "get_meeting_transcript",\n  "arguments": {\n    "ivod_id": ${safeId},\n    "transcript_type": "ly_only"\n  }\n}\n\`\`\`\n\n## 其他版本選項\n\n### 自動選擇最佳版本 (優先立法院版)\n\`\`\`json\n{\n  "tool": "get_meeting_transcript",\n  "arguments": {\n    "ivod_id": ${safeId},\n    "transcript_type": "auto"\n  }\n}\n\`\`\`\n\n### 僅取得AI處理版本\n\`\`\`json\n{\n  "tool": "get_meeting_transcript",\n  "arguments": {\n    "ivod_id": ${safeId},\n    "transcript_type": "ai_only"\n  }\n}\n\`\`\`\n\n**說明**: 此工具將返回完整的會議逐字稿內容，包含所有發言人的完整發言記錄，讓 AI 能基於完整的會議內容回答詳細問題。\n\n**建議**: 使用 \`ly_only\` 可取得最精確的立法院官方逐字稿。`;
 }

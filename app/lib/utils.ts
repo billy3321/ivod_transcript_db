@@ -82,13 +82,15 @@ export function formatVideoType(videoType: string | null): string {
   return typeMap[videoType.toLowerCase()] || videoType;
 }
 
+export type DbBackend = 'sqlite' | 'postgresql' | 'mysql';
+
 /**
  * Get database backend type from environment
  */
-export function getDbBackend(): 'sqlite' | 'postgresql' | 'mysql' {
+export function getDbBackend(): DbBackend {
   const backend = process.env.DB_BACKEND?.toLowerCase() || 'sqlite';
   if (['sqlite', 'postgresql', 'mysql'].includes(backend)) {
-    return backend as 'sqlite' | 'postgresql' | 'mysql';
+    return backend as DbBackend;
   }
   return 'sqlite'; // fallback
 }

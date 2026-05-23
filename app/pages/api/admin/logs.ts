@@ -1,14 +1,12 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import fs from 'fs';
 import path from 'path';
+import { timingSafeEqual } from 'crypto';
 import { logger } from '@/lib/logger';
-
-interface LogFile {
-  name: string;
-  size: number;
-  lastModified: string;
-  path: string;
-}
+import {
+  withErrorHandler,
+  createErrorResponse,
+} from '@/lib/api-middleware';
 
 interface LogEntry {
   timestamp: string;
@@ -17,143 +15,121 @@ interface LogEntry {
   context?: any;
 }
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  // Basic authentication check (you might want to implement proper auth)
+async function adminLogsHandler(req: NextApiRequest, res: NextApiResponse) {
+  // Bearer token auth
   const authHeader = req.headers.authorization;
   if (!authHeader || !isValidAuth(authHeader)) {
-    res.status(401).json({ error: 'Unauthorized' });
-    return;
+    throw createErrorResponse('Unauthorized', 401);
   }
 
   const { method } = req;
   const logDirectory = process.env.LOG_PATH || 'logs';
+  const resolvedLogDir = path.resolve(logDirectory);
 
-  try {
-    if (method === 'GET') {
-      const { file, lines = '100' } = req.query;
+  if (method === 'GET') {
+    const { file, lines = '100' } = req.query;
 
-      if (file && typeof file === 'string') {
-        // Read specific log file
-        const logFilePath = path.join(logDirectory, file);
-        
-        // Security check: ensure file is within log directory
-        const resolvedPath = path.resolve(logFilePath);
-        const resolvedLogDir = path.resolve(logDirectory);
-        if (!resolvedPath.startsWith(resolvedLogDir)) {
-          res.status(403).json({ error: 'Access denied' });
-          return;
-        }
-
-        if (!fs.existsSync(logFilePath)) {
-          res.status(404).json({ error: 'Log file not found' });
-          return;
-        }
-
-        const logContent = fs.readFileSync(logFilePath, 'utf8');
-        const logLines = logContent.split('\n').filter(line => line.trim());
-        
-        // Return last N lines
-        const numLines = parseInt(lines as string, 10) || 100;
-        const recentLines = logLines.slice(-numLines);
-        
-        // Parse log entries
-        const entries: LogEntry[] = recentLines.map(line => {
-          try {
-            // Try to parse structured log format
-            const match = line.match(/^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z) \[(\w+)\] (.+)$/);
-            if (match) {
-              const [, timestamp, level, message] = match;
-              return { timestamp, level, message };
-            }
-            
-            // Fallback for non-structured logs
-            return {
-              timestamp: new Date().toISOString(),
-              level: 'info',
-              message: line
-            };
-          } catch {
-            return {
-              timestamp: new Date().toISOString(),
-              level: 'info',
-              message: line
-            };
-          }
-        });
-
-        res.status(200).json({ entries, totalLines: logLines.length });
-      } else {
-        // List available log files
-        if (!fs.existsSync(logDirectory)) {
-          res.status(200).json({ files: [] });
-          return;
-        }
-
-        const files = fs.readdirSync(logDirectory)
-          .filter(file => file.endsWith('.log'))
-          .map(file => {
-            const filePath = path.join(logDirectory, file);
-            const stats = fs.statSync(filePath);
-            return {
-              name: file,
-              size: stats.size,
-              lastModified: stats.mtime.toISOString(),
-              path: file
-            };
-          })
-          .sort((a, b) => new Date(b.lastModified).getTime() - new Date(a.lastModified).getTime());
-
-        res.status(200).json({ files });
-      }
-    } else if (method === 'DELETE') {
-      const { file } = req.body;
-      
-      if (!file || typeof file !== 'string') {
-        res.status(400).json({ error: 'File name required' });
-        return;
-      }
-
+    if (file && typeof file === 'string') {
+      // 讀特定 log 檔案
       const logFilePath = path.join(logDirectory, file);
-      
-      // Security check
       const resolvedPath = path.resolve(logFilePath);
-      const resolvedLogDir = path.resolve(logDirectory);
-      if (!resolvedPath.startsWith(resolvedLogDir)) {
-        res.status(403).json({ error: 'Access denied' });
-        return;
+      if (!resolvedPath.startsWith(resolvedLogDir + path.sep) && resolvedPath !== resolvedLogDir) {
+        throw createErrorResponse('Access denied', 403);
       }
 
-      if (fs.existsSync(logFilePath)) {
-        fs.unlinkSync(logFilePath);
-        logger.info('Log file deleted via admin interface', {
-          component: 'admin',
-          action: 'delete_log_file',
-          metadata: {
-            fileName: file
-          }
-        });
-        res.status(200).json({ success: true });
-      } else {
-        res.status(404).json({ error: 'File not found' });
+      if (!fs.existsSync(logFilePath)) {
+        throw createErrorResponse('Log file not found', 404);
       }
-    } else {
-      res.status(405).json({ error: 'Method not allowed' });
+
+      const logContent = fs.readFileSync(logFilePath, 'utf8');
+      const logLines = logContent.split('\n').filter(line => line.trim());
+      const numLines = parseInt(lines as string, 10) || 100;
+      const recentLines = logLines.slice(-numLines);
+
+      const entries: LogEntry[] = recentLines.map(line => {
+        const match = line.match(/^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z) \[(\w+)\] (.+)$/);
+        if (match) {
+          const [, timestamp, level, message] = match;
+          return { timestamp, level, message };
+        }
+        return {
+          timestamp: new Date().toISOString(),
+          level: 'info',
+          message: line,
+        };
+      });
+
+      res.status(200).json({ entries, totalLines: logLines.length });
+      return;
     }
-  } catch (error: any) {
-    logger.logApiError(error, req, { endpoint: 'admin/logs' });
-    res.status(500).json({ error: 'Internal server error' });
+
+    // 列出所有 log 檔案
+    if (!fs.existsSync(logDirectory)) {
+      res.status(200).json({ files: [] });
+      return;
+    }
+
+    const files = fs.readdirSync(logDirectory)
+      .filter(f => f.endsWith('.log'))
+      .map(f => {
+        const filePath = path.join(logDirectory, f);
+        const stats = fs.statSync(filePath);
+        return {
+          name: f,
+          size: stats.size,
+          lastModified: stats.mtime.toISOString(),
+          path: f,
+        };
+      })
+      .sort((a, b) => new Date(b.lastModified).getTime() - new Date(a.lastModified).getTime());
+
+    res.status(200).json({ files });
+    return;
   }
+
+  if (method === 'DELETE') {
+    const { file } = req.body || {};
+
+    if (!file || typeof file !== 'string') {
+      throw createErrorResponse('File name required', 400);
+    }
+
+    const logFilePath = path.join(logDirectory, file);
+    const resolvedPath = path.resolve(logFilePath);
+    if (!resolvedPath.startsWith(resolvedLogDir + path.sep) && resolvedPath !== resolvedLogDir) {
+      throw createErrorResponse('Access denied', 403);
+    }
+
+    if (!fs.existsSync(logFilePath)) {
+      throw createErrorResponse('File not found', 404);
+    }
+
+    fs.unlinkSync(logFilePath);
+    logger.info('Log file deleted via admin interface', {
+      component: 'admin',
+      action: 'delete_log_file',
+      metadata: { fileName: file },
+    });
+    res.status(200).json({ success: true });
+    return;
+  }
+
+  throw createErrorResponse('Method not allowed', 405);
 }
 
 function isValidAuth(authHeader: string): boolean {
-  // Simple basic auth check - you should implement proper authentication
-  const token = authHeader.replace('Bearer ', '');
+  if (!authHeader?.startsWith('Bearer ')) return false;
+  const token = authHeader.slice(7);
   const adminToken = process.env.ADMIN_TOKEN;
-  
+
   if (!adminToken) {
     console.warn('ADMIN_TOKEN not set - admin access disabled');
     return false;
   }
-  
-  return token === adminToken;
+
+  const a = Buffer.from(token);
+  const b = Buffer.from(adminToken);
+  return a.length === b.length && timingSafeEqual(a, b);
 }
+
+export default withErrorHandler(adminLogsHandler);

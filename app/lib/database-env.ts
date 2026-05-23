@@ -73,17 +73,31 @@ function getSQLiteConfig(env: DatabaseEnvironment) {
   }
 }
 
+function assertProductionEnv(env: DatabaseEnvironment, required: string[]) {
+  // 只在 production 嚴格驗證；development/testing 允許 fallback 預設值方便本機開發
+  if (env !== 'production') return;
+  if (process.env.NODE_ENV !== 'production') return;
+  const missing = required.filter(k => !process.env[k]);
+  if (missing.length > 0) {
+    throw new Error(
+      `Missing required environment variable(s) in production: ${missing.join(', ')}`
+    );
+  }
+}
+
 /**
  * PostgreSQL 環境設定
  */
 function getPostgreSQLConfig(env: DatabaseEnvironment) {
+  assertProductionEnv(env, ['PG_HOST', 'PG_USER', 'PG_PASS', 'PG_DB']);
+
   const baseConfig = {
     host: process.env.PG_HOST || 'localhost',
     port: process.env.PG_PORT || '5432',
     user: process.env.PG_USER || 'ivod_user',
     pass: process.env.PG_PASS || 'ivod_password'
   };
-  
+
   let database: string;
   switch (env) {
     case 'testing':
@@ -96,7 +110,7 @@ function getPostgreSQLConfig(env: DatabaseEnvironment) {
       database = process.env.PG_DB || 'ivod_db';
       break;
   }
-  
+
   return {
     database,
     url: `postgresql://${baseConfig.user}:${baseConfig.pass}@${baseConfig.host}:${baseConfig.port}/${database}`
@@ -107,13 +121,15 @@ function getPostgreSQLConfig(env: DatabaseEnvironment) {
  * MySQL 環境設定
  */
 function getMySQLConfig(env: DatabaseEnvironment) {
+  assertProductionEnv(env, ['MYSQL_HOST', 'MYSQL_USER', 'MYSQL_PASS', 'MYSQL_DB']);
+
   const baseConfig = {
     host: process.env.MYSQL_HOST || 'localhost',
     port: process.env.MYSQL_PORT || '3306',
     user: process.env.MYSQL_USER || 'ivod_user',
     pass: process.env.MYSQL_PASS || 'ivod_password'
   };
-  
+
   let database: string;
   switch (env) {
     case 'testing':
@@ -126,7 +142,7 @@ function getMySQLConfig(env: DatabaseEnvironment) {
       database = process.env.MYSQL_DB || 'ivod_db';
       break;
   }
-  
+
   return {
     database,
     url: `mysql://${baseConfig.user}:${baseConfig.pass}@${baseConfig.host}:${baseConfig.port}/${database}`

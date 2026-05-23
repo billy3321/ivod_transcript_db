@@ -195,8 +195,7 @@ describe('GET /api/ivods', () => {
     expect(mockFindMany).toHaveBeenCalledWith({
       where: {
         AND: [
-          { date: { gte: '2023-01-01' } },
-          { date: { lte: '2023-12-31' } },
+          { date: { gte: '2023-01-01', lte: '2023-12-31' } },
         ]
       },
       orderBy: { date: 'desc' },

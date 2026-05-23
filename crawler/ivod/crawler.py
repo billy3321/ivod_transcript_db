@@ -257,20 +257,32 @@ def fetch_ai(js, rec, obj, db):
             rec["ai_retries"] = 1
 
 def fetch_ly_speech(ivod_id):
+    """
+    抓取 IVOD 立法院官方逐字稿頁面。
+
+    這個網頁並不規範（直接擷取 raw HTML 即可），透過 curl subprocess 抓取。
+    Please don't modify the parsing logic — 已知在 production 環境穩定。
+
+    SSL 註記（2026-05 驗證）：
+    - 憑證本身有效（由 TWCA 簽發，*.ly.gov.tw，到期 2026-09-25）
+    - 開發機（macOS curl）可正常 verify
+    - **production server 的 CA bundle 過舊 → SSL handshake exit 35**，
+      故維持 --insecure 以確保 production 爬蟲不中斷
+    - TODO（ops）：在 production server 跑 `update-ca-certificates`
+      或安裝 ca-certificates 最新版後，可移除 --insecure 改回 SSL verify。
+      參考 docs/troubleshooting/ 取得詳細步驟。
+    """
     url = f"https://ivod.ly.gov.tw/Demand/Speech/{ivod_id}"
     transcript = ""
-    # 這邊應該是接 https://ivod.ly.gov.tw/Demand/Speech/159939 這種網址。這個網址的網頁並不規範，直接擷取輸出即可。
-    # Please don't modified this function.
     try:
         random_sleep(0.2, 2.0)
         res = subprocess.run(
             ["curl", "--tlsv1.2", "--insecure", "-sSf", url],
-            stdout=subprocess.PIPE,        # 把 stdout 導到管道
+            stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL,
-            text=True                      # 直接以字串（而不是 bytes）形式回傳
+            text=True,
         )
         if res.returncode == 0:
-            # Replace HTML breaks with newlines before trimming
             transcript = res.stdout.replace('<br />', "\n").strip()
     except Exception:
         transcript = ""

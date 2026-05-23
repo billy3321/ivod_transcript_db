@@ -1,26 +1,31 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
 import { logger } from '@/lib/logger';
+import {
+  withErrorHandler,
+  validateMethod,
+  parseIntParam,
+  createSuccessResponse,
+  createErrorResponse,
+  APIResponse,
+} from '@/lib/api-middleware';
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const { id } = req.query;
-  
-  logger.logApiRequest(req, { ivodId: id });
-  
-  if (!id || Array.isArray(id)) {
-    logger.warn('Invalid IVOD ID provided', {
-      method: req.method,
-      url: req.url,
-      metadata: {
-        providedId: id
-      }
-    });
-    res.status(400).json({ error: 'Invalid id' });
-    return;
+async function ivodDetailHandler(
+  req: NextApiRequest,
+  res: NextApiResponse
+): Promise<APIResponse<any>> {
+  validateMethod(req, ['GET']);
+
+  const ivodId = parseIntParam(req.query.id, 'id');
+  if (!Number.isInteger(ivodId) || ivodId <= 0) {
+    throw createErrorResponse('Invalid id: must be a positive integer', 400);
   }
+
+  logger.logApiRequest(req, { ivodId });
+
   try {
     const data = await prisma.iVODTranscript.findUnique({
-      where: { ivod_id: parseInt(id, 10) },
+      where: { ivod_id: ivodId },
       select: {
         ivod_id: true,
         date: true,
@@ -45,37 +50,39 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         last_updated: true,
       },
     });
-    
+
     if (!data) {
       logger.warn('IVOD not found', {
         action: 'ivod_detail_not_found',
-        metadata: {
-          ivodId: id
-        }
+        metadata: { ivodId },
       });
-      res.status(404).json({ error: 'Not found' });
-    } else {
-      logger.info('IVOD detail retrieved successfully', {
-        metadata: {
-          ivodId: id,
-          hasAiTranscript: !!data.ai_transcript,
-          hasLyTranscript: !!data.ly_transcript
-        }
-      });
-      res.status(200).json({ data });
+      throw createErrorResponse('Not found', 404);
     }
-  } catch (error: any) {
-    // 檢查是否為表格不存在的錯誤
-    if (error.message && error.message.includes('does not exist')) {
-      logger.warn('Database table does not exist for IVOD detail', {
-        metadata: { tableName: 'ivod_transcripts', ivodId: id }
-      });
-      return res.status(404).json({ error: 'Not found' });
-    }
-    
-    logger.logDatabaseError(error, 'ivod_detail', {
-      ivodId: id
+
+    logger.info('IVOD detail retrieved successfully', {
+      metadata: {
+        ivodId,
+        hasAiTranscript: !!data.ai_transcript,
+        hasLyTranscript: !!data.ly_transcript,
+      },
     });
-    res.status(500).json({ error: error.message });
+
+    return createSuccessResponse(data);
+  } catch (error: any) {
+    if (error?.statusCode) {
+      throw error;
+    }
+
+    if (error?.message && error.message.includes('does not exist')) {
+      logger.warn('Database table does not exist for IVOD detail', {
+        metadata: { tableName: 'ivod_transcripts', ivodId },
+      });
+      throw createErrorResponse('Not found', 404);
+    }
+
+    logger.logDatabaseError(error, 'ivod_detail', { ivodId });
+    throw createErrorResponse('Database query failed', 500);
   }
 }
+
+export default withErrorHandler(ivodDetailHandler);

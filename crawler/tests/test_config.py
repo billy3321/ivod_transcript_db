@@ -209,11 +209,107 @@ class TestConfigLoading:
         config = load_config()
         assert config.environment == "testing"
     
-    @patch.dict(os.environ, {"DB_ENV": "production"})
+    @patch.dict(
+        os.environ,
+        {
+            "DB_ENV": "production",
+            # 走 sqlite 避免觸發 PG/MySQL credential 驗證
+            "DB_BACKEND": "sqlite",
+            "SQLITE_PATH": "../db/ivod_local.db",
+        },
+        clear=True,
+    )
     def test_production_environment_detection(self):
         """Test production environment detection."""
         config = load_config()
         assert config.environment == "production"
+
+    @patch.dict(
+        os.environ,
+        {
+            "DB_ENV": "production",
+            "DB_BACKEND": "mysql",
+            "MYSQL_HOST": "localhost",
+            # 故意不設 MYSQL_USER/PASS/DB，應被預設值 ivod_user/ivod_password 補上後遭拒
+        },
+        clear=True,
+    )
+    def test_production_rejects_default_mysql_credentials(self):
+        """Production with default MySQL credentials should be rejected."""
+        with pytest.raises(IVODConfigurationError) as exc_info:
+            load_config()
+        assert "default ivod_user/ivod_password is not allowed" in str(exc_info.value)
+
+    @patch.dict(
+        os.environ,
+        {
+            "DB_ENV": "production",
+            "DB_BACKEND": "postgresql",
+            "PG_HOST": "localhost",
+        },
+        clear=True,
+    )
+    def test_production_rejects_default_postgres_credentials(self):
+        """Production with default PostgreSQL credentials should be rejected."""
+        with pytest.raises(IVODConfigurationError) as exc_info:
+            load_config()
+        assert "default ivod_user/ivod_password is not allowed" in str(exc_info.value)
+
+    @patch.dict(
+        os.environ,
+        {
+            "DB_ENV": "production",
+            "DB_BACKEND": "mysql",
+            "MYSQL_HOST": "localhost",
+            "MYSQL_USER": "real_user",
+            "MYSQL_PASS": "real_pass",
+            "MYSQL_DB": "real_db",
+        },
+        clear=True,
+    )
+    def test_production_accepts_real_credentials(self):
+        """Production with non-default credentials should be accepted."""
+        config = load_config()
+        assert config.environment == "production"
+        assert config.database.mysql_user == "real_user"
+
+    @patch.dict(
+        os.environ,
+        {
+            "DB_ENV": "production",
+            "DB_BACKEND": "mysql",
+            "MYSQL_HOST": "localhost",
+            "MYSQL_USER": "ivod_user",
+            # 故意用 default username 但搭配自訂密碼 → 應該被允許
+            "MYSQL_PASS": "very_strong_custom_password",
+            "MYSQL_DB": "real_db",
+        },
+        clear=True,
+    )
+    def test_production_accepts_default_user_with_real_password(self):
+        """Default username with custom password is acceptable (only the pair matches → reject)."""
+        config = load_config()
+        assert config.environment == "production"
+        assert config.database.mysql_user == "ivod_user"
+        assert config.database.mysql_pass == "very_strong_custom_password"
+
+    @patch.dict(
+        os.environ,
+        {
+            "DB_ENV": "production",
+            "DB_BACKEND": "postgresql",
+            "PG_HOST": "localhost",
+            "PG_USER": "ivod_user",
+            "PG_PASS": "very_strong_custom_password",
+            "PG_DB": "real_db",
+        },
+        clear=True,
+    )
+    def test_production_accepts_default_pg_user_with_real_password(self):
+        """Same edge case for PostgreSQL."""
+        config = load_config()
+        assert config.environment == "production"
+        assert config.database.pg_user == "ivod_user"
     
     def test_development_environment_default(self):
         """Test development environment as default."""

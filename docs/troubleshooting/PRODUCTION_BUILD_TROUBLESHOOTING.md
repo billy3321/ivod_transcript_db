@@ -6,12 +6,8 @@ This error typically occurs during Next.js production builds due to webpack opti
 
 ## Solutions (in order of recommendation):
 
-### 1. Use Production-Safe Config
-Replace `next.config.js` with `next.config.prod.js`:
-```bash
-cp next.config.prod.js next.config.js
-npm run build
-```
+### 1. 確認 next.config.js 為單一來源
+`next.config.prod.js` 已於 2026-05 合併進主 `next.config.js`，請確保只存在一份 config。
 
 ### 2. Clear All Caches
 ```bash
@@ -111,7 +107,7 @@ NODE_ENV=production npm run build
 
 ## Production Deployment Checklist
 
-1. ✅ Use `next.config.prod.js` for production
+1. ✅ Use `next.config.js`（單一 source，security headers 由 nginx 統一管理）
 2. ✅ Clear all caches before building
 3. ✅ Verify Node.js version compatibility
 4. ✅ Set required environment variables

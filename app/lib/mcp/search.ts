@@ -1,7 +1,8 @@
 // 簡化版 MCP 工具實作 - 僅使用資料庫搜尋，避免 Elasticsearch 編譯問題
 import { z } from 'zod';
 import prisma from '@/lib/prisma';
-import { getDbBackend, createContainsCondition, convertToDate } from '@/lib/utils';
+import { getDbBackend } from '@/lib/utils';
+import { buildIVODWhere } from '@/lib/search/where-builder';
 import { extractSearchExcerpt, isTranscriptSearch } from '@/lib/searchHighlight';
 import { logger } from '@/lib/logger';
 import { TranscriptResult, FullTranscriptResult, SearchParams } from './types';
@@ -176,92 +177,18 @@ async function performPrismaQuery(params: z.infer<typeof MCPSearchSchema>, where
 
 // 建立搜尋條件 (支援搜尋模式和 MCP array 參數)
 function buildSearchConditions(params: z.infer<typeof MCPSearchSchema>, includeAllFields: boolean = true) {
-  const dbBackend = getDbBackend();
-  const conditions: any[] = [];
-
-  // 關鍵字搜尋（根據模式決定搜尋範圍）
-  if (params.query) {
-    const searchFields = [];
-    
-    if (includeAllFields) {
-      // 搜尋全部欄位
-      searchFields.push(
-        createContainsCondition('title', params.query, dbBackend),
-        createContainsCondition('meeting_name', params.query, dbBackend),
-        createContainsCondition('speaker_name', params.query, dbBackend),
-        createContainsCondition('committee_names', params.query, dbBackend)
-      );
-    }
-    
-    // 根據 transcription_source 參數決定搜尋的逐字稿欄位
-    if (params.transcription_source === 'ly_only') {
-      // 僅搜尋立法院官方逐字稿
-      searchFields.push(
-        createContainsCondition('ly_transcript', params.query, dbBackend)
-      );
-    } else {
-      // 搜尋所有逐字稿欄位（預設）
-      searchFields.push(
-        createContainsCondition('ai_transcript', params.query, dbBackend),
-        createContainsCondition('ly_transcript', params.query, dbBackend)
-      );
-    }
-    
-    conditions.push({ OR: searchFields });
-  }
-
-  // 發言人條件（支援 array）
-  if (params.speakers && params.speakers.length > 0) {
-    const speakerConditions = params.speakers.map((speaker: string) =>
-      createContainsCondition('speaker_name', speaker, dbBackend)
-    );
-    conditions.push({ OR: speakerConditions });
-  }
-
-  // 會議名稱條件
-  if (params.meeting_name) {
-    conditions.push(createContainsCondition('meeting_name', params.meeting_name, dbBackend));
-  }
-
-  // 委員會條件（支援 array）
-  if (params.committees && params.committees.length > 0) {
-    const committeeConditions = params.committees.map((committee: string) =>
-      createContainsCondition('committee_names', committee, dbBackend)
-    );
-    conditions.push({ OR: committeeConditions });
-  }
-
-  // 日期範圍條件
-  if (params.date_from || params.date_to) {
-    const dateCondition: any = {};
-    if (params.date_from) {
-      const fromDate = convertToDate(params.date_from);
-      if (fromDate) dateCondition.gte = fromDate;
-    }
-    if (params.date_to) {
-      const toDate = convertToDate(params.date_to);
-      if (toDate) dateCondition.lte = toDate;
-    }
-    conditions.push({ date: dateCondition });
-  }
-
-  // 根據 transcription_source 參數確保有對應的逐字稿內容
-  if (params.transcription_source === 'ly_only') {
-    // 僅檢查立法院官方逐字稿
-    conditions.push({
-      ly_transcript: { not: null }
-    });
-  } else {
-    // 確保有任何逐字稿內容（預設）
-    conditions.push({
-      OR: [
-        { ly_transcript: { not: null } },
-        { ai_transcript: { not: null } }
-      ]
-    });
-  }
-
-  return conditions.length > 0 ? { AND: conditions } : {};
+  return buildIVODWhere({
+    dbBackend: getDbBackend(),
+    query: params.query,
+    queryScope: includeAllFields ? 'all' : 'transcript_only',
+    transcriptionSource: params.transcription_source,
+    meetingName: params.meeting_name,
+    speakers: params.speakers,
+    committees: params.committees,
+    dateFrom: params.date_from,
+    dateTo: params.date_to,
+    requireTranscript: true,
+  });
 }
 
 // 格式化搜尋結果並提取段落

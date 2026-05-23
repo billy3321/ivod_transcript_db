@@ -48,10 +48,13 @@ const Footer: FC = () => {
       try {
         const response = await fetch('/api/database-status');
         if (response.ok) {
-          const data = await response.json();
-          databaseStatusCache.lastUpdated = data.lastUpdated;
+          const json = await response.json();
+          // 統一 API middleware 回應：{ data: { lastUpdated }, success: true }
+          // 同時相容舊格式：{ lastUpdated }
+          const lastUpdatedValue = json.data?.lastUpdated ?? json.lastUpdated ?? null;
+          databaseStatusCache.lastUpdated = lastUpdatedValue;
           databaseStatusCache.error = null;
-          setLastUpdated(data.lastUpdated);
+          setLastUpdated(lastUpdatedValue);
           setDatabaseError(null);
         } else {
           // 處理非 200 狀態碼

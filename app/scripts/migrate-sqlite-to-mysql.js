@@ -9,8 +9,8 @@ const sqlite3 = require('sqlite3').verbose();
 const mysql = require('mysql2/promise');
 const path = require('path');
 
-// SQLite database path
-const SQLITE_DB_PATH = path.join(__dirname, '../db/ivod_test.db');
+// SQLite database path（從 app/scripts/ 往上兩層到專案根再進 db/）
+const SQLITE_DB_PATH = path.join(__dirname, '../../db/ivod_test.db');
 
 // MySQL connection settings from .env
 const MYSQL_CONFIG = {

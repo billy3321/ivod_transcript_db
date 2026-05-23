@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { isAllowedVideoOrigin } from '@/lib/video-allowlist';
 
 interface VideoDownloaderProps {
   videoUrl: string;
@@ -45,36 +46,53 @@ const VideoDownloader: React.FC<VideoDownloaderProps> = ({
   }, [isDownloading, progress, downloadedSize, totalSegments, error, onProgressChange]);
 
   const parseM3U8 = async (m3u8Url: string): Promise<string[]> => {
+    // origin allowlist 驗證 — 防止 DB 內容被竄改後 fetch 任意網域
+    if (!isAllowedVideoOrigin(m3u8Url)) {
+      throw new Error(`影片來源網域不允許: ${new URL(m3u8Url).hostname}`);
+    }
+
     try {
       const response = await fetch(m3u8Url);
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
       const text = await response.text();
-      
+
       // 檢查是否是主播放列表（包含其他.m3u8檔案）
       const lines = text.split('\n').filter(line => line.trim());
       const m3u8Lines = lines.filter(line => line.includes('.m3u8') && !line.startsWith('#'));
-      
+
       if (m3u8Lines.length > 0) {
-        // 這是主播放列表，需要獲取子播放列表
         const baseUrl = m3u8Url.substring(0, m3u8Url.lastIndexOf('/') + 1);
         const subPlaylistUrl = m3u8Lines[0].startsWith('http') ? m3u8Lines[0] : baseUrl + m3u8Lines[0];
-        return parseM3U8(subPlaylistUrl); // 遞迴解析子播放列表
+        return parseM3U8(subPlaylistUrl); // 遞迴解析子播放列表（會再次驗證 origin）
       }
-      
+
       // 這是包含.ts片段的播放列表
       const segmentLines = lines.filter(line => line.trim() && !line.startsWith('#'));
       const baseUrl = m3u8Url.substring(0, m3u8Url.lastIndexOf('/') + 1);
-      
-      return segmentLines.map(line => {
+
+      const urls = segmentLines.map(line => {
         if (line.startsWith('http')) {
           return line.trim();
         } else {
           return baseUrl + line.trim();
         }
       });
+
+      // 驗證所有片段 URL 都在 allowlist 內
+      for (const url of urls) {
+        if (!isAllowedVideoOrigin(url)) {
+          throw new Error(`影片片段網域不允許: ${new URL(url).hostname}`);
+        }
+      }
+
+      return urls;
     } catch (err) {
+      if (err instanceof Error && err.message.startsWith('影片')) {
+        // 保留 origin 驗證的明確錯誤訊息
+        throw err;
+      }
       throw new Error('無法解析 M3U8 播放列表');
     }
   };

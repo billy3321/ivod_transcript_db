@@ -5,9 +5,11 @@ logs
 *.log
 .env
 .ipynb_checkpoints
-ivod_local.db
-# Ignore shared SQLite DB files
+# Ignore stray DB files anywhere in repo
+*.db
 db/*.db
+# Stray scratch files
+temp_*
 Test.ipynb
 test.py
 .pytest_cache/
@@ -15,5 +17,4 @@ test.py
 __pycache__/
 coverage.xml
 *.pyc
-db/ivod_local.db
 docs/plan

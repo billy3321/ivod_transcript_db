@@ -4,6 +4,9 @@
  */
 
 import { NextApiRequest } from 'next';
+import * as fs from 'fs';
+import * as path from 'path';
+import { getClientIp } from '@/lib/get-client-ip';
 
 export type LogLevel = 'error' | 'warn' | 'info' | 'debug';
 
@@ -69,7 +72,6 @@ class Logger {
 
   private ensureLogDirectory(): void {
     try {
-      const fs = require('fs');
       if (!fs.existsSync(this.options.logDirectory)) {
         fs.mkdirSync(this.options.logDirectory, { recursive: true });
       }
@@ -133,7 +135,6 @@ class Logger {
     if (!this.options.logToFile) return;
 
     try {
-      const path = require('path');
       const logFileName = `app_${new Date().toISOString().split('T')[0]}.log`;
       const logFilePath = path.join(this.options.logDirectory, logFileName);
       const logLine = this.formatLogEntry(entry) + '\n';
@@ -141,7 +142,6 @@ class Logger {
       // Check file size and rotate if necessary
       this.rotateLogFile(logFilePath);
 
-      const fs = require('fs');
       fs.appendFileSync(logFilePath, logLine, 'utf8');
     } catch (error) {
       console.error('Failed to write to log file:', error);
@@ -150,7 +150,6 @@ class Logger {
 
   private rotateLogFile(logFilePath: string): void {
     try {
-      const fs = require('fs');
       if (!fs.existsSync(logFilePath)) return;
 
       const stats = fs.statSync(logFilePath);
@@ -158,7 +157,7 @@ class Logger {
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
         const rotatedPath = logFilePath.replace('.log', `_${timestamp}.log`);
         fs.renameSync(logFilePath, rotatedPath);
-        
+
         // Clean up old log files
         this.cleanupOldLogs();
       }
@@ -169,9 +168,8 @@ class Logger {
 
   private cleanupOldLogs(): void {
     try {
-      const fs = require('fs');
-      const path = require('path');
-      const files = fs.readdirSync(this.options.logDirectory)
+      const files = fs
+        .readdirSync(this.options.logDirectory)
         .filter((file: string) => file.startsWith('app_') && file.endsWith('.log'))
         .map((file: string) => ({
           name: file,
@@ -285,11 +283,9 @@ class Logger {
   }
 
   private getClientIP(req: NextApiRequest): string | undefined {
-    return (
-      req.headers?.['x-forwarded-for'] as string ||
-      req.headers?.['x-real-ip'] as string ||
-      req.socket?.remoteAddress
-    );
+    if (!req) return undefined;
+    const ip = getClientIp(req as any);
+    return ip === 'unknown' ? undefined : ip;
   }
 }
 

@@ -1,15 +1,16 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
-import { getDbBackend, createContainsCondition, convertToDate } from '@/lib/utils';
+import { getDbBackend } from '@/lib/utils';
 import { universalSearch, shouldUseUniversalSearch } from '@/lib/universal-search';
-import { 
-  withErrorHandler, 
-  validateMethod, 
-  parseStringParam, 
+import { buildIVODWhere, parseIvodIds } from '@/lib/search/where-builder';
+import {
+  withErrorHandler,
+  validateMethod,
+  parseStringParam,
   parseIntParam,
   createSuccessResponse,
   createErrorResponse,
-  APIResponse 
+  APIResponse,
 } from '@/lib/api-middleware';
 import { IVOD } from '@/types';
 
@@ -66,79 +67,21 @@ async function ivodsHandler(req: NextApiRequest, res: NextApiResponse): Promise<
   const skip = (searchParams.page - 1) * searchParams.pageSize;
   const orderBy: any = searchParams.sort === 'date_asc' ? { date: 'asc' } : { date: 'desc' };
 
-  let where: any = {};
-  const conditions: any[] = [];
-
-  // Get database backend to determine search strategy
   const dbBackend = getDbBackend();
-  const isInsensitiveSupported = dbBackend !== 'sqlite';
-  
-  // General search in multiple fields
-  if (searchParams.q) {
-    const searchFields = [
-      createContainsCondition('title', searchParams.q, dbBackend),
-      createContainsCondition('meeting_name', searchParams.q, dbBackend),
-      createContainsCondition('speaker_name', searchParams.q, dbBackend),
-      createContainsCondition('committee_names', searchParams.q, dbBackend),
-      createContainsCondition('meeting_code_str', searchParams.q, dbBackend),
-      createContainsCondition('ai_transcript', searchParams.q, dbBackend),
-      createContainsCondition('ly_transcript', searchParams.q, dbBackend),
-    ];
-    
-    conditions.push({
-      OR: searchFields,
-    });
-  }
 
-  // Specific field searches
-  if (searchParams.meeting_name) {
-    const meetingCondition = createContainsCondition('meeting_name', searchParams.meeting_name, dbBackend);
-    conditions.push(meetingCondition);
-  }
-
-  if (searchParams.speaker) {
-    const speakerCondition = createContainsCondition('speaker_name', searchParams.speaker, dbBackend);
-    conditions.push(speakerCondition);
-  }
-
-  if (searchParams.committee) {
-    const committeeCondition = createContainsCondition('committee_names', searchParams.committee, dbBackend);
-    conditions.push(committeeCondition);
-  }
-
-  // Date range filters
-  if (searchParams.date_from) {
-    const fromDate = convertToDate(searchParams.date_from);
-    if (fromDate) {
-      conditions.push({
-        date: { gte: fromDate }
-      });
-    }
-  }
-
-  if (searchParams.date_to) {
-    const toDate = convertToDate(searchParams.date_to);
-    if (toDate) {
-      conditions.push({
-        date: { lte: toDate }
-      });
-    }
-  }
-
-  // Filter by specific IVOD IDs (for transcript search results)
-  if (searchParams.ids) {
-    const ivodIds = searchParams.ids.split(',').map(id => parseInt(id.trim(), 10)).filter(id => !isNaN(id));
-    if (ivodIds.length > 0) {
-      conditions.push({
-        ivod_id: { in: ivodIds }
-      });
-    }
-  }
-
-  // Combine all conditions with AND
-  if (conditions.length > 0) {
-    where = { AND: conditions };
-  }
+  const where = buildIVODWhere({
+    dbBackend,
+    query: searchParams.q || undefined,
+    queryScope: 'all',
+    transcriptionSource: 'all',
+    includeMeetingCode: true,
+    meetingName: searchParams.meeting_name || undefined,
+    speaker: searchParams.speaker || undefined,
+    committee: searchParams.committee || undefined,
+    dateFrom: searchParams.date_from || undefined,
+    dateTo: searchParams.date_to || undefined,
+    ivodIds: parseIvodIds(searchParams.ids),
+  });
 
   try {
     const [data, total] = await Promise.all([

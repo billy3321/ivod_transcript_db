@@ -41,14 +41,18 @@ class DatabaseConfig:
     mysql_dev_db: str = "ivod_dev_db"
     mysql_test_db: str = "ivod_test_db"
     
-    def validate(self):
-        """Validate database configuration."""
+    def validate(self, *, is_production: bool = False):
+        """Validate database configuration.
+
+        When ``is_production`` is True，禁止使用 hardcode 預設帳密
+        （ivod_user / ivod_password），必須由環境變數明確提供。
+        """
         if self.backend not in ["sqlite", "postgresql", "mysql"]:
             raise IVODConfigurationError(
                 f"Invalid database backend: {self.backend}. Must be one of: sqlite, postgresql, mysql",
                 config_key="DB_BACKEND"
             )
-        
+
         if self.backend == "postgresql":
             if not all([self.pg_host, self.pg_user, self.pg_pass, self.pg_db]):
                 raise IVODConfigurationError(
@@ -60,7 +64,15 @@ class DatabaseConfig:
                     f"Invalid PostgreSQL port: {self.pg_port}. Must be between 1 and 65535",
                     config_key="PG_PORT"
                 )
-                
+            if is_production and (
+                self.pg_user == "ivod_user" and self.pg_pass == "ivod_password"
+            ):
+                raise IVODConfigurationError(
+                    "PostgreSQL credentials must be set via env (PG_USER, PG_PASS) in production; "
+                    "default ivod_user/ivod_password is not allowed.",
+                    config_key="postgresql"
+                )
+
         elif self.backend == "mysql":
             if not all([self.mysql_host, self.mysql_user, self.mysql_pass, self.mysql_db]):
                 raise IVODConfigurationError(
@@ -71,6 +83,14 @@ class DatabaseConfig:
                 raise IVODConfigurationError(
                     f"Invalid MySQL port: {self.mysql_port}. Must be between 1 and 65535",
                     config_key="MYSQL_PORT"
+                )
+            if is_production and (
+                self.mysql_user == "ivod_user" and self.mysql_pass == "ivod_password"
+            ):
+                raise IVODConfigurationError(
+                    "MySQL credentials must be set via env (MYSQL_USER, MYSQL_PASS) in production; "
+                    "default ivod_user/ivod_password is not allowed.",
+                    config_key="mysql"
                 )
         
         elif self.backend == "sqlite":
@@ -207,10 +227,11 @@ class IVODConfig:
     
     def validate(self):
         """Validate all configuration sections."""
-        self.database.validate()
+        is_production = self.environment == "production"
+        self.database.validate(is_production=is_production)
         self.elasticsearch.validate()
         self.crawler.validate()
-        
+
         if self.environment not in ["development", "testing", "production"]:
             raise IVODConfigurationError(
                 f"Invalid environment: {self.environment}. Must be one of: development, testing, production",

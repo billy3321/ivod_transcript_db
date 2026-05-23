@@ -1,12 +1,14 @@
+// 統一 Next.js 設定。
+// 注意：security headers（X-Frame-Options 等）由 nginx 統一處理，
+// 不在這裡設定，避免與 reverse proxy 雙重 header 衝突。
+// 參考 /etc/nginx/sites-enabled/ivod-app
 if (process.env.NODE_ENV === 'development') {
   require('dotenv').config();
   const { resolve } = require('path');
-  
+
   const backend = process.env.DB_BACKEND;
   let databaseUrl = process.env.DATABASE_URL;
-  
-  
-  // Generate DATABASE_URL if not set
+
   if (backend && !databaseUrl) {
     if (backend === 'sqlite') {
       const sqlitePath = process.env.SQLITE_PATH || '../db/ivod_test.db';
@@ -19,107 +21,71 @@ if (process.env.NODE_ENV === 'development') {
       databaseUrl = `mysql://${MYSQL_USER}:${MYSQL_PASS}@${MYSQL_HOST}:${MYSQL_PORT}/${MYSQL_DB}`;
     }
   }
-  
+
   if (backend === 'sqlite') {
     console.log(
       `使用資料庫: SQLite，檔案路徑: ${process.env.SQLITE_PATH || '../db/ivod_test.db'}`
     );
   } else if (backend) {
-    console.log(
-      `使用資料庫: ${backend}，連線 URL: ${databaseUrl}`
-    );
-  } else if (databaseUrl) {
-    console.log(
-      `使用資料庫連線字串: ${databaseUrl}`
-    );
+    console.log(`使用資料庫: ${backend}`);
   }
 }
 
+const isDev = process.env.NODE_ENV === 'development';
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Enable compression for better performance
+  // Enable compression
   compress: true,
-  
-  // Generate ETags for better caching
+
+  // Generate ETags
   generateEtags: true,
-  
-  // Development-specific settings to help with debugging
+
   experimental: {
     optimizeCss: false,
   },
-  
-  // Development configuration
-  ...(process.env.NODE_ENV === 'development' && {
-    // Enable strict mode but disable Fast Refresh auto-reload
+
+  // Dev-only settings
+  ...(isDev && {
     reactStrictMode: true,
-    
     onDemandEntries: {
-      // Period (in ms) where the server will keep pages in the buffer
       maxInactiveAge: 25 * 1000,
-      // Number of pages that should be kept simultaneously without being disposed
       pagesBufferLength: 2,
-    }
+    },
   }),
-  
-  // Optimize images
+
+  // 圖片優化
   images: {
     formats: ['image/webp', 'image/avif'],
-    domains: ['ivod.ly.gov.tw', 'lyvod.ly.gov.tw'], // IVOD image domains
+    domains: ['ivod.ly.gov.tw', 'lyvod.ly.gov.tw'],
     deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048, 3840],
     imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
   },
-  
-  // Security headers for better SEO and security
+
+  // Cache headers only — security headers handled by nginx
   async headers() {
     return [
       {
-        source: '/:path*',
-        headers: [
-          {
-            key: 'X-DNS-Prefetch-Control',
-            value: 'on'
-          },
-          {
-            key: 'X-XSS-Protection',
-            value: '1; mode=block'
-          },
-          {
-            key: 'X-Frame-Options',
-            value: 'SAMEORIGIN'
-          },
-          {
-            key: 'X-Content-Type-Options',
-            value: 'nosniff'
-          },
-          {
-            key: 'Referrer-Policy',
-            value: 'origin-when-cross-origin'
-          },
-        ],
-      },
-      {
-        // Cache static assets for better performance
         source: '/favicon.ico',
         headers: [
           {
             key: 'Cache-Control',
-            value: 'public, immutable, max-age=86400'
-          }
-        ]
+            value: 'public, immutable, max-age=86400',
+          },
+        ],
       },
       {
         source: '/(.*\\.(?:js|css)$)',
         headers: [
           {
             key: 'Cache-Control',
-            value: 'public, immutable, max-age=31536000'
-          }
-        ]
-      }
+            value: 'public, immutable, max-age=31536000',
+          },
+        ],
+      },
     ];
   },
-  
-  // Rewrites for SEO-friendly URLs and API routes
+
   async rewrites() {
     return [
       {
@@ -140,82 +106,71 @@ const nextConfig = {
       },
     ];
   },
-  
-  // Simplified webpack configuration to avoid production build issues
+
   webpack: (config, { dev, isServer }) => {
-    // Development: Conditionally disable Fast Refresh to prevent auto-reload on errors
     if (dev && !isServer && process.env.DISABLE_ALL_HMR === 'true') {
-      console.log('🚫 ALL HMR and Fast Refresh completely disabled - no auto-reload')
-      
-      // Completely remove all HMR and Fast Refresh plugins
-      config.plugins = config.plugins.filter((plugin) => {
-        const name = plugin.constructor.name
-        return !name.includes('HotModuleReplacement') &&
-               !name.includes('ReactRefresh') &&
-               !name.includes('NextJsRequireCacheHotReloader') &&
-               !name.includes('HotModuleReplacementPlugin') &&
-               !name.includes('ReactRefreshPlugin')
-      })
-      
-      // Disable webpack-dev-server hot reloading completely
+      console.log('🚫 ALL HMR and Fast Refresh completely disabled - no auto-reload');
+
+      config.plugins = config.plugins.filter(plugin => {
+        const name = plugin.constructor.name;
+        return (
+          !name.includes('HotModuleReplacement') &&
+          !name.includes('ReactRefresh') &&
+          !name.includes('NextJsRequireCacheHotReloader') &&
+          !name.includes('HotModuleReplacementPlugin') &&
+          !name.includes('ReactRefreshPlugin')
+        );
+      });
+
       if (config.devServer) {
-        config.devServer.hot = false
-        config.devServer.liveReload = false
+        config.devServer.hot = false;
+        config.devServer.liveReload = false;
         config.devServer.client = {
           overlay: false,
           reconnect: false,
-        }
+        };
       }
-      
-      // Disable caching and optimization for debugging
-      config.mode = 'development'
-      config.cache = false
+
+      config.mode = 'development';
+      config.cache = false;
       config.optimization = {
         ...config.optimization,
         removeAvailableModules: false,
         removeEmptyChunks: false,
         splitChunks: false,
-      }
-      
-      // Remove any HMR related entries from webpack entry points
+      };
+
       if (config.entry && typeof config.entry === 'object') {
         Object.keys(config.entry).forEach(key => {
           if (Array.isArray(config.entry[key])) {
-            config.entry[key] = config.entry[key].filter(entry => 
-              typeof entry !== 'string' || (
-                !entry.includes('webpack-hot-middleware') &&
-                !entry.includes('react-refresh') &&
-                !entry.includes('next/dist/client/dev/hot-dev-client') &&
-                !entry.includes('next/dist/client/dev/amp-dev')
-              )
-            )
+            config.entry[key] = config.entry[key].filter(
+              entry =>
+                typeof entry !== 'string' ||
+                (!entry.includes('webpack-hot-middleware') &&
+                  !entry.includes('react-refresh') &&
+                  !entry.includes('next/dist/client/dev/hot-dev-client') &&
+                  !entry.includes('next/dist/client/dev/amp-dev'))
+            );
           }
-        })
+        });
       }
-      
     } else if (dev && !isServer && process.env.DISABLE_FAST_REFRESH === 'true') {
-      console.log('🚫 Fast Refresh disabled - errors will not trigger auto-reload')
-      
-      // Partially disable Fast Refresh but keep some HMR for CSS
-      config.plugins = config.plugins.filter((plugin) => {
-        const name = plugin.constructor.name
-        return !name.includes('ReactRefresh')
-      })
-      
+      console.log('🚫 Fast Refresh disabled - errors will not trigger auto-reload');
+      config.plugins = config.plugins.filter(plugin => {
+        const name = plugin.constructor.name;
+        return !name.includes('ReactRefresh');
+      });
     } else if (dev && !isServer) {
-      console.log('⚡ Fast Refresh enabled - normal auto-reload behavior')
+      console.log('⚡ Fast Refresh enabled - normal auto-reload behavior');
     }
-    
-    // Removed complex production optimization that might cause the hash error
-    
+
     return config;
   },
-  
-  // Environment variables for SEO
+
   env: {
     SITE_NAME: 'IVOD 逐字稿檢索系統',
     SITE_DESCRIPTION: '台灣立法院 IVOD 逐字稿檢索與瀏覽系統',
-  }
+  },
 };
 
 module.exports = nextConfig;

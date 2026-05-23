@@ -20,10 +20,10 @@ if (process.env.DB_BACKEND?.toLowerCase() === 'sqlite') {
 
 import { PrismaClient } from '@prisma/client';
 
-// 在開發環境顯示資料庫環境資訊
+// 在開發環境顯示資料庫環境資訊（不印含密碼的 DATABASE_URL）
 if (process.env.NODE_ENV !== 'production') {
-  console.log(`🗄️  Database Environment: ${dbEnv}`);
-  console.log(`🔗 Database URL: ${process.env.DATABASE_URL}`);
+  const backend = process.env.DB_BACKEND || 'sqlite';
+  console.log(`🗄️  Database Environment: ${dbEnv}, Backend: ${backend}`);
 }
 
 const prisma = new PrismaClient();
