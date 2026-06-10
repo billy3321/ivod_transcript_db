@@ -87,7 +87,7 @@ export async function searchTranscripts(args: unknown): Promise<{ content: any[]
       content: [{
         type: 'text',
         text: JSON.stringify({
-          error: error instanceof Error ? error.message : 'Unknown error',
+          error: 'Search failed due to an internal error',
           results: [],
           metadata: {
             search_time_ms: Date.now() - startTime,

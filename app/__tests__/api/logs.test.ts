@@ -209,7 +209,7 @@ describe('/api/logs', () => {
       expect(callArgs[0]).toContain('world');
     });
 
-    it('preserves newlines and tabs in message', async () => {
+    it('strips newlines and tabs to prevent log entry forging', async () => {
       const { req, res } = buildReq({
         level: 'info',
         message: 'line1\nline2\tindented',
@@ -217,8 +217,10 @@ describe('/api/logs', () => {
       await logsHandler(req as any, res as any);
       expect(res._getStatusCode()).toBe(200);
       const callArgs = mockLogger.info.mock.calls[0];
-      expect(callArgs[0]).toContain('\n');
-      expect(callArgs[0]).toContain('\t');
+      expect(callArgs[0]).not.toContain('\n');
+      expect(callArgs[0]).not.toContain('\t');
+      expect(callArgs[0]).toContain('line1');
+      expect(callArgs[0]).toContain('line2');
     });
 
     it('truncates message longer than 4KB', async () => {

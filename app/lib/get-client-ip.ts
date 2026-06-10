@@ -91,7 +91,9 @@ export function isTrustedProxy(ip: string): boolean {
 /**
  * 提取真實 client IP。
  *
- * - 若請求來自信任的 proxy（socket IP 在 TRUSTED_PROXIES 中），讀 X-Forwarded-For（取最左）或 X-Real-IP
+ * - 若請求來自信任的 proxy（socket IP 在 TRUSTED_PROXIES 中），讀 X-Forwarded-For（取最右）或 X-Real-IP
+ *   取最右是因為 nginx 等 proxy 會把真實 client IP「附加」在 XFF 尾端；
+ *   最左的值是 client 可自行偽造的，取最左會讓 rate limit 被繞過、log 中的 IP 被偽造
  * - 否則只用 socket IP，避免直連用戶偽造 forwarded headers
  */
 export function getClientIp(req: RequestLike): string {
@@ -102,9 +104,10 @@ export function getClientIp(req: RequestLike): string {
   if (socketIp && isTrustedProxy(socketIp)) {
     const fwd = req.headers['x-forwarded-for'];
     if (fwd) {
-      const raw = Array.isArray(fwd) ? fwd[0] : fwd;
-      const first = raw.split(',')[0].trim();
-      if (first) return normalizeIp(first);
+      const raw = Array.isArray(fwd) ? fwd.join(',') : fwd;
+      const parts = raw.split(',').map(s => s.trim()).filter(Boolean);
+      const last = parts[parts.length - 1];
+      if (last) return normalizeIp(last);
     }
     const realIp = req.headers['x-real-ip'];
     if (realIp && !Array.isArray(realIp)) {

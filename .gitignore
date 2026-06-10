@@ -8,6 +8,8 @@ logs
 # Ignore stray DB files anywhere in repo
 *.db
 db/*.db
+*.db.bak
+*.db.backup
 # Stray scratch files
 temp_*
 Test.ipynb

@@ -386,7 +386,7 @@ describe('MCPHandler Comprehensive Tests', () => {
         id: 1,
         error: {
           code: -32603,
-          message: 'Internal error while executing tool \'search_transcripts\': Tool execution failed'
+          message: 'Internal error while executing tool \'search_transcripts\''
         }
       });
     });

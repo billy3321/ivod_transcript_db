@@ -28,7 +28,9 @@
     "fresh-start": "npm run clean:all && npm install && npm run prisma:generate"
   },
   "overrides": {
-    "simple-swizzle": "0.2.2"
+    "simple-swizzle": "0.2.2",
+    "qs": "^6.15.2",
+    "tmp": "^0.2.6"
   },
   "dependencies": {
     "@elastic/elasticsearch": "^8.8.0",
@@ -42,7 +44,6 @@
     "@types/js-yaml": "^4.0.9",
     "autoprefixer": "^10.4.21",
     "axios": "^1.9.0",
-    "bodybuilder": "^2.1.0",
     "dompurify": "^3.2.6",
     "dotenv": "^16.5.0",
     "hls.js": "^1.6.4",

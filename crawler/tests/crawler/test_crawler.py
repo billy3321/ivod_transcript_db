@@ -269,8 +269,10 @@ def test_fetch_ly_speech_success(monkeypatch):
 
     monkeypatch.setattr("ivod.crawler.random_sleep", lambda a, b: None)
 
-    def fake_run(cmd, stdout, stderr, text):
-        assert cmd == ["curl", "--tlsv1.2", "--insecure", "-sSf", expected_url]
+    def fake_run(cmd, stdout, stderr, text, env=None):
+        # 預設走 SSL 驗證（無 --insecure），並以 OPENSSL_CONF 允許 legacy renegotiation
+        assert cmd == ["curl", "--tlsv1.2", "-sSf", expected_url]
+        assert env is not None and env["OPENSSL_CONF"].endswith("openssl.cnf")
         return DummyProcess("<br />line1<br />line2<br />", 0)
 
     monkeypatch.setattr("ivod.crawler.subprocess.run", fake_run)
@@ -279,17 +281,44 @@ def test_fetch_ly_speech_success(monkeypatch):
     assert result == "line1\nline2"
 
 
+def test_fetch_ly_speech_ssl_fallback_insecure(monkeypatch):
+    ivod_id = 159939
+    expected_url = f"https://ivod.ly.gov.tw/Demand/Speech/{ivod_id}"
+
+    monkeypatch.setattr("ivod.crawler.random_sleep", lambda a, b: None)
+
+    calls = []
+
+    def fake_run(cmd, stdout, stderr, text, env=None):
+        calls.append(cmd)
+        if "--insecure" not in cmd:
+            return DummyProcess("", 35)  # SSL handshake 失敗
+        assert cmd == ["curl", "--tlsv1.2", "--insecure", "-sSf", expected_url]
+        return DummyProcess("<br />line1<br />", 0)
+
+    monkeypatch.setattr("ivod.crawler.subprocess.run", fake_run)
+
+    result = fetch_ly_speech(ivod_id)
+    assert result == "line1"
+    assert len(calls) == 2
+
+
 def test_fetch_ly_speech_non_zero_return(monkeypatch):
     ivod_id = 159939
 
     monkeypatch.setattr("ivod.crawler.random_sleep", lambda a, b: None)
 
-    monkeypatch.setattr(
-        "ivod.crawler.subprocess.run",
-        lambda cmd, stdout, stderr, text: DummyProcess("ignored", 1),
-    )
+    # 非 SSL 錯誤（如 curl exit 22 = HTTP 4xx）不應觸發 --insecure fallback
+    calls = []
+
+    def fake_run(cmd, stdout, stderr, text, env=None):
+        calls.append(cmd)
+        return DummyProcess("ignored", 22)
+
+    monkeypatch.setattr("ivod.crawler.subprocess.run", fake_run)
     result = fetch_ly_speech(ivod_id)
     assert result == ""
+    assert len(calls) == 1
 
 
 def test_fetch_ly_speech_exception(monkeypatch):

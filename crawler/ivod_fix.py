@@ -18,7 +18,7 @@ def main():
     parser = argparse.ArgumentParser(description="IVOD補抓腳本")
     parser.add_argument("--file", "-f", help="從錯誤記錄檔案批量修復")
     parser.add_argument("--ivod-id", "-i", type=int, help="指定IVOD_ID進行單一修復")
-    parser.add_argument("--skip-ssl", action="store_true", default=True, help="跳過SSL驗證")
+    parser.add_argument("--skip-ssl", action="store_true", default=None, help="跳過SSL驗證（未指定時依 SKIP_SSL 環境變數，預設驗證）")
     parser.add_argument("--error-log", default=None, help="指定錯誤記錄檔案路徑")
     
     args = parser.parse_args()

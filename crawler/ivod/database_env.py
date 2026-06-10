@@ -139,12 +139,17 @@ def get_elasticsearch_config(env: DatabaseEnvironment = None) -> Dict[str, Any]:
         "index": index
     }
 
+def mask_database_url(url: str) -> str:
+    """遮蔽連線 URL 中的密碼，避免印出或寫入 log"""
+    import re
+    return re.sub(r'://([^:/@]+):([^@]+)@', r'://\1:***@', url)
+
 def print_database_info():
     """顯示當前資料庫環境資訊（用於除錯）"""
     env = get_database_environment()
     db_config = get_database_config(env)
     es_config = get_elasticsearch_config(env)
-    
+
     print(f"🗄️  Database Environment: {env}")
-    print(f"🔗 Database URL: {db_config.get('url', 'N/A')}")
+    print(f"🔗 Database URL: {mask_database_url(db_config.get('url', 'N/A'))}")
     print(f"🔍 Elasticsearch Index: {es_config['index']}")

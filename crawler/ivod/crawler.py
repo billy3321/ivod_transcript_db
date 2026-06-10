@@ -69,7 +69,14 @@ def create_ssl_context(skip_ssl: bool = False) -> ssl.SSLContext:
         # Configure additional security options
         ctx.check_hostname = True
         ctx.verify_mode = ssl.CERT_REQUIRED
-        
+        # ivod.ly.gov.tw 的伺服器只支援 legacy TLS renegotiation（RFC5746 前的舊機制），
+        # OpenSSL 3.x 預設拒絕；允許 legacy renegotiation，憑證驗證不受影響
+        ctx.options |= getattr(ssl, "OP_LEGACY_SERVER_CONNECT", 0x4)
+        # Python 3.13 起預設啟用 VERIFY_X509_STRICT，*.ly.gov.tw 憑證缺 SKI 欄位會被拒；
+        # 關掉 strict 檢查，仍維持完整憑證鏈與 hostname 驗證（Python 3.12 以前的標準行為）
+        if hasattr(ssl, "VERIFY_X509_STRICT"):
+            ctx.verify_flags &= ~ssl.VERIFY_X509_STRICT
+
     return ctx
 
 
@@ -263,25 +270,39 @@ def fetch_ly_speech(ivod_id):
     這個網頁並不規範（直接擷取 raw HTML 即可），透過 curl subprocess 抓取。
     Please don't modify the parsing logic — 已知在 production 環境穩定。
 
-    SSL 註記（2026-05 驗證）：
-    - 憑證本身有效（由 TWCA 簽發，*.ly.gov.tw，到期 2026-09-25）
-    - 開發機（macOS curl）可正常 verify
-    - **production server 的 CA bundle 過舊 → SSL handshake exit 35**，
-      故維持 --insecure 以確保 production 爬蟲不中斷
-    - TODO（ops）：在 production server 跑 `update-ca-certificates`
-      或安裝 ca-certificates 最新版後，可移除 --insecure 改回 SSL verify。
-      參考 docs/troubleshooting/ 取得詳細步驟。
+    SSL 註記（2026-06 驗證）：
+    - 憑證有效（TWCA 簽發，*.ly.gov.tw，到期 2026-09-25）
+    - 伺服器只支援 legacy TLS renegotiation，OpenSSL 3.x 預設拒絕
+      （production 之前的 handshake exit 35 即此原因，非 CA bundle 問題）
+    - 修法：以 OPENSSL_CONF 指向 repo 內的 openssl.cnf（允許 legacy
+      renegotiation），維持完整憑證驗證；驗證失敗時才退回 --insecure
+      並記 warning，確保 production 爬蟲不中斷
     """
     url = f"https://ivod.ly.gov.tw/Demand/Speech/{ivod_id}"
     transcript = ""
+    openssl_cnf = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "openssl.cnf")
     try:
         random_sleep(0.2, 2.0)
         res = subprocess.run(
-            ["curl", "--tlsv1.2", "--insecure", "-sSf", url],
+            ["curl", "--tlsv1.2", "-sSf", url],
             stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL,
             text=True,
+            env={**os.environ, "OPENSSL_CONF": openssl_cnf},
         )
+        if res.returncode != 0 and res.returncode in (35, 60):
+            # SSL handshake / 憑證問題才退回 --insecure，其餘錯誤（404 等）不重試
+            import logging
+            logging.warning(
+                f"fetch_ly_speech: SSL verify failed (curl exit {res.returncode}), "
+                f"falling back to --insecure for ivod {ivod_id}"
+            )
+            res = subprocess.run(
+                ["curl", "--tlsv1.2", "--insecure", "-sSf", url],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL,
+                text=True,
+            )
         if res.returncode == 0:
             transcript = res.stdout.replace('<br />', "\n").strip()
     except Exception:

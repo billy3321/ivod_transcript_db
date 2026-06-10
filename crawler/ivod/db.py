@@ -16,7 +16,7 @@ DB_BACKEND = os.getenv("DB_BACKEND", "sqlite").lower()
 DB_URL = db_config["url"]
 
 # 在非生產環境顯示資料庫環境資訊
-if os.getenv("ENVIRONMENT") != "production":
+if db_env != "production" and os.getenv("ENVIRONMENT") != "production":
     print_database_info()
 
 # 2. SQLAlchemy setup

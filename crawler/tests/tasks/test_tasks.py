@@ -12,6 +12,7 @@ def test_tasks_callable():
 def test_run_full_noop(monkeypatch):
     import ivod.tasks as tasks
 
+    monkeypatch.setattr(tasks, "check_and_create_database_tables", lambda: True)
     monkeypatch.setattr(tasks, "date_range", lambda start, end: [])
     monkeypatch.setattr(tasks, "fetch_ivod_list", lambda br, date: [])
     monkeypatch.setattr(tasks, "make_browser", lambda skip_ssl: None)
@@ -32,6 +33,7 @@ def test_run_full_noop(monkeypatch):
 def test_run_incremental_noop(monkeypatch):
     import ivod.tasks as tasks
 
+    monkeypatch.setattr(tasks, "check_and_create_database_tables", lambda: True)
     monkeypatch.setattr(tasks, "date_range", lambda start, end: [])
     monkeypatch.setattr(tasks, "fetch_ivod_list", lambda br, date: [])
     monkeypatch.setattr(tasks, "make_browser", lambda skip_ssl: None)
@@ -55,6 +57,7 @@ def test_run_incremental_noop(monkeypatch):
 def test_run_retry_noop(monkeypatch):
     import ivod.tasks as tasks
 
+    monkeypatch.setattr(tasks, "check_and_create_database_tables", lambda: True)
     monkeypatch.setattr(tasks, "make_browser", lambda skip_ssl: None)
 
     calls = []
@@ -85,6 +88,7 @@ def test_run_retry_noop(monkeypatch):
 def test_run_retry_with_objects(monkeypatch):
     import ivod.tasks as tasks
 
+    monkeypatch.setattr(tasks, "check_and_create_database_tables", lambda: True)
     monkeypatch.setattr(tasks, "make_browser", lambda skip_ssl: None)
     from datetime import date
     objs = [

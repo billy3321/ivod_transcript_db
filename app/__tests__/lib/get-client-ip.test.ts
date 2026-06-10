@@ -39,11 +39,12 @@ describe('get-client-ip', () => {
     });
 
     it('trusts X-Forwarded-For from 127.0.0.1', () => {
+      // nginx 會把真實 client IP append 在 XFF 尾端 → 取最右
       const req = {
         headers: { 'x-forwarded-for': '8.8.8.8, 10.0.0.50' },
         socket: { remoteAddress: '127.0.0.1' },
       };
-      expect(getClientIp(req)).toBe('8.8.8.8');
+      expect(getClientIp(req)).toBe('10.0.0.50');
     });
 
     it('trusts X-Real-IP from ::1', () => {
@@ -88,12 +89,21 @@ describe('get-client-ip', () => {
       expect(getClientIp(req)).toBe('1.2.3.4');
     });
 
-    it('takes first IP in X-Forwarded-For chain', () => {
+    it('takes last IP in X-Forwarded-For chain (proxy-appended)', () => {
       const req = {
         headers: { 'x-forwarded-for': '1.1.1.1, 2.2.2.2, 3.3.3.3' },
         socket: { remoteAddress: '127.0.0.1' },
       };
-      expect(getClientIp(req)).toBe('1.1.1.1');
+      expect(getClientIp(req)).toBe('3.3.3.3');
+    });
+
+    it('client-spoofed XFF prefix does not override proxy-appended IP', () => {
+      // client 自帶 XFF: 9.9.9.9，nginx append 真實 IP 5.5.5.5
+      const req = {
+        headers: { 'x-forwarded-for': '9.9.9.9, 5.5.5.5' },
+        socket: { remoteAddress: '127.0.0.1' },
+      };
+      expect(getClientIp(req)).toBe('5.5.5.5');
     });
 
     it('falls back to socket when forwarded header empty', () => {

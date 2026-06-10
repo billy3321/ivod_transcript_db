@@ -97,7 +97,7 @@ describe('HLSPlayer', () => {
   });
 
   it.skip('renders video element with controls', () => {
-    render(<HLSPlayer src="test.m3u8" />);
+    render(<HLSPlayer src="https://ivod.ly.gov.tw/test.m3u8" />);
     
     const video = screen.getByRole('application');
     expect(video).toHaveAttribute('controls');
@@ -105,13 +105,20 @@ describe('HLSPlayer', () => {
   });
 
   it('shows loading state initially', () => {
-    render(<HLSPlayer src="test.m3u8" />);
-    
+    render(<HLSPlayer src="https://ivod.ly.gov.tw/test.m3u8" />);
+
     expect(screen.getByText('載入影片中...')).toBeInTheDocument();
   });
 
+  it('blocks src not in video allowlist', () => {
+    render(<HLSPlayer src="https://evil.example.com/test.m3u8" />);
+
+    expect(screen.getByText('影片來源不在允許清單，無法播放')).toBeInTheDocument();
+    expect(mockHls.loadSource).not.toHaveBeenCalled();
+  });
+
   it.skip('applies custom className', () => {
-    render(<HLSPlayer src="test.m3u8" className="custom-class" />);
+    render(<HLSPlayer src="https://ivod.ly.gov.tw/test.m3u8" className="custom-class" />);
     
     const container = screen.getByText('載入影片中...').closest('div')?.parentElement;
     expect(container).toHaveClass('custom-class');
@@ -121,19 +128,19 @@ describe('HLSPlayer', () => {
     it('initializes HLS player when supported', () => {
       mockHls.isSupported.mockReturnValue(true);
       
-      render(<HLSPlayer src="test.m3u8" />);
+      render(<HLSPlayer src="https://ivod.ly.gov.tw/test.m3u8" />);
       
       expect(MockHlsConstructor).toHaveBeenCalledWith({
         enableWorker: false,
         lowLatencyMode: false,
         backBufferLength: 90,
       });
-      expect(mockHls.loadSource).toHaveBeenCalledWith('test.m3u8');
+      expect(mockHls.loadSource).toHaveBeenCalledWith('https://ivod.ly.gov.tw/test.m3u8');
       expect(mockHls.attachMedia).toHaveBeenCalled();
     });
 
     it('sets up event listeners for HLS events', () => {
-      render(<HLSPlayer src="test.m3u8" />);
+      render(<HLSPlayer src="https://ivod.ly.gov.tw/test.m3u8" />);
       
       expect(mockHls.on).toHaveBeenCalledWith('hlsManifestParsed', expect.any(Function));
       expect(mockHls.on).toHaveBeenCalledWith('hlsError', expect.any(Function));
@@ -147,7 +154,7 @@ describe('HLSPlayer', () => {
         }
       });
       
-      render(<HLSPlayer src="test.m3u8" />);
+      render(<HLSPlayer src="https://ivod.ly.gov.tw/test.m3u8" />);
       
       // Trigger manifest parsed event
       manifestParsedCallback!();
@@ -165,7 +172,7 @@ describe('HLSPlayer', () => {
         }
       });
       
-      render(<HLSPlayer src="test.m3u8" />);
+      render(<HLSPlayer src="https://ivod.ly.gov.tw/test.m3u8" />);
       
       // Trigger network error
       errorCallback!('error', {
@@ -187,7 +194,7 @@ describe('HLSPlayer', () => {
         }
       });
       
-      render(<HLSPlayer src="test.m3u8" />);
+      render(<HLSPlayer src="https://ivod.ly.gov.tw/test.m3u8" />);
       
       // Trigger media error
       errorCallback!('error', {
@@ -209,7 +216,7 @@ describe('HLSPlayer', () => {
         }
       });
       
-      render(<HLSPlayer src="test.m3u8" />);
+      render(<HLSPlayer src="https://ivod.ly.gov.tw/test.m3u8" />);
       
       // Trigger fatal error
       errorCallback!('error', {
@@ -231,7 +238,7 @@ describe('HLSPlayer', () => {
         }
       });
       
-      render(<HLSPlayer src="test.m3u8" />);
+      render(<HLSPlayer src="https://ivod.ly.gov.tw/test.m3u8" />);
       
       // Trigger non-fatal error
       errorCallback!('error', {
@@ -265,10 +272,10 @@ describe('HLSPlayer', () => {
         return originalCreateElement.call(document, tagName);
       });
       
-      render(<HLSPlayer src="test.m3u8" />);
+      render(<HLSPlayer src="https://ivod.ly.gov.tw/test.m3u8" />);
       
       expect(mockVideo.canPlayType).toHaveBeenCalledWith('application/vnd.apple.mpegurl');
-      expect(mockVideo.src).toBe('test.m3u8');
+      expect(mockVideo.src).toBe('https://ivod.ly.gov.tw/test.m3u8');
       
       document.createElement = originalCreateElement;
     });
@@ -294,14 +301,14 @@ describe('HLSPlayer', () => {
         return originalCreateElement.call(document, tagName);
       });
       
-      render(<HLSPlayer src="test.m3u8" />);
+      render(<HLSPlayer src="https://ivod.ly.gov.tw/test.m3u8" />);
       
       await waitFor(() => {
         expect(screen.getByText('您的瀏覽器不支援HLS影片格式')).toBeInTheDocument();
       });
       
       // Should still try to load URL as fallback
-      expect(mockVideo.src).toBe('test.m3u8');
+      expect(mockVideo.src).toBe('https://ivod.ly.gov.tw/test.m3u8');
       
       document.createElement = originalCreateElement;
     });
@@ -322,7 +329,7 @@ describe('HLSPlayer', () => {
         return originalCreateElement.call(document, tagName);
       });
       
-      render(<HLSPlayer src="test.m3u8" />);
+      render(<HLSPlayer src="https://ivod.ly.gov.tw/test.m3u8" />);
       
       expect(mockVideo.addEventListener).toHaveBeenCalledWith('loadstart', expect.any(Function));
       expect(mockVideo.addEventListener).toHaveBeenCalledWith('canplay', expect.any(Function));
@@ -341,7 +348,7 @@ describe('HLSPlayer', () => {
         }
       });
       
-      render(<HLSPlayer src="test.m3u8" />);
+      render(<HLSPlayer src="https://ivod.ly.gov.tw/test.m3u8" />);
       
       // Trigger fatal error
       errorCallback!('error', {
@@ -362,7 +369,7 @@ describe('HLSPlayer', () => {
         }
       });
       
-      render(<HLSPlayer src="test.m3u8" />);
+      render(<HLSPlayer src="https://ivod.ly.gov.tw/test.m3u8" />);
       
       // Trigger fatal error
       errorCallback!('error', {
@@ -381,7 +388,7 @@ describe('HLSPlayer', () => {
 
   describe('Cleanup', () => {
     it.skip('destroys HLS instance on unmount', () => {
-      const { unmount } = render(<HLSPlayer src="test.m3u8" />);
+      const { unmount } = render(<HLSPlayer src="https://ivod.ly.gov.tw/test.m3u8" />);
       
       unmount();
       

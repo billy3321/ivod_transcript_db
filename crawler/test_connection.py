@@ -76,7 +76,8 @@ def test_database_connection(env: str = None):
                 db_config = get_database_config(test_env)
                 db_url = db_config["url"]
                 
-                print(f"🔗 連線字串: {db_url}")
+                from ivod.database_env import mask_database_url
+                print(f"🔗 連線字串: {mask_database_url(db_url)}")
                 
                 # 測試連線
                 engine = create_engine(db_url, echo=False)
@@ -510,8 +511,7 @@ def _print_database_fix_instructions(db_backend: str, env: str, error_message: s
             print(f"   CREATE DATABASE {db_name};")
             print("3. 建立使用者並授權:")
             user = os.getenv("PG_USER", "ivod_user")
-            password = os.getenv("PG_PASS", "ivod_password")
-            print(f"   CREATE USER {user} WITH PASSWORD '{password}';")
+            print(f"   CREATE USER {user} WITH PASSWORD '<.env 中的 PG_PASS>';")
             print(f"   GRANT ALL PRIVILEGES ON DATABASE {db_name} TO {user};")
             print("   \\q")
         elif "authentication failed" in error_lower or "password" in error_lower:
@@ -521,8 +521,7 @@ def _print_database_fix_instructions(db_backend: str, env: str, error_message: s
             print("2. 重設使用者密碼:")
             print("   sudo -u postgres psql")
             user = os.getenv("PG_USER", "ivod_user")
-            password = os.getenv("PG_PASS", "ivod_password")
-            print(f"   ALTER USER {user} PASSWORD '{password}';")
+            print(f"   ALTER USER {user} PASSWORD '<.env 中的 PG_PASS>';")
             print("   \\q")
     
     elif db_backend == "mysql":
@@ -549,8 +548,7 @@ def _print_database_fix_instructions(db_backend: str, env: str, error_message: s
             print(f"   CREATE DATABASE {db_name} CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;")
             print("3. 建立使用者並授權:")
             user = os.getenv("MYSQL_USER", "ivod_user")
-            password = os.getenv("MYSQL_PASS", "ivod_password")
-            print(f"   CREATE USER '{user}'@'localhost' IDENTIFIED BY '{password}';")
+            print(f"   CREATE USER '{user}'@'localhost' IDENTIFIED BY '<.env 中的 MYSQL_PASS>';")
             print(f"   GRANT ALL PRIVILEGES ON {db_name}.* TO '{user}'@'localhost';")
             print("   FLUSH PRIVILEGES;")
             print("   EXIT;")
@@ -561,8 +559,7 @@ def _print_database_fix_instructions(db_backend: str, env: str, error_message: s
             print("2. 重設使用者密碼:")
             print("   mysql -u root -p")
             user = os.getenv("MYSQL_USER", "ivod_user")
-            password = os.getenv("MYSQL_PASS", "ivod_password")
-            print(f"   ALTER USER '{user}'@'localhost' IDENTIFIED BY '{password}';")
+            print(f"   ALTER USER '{user}'@'localhost' IDENTIFIED BY '<.env 中的 MYSQL_PASS>';")
             print("   FLUSH PRIVILEGES;")
             print("   EXIT;")
     

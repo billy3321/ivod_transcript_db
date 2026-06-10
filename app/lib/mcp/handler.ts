@@ -302,12 +302,11 @@ export class MCPHandler {
         }
       });
       
-      // 提供更詳細的錯誤信息給開發者，但不洩露敏感信息
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      // 詳細錯誤已寫入 server log；對外只回傳泛用訊息，避免洩露 DB/driver 細節
       return this.createErrorResponse(
-        id, 
-        JSON_RPC_ERRORS.INTERNAL_ERROR, 
-        `Internal error while executing tool '${name}': ${errorMessage}`
+        id,
+        JSON_RPC_ERRORS.INTERNAL_ERROR,
+        `Internal error while executing tool '${name}'`
       );
     }
   }

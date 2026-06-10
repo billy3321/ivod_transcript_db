@@ -153,12 +153,12 @@ def setup_logging():
     )
 
 
-def run_full(skip_ssl: bool = True, start_date: str = None, end_date: str = None):
+def run_full(skip_ssl: bool = None, start_date: str = None, end_date: str = None):
     """
     全量拉取：從指定起始日跑到指定結束日（或今天），逐筆 upsert 到資料庫。
-    
+
     Args:
-        skip_ssl: 是否跳過SSL驗證
+        skip_ssl: 是否跳過SSL驗證，None 時依 SKIP_SSL 環境變數決定（預設驗證）
         start_date: 自訂起始日期 (YYYY-MM-DD)，如果早於預設起始日期則使用預設值
         end_date: 自訂結束日期 (YYYY-MM-DD)，如果晚於今天則使用今天
     """
@@ -247,7 +247,7 @@ def run_full(skip_ssl: bool = True, start_date: str = None, end_date: str = None
     return True
 
 
-def run_incremental(skip_ssl: bool = True):
+def run_incremental(skip_ssl: bool = None):
     """
     增量更新：只檢查過去兩週的新 ID，並針對缺漏的 AI 或 LY 逐字稿進行補抓。
     """
@@ -398,7 +398,7 @@ def check_consecutive_failures(records, transcript_type, max_consecutive_days=3)
     return False, failed_dates
 
 
-def run_retry(skip_ssl: bool = True):
+def run_retry(skip_ssl: bool = None):
     """
     重新嘗試失敗的任務：AI 或 LY 逐字稿之前發生錯誤，且重試次數尚未超過上限。
     按日期和IVOD_ID排序處理，如果連續3天失敗則停止該類型的重試。
@@ -619,14 +619,14 @@ def remove_from_error_log(ivod_id, error_log_path):
         f.writelines(filtered_lines)
 
 
-def run_fix(ivod_ids=None, error_log_path=None, skip_ssl: bool = True):
+def run_fix(ivod_ids=None, error_log_path=None, skip_ssl: bool = None):
     """
     修復失敗的IVOD記錄
-    
+
     Args:
         ivod_ids: 指定要修復的IVOD_ID列表，如果為None且error_log_path為None則使用預設錯誤記錄檔案
         error_log_path: 錯誤記錄檔案路徑，如果指定則從檔案讀取失敗的IVOD_ID列表
-        skip_ssl: 是否跳過SSL驗證
+        skip_ssl: 是否跳過SSL驗證，None 時依 SKIP_SSL 環境變數決定（預設驗證）
     
     Returns:
         bool: 執行是否成功

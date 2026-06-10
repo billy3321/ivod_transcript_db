@@ -247,7 +247,8 @@ describe('MCPHandler', () => {
       expect(response.id).toBe(1);
       expect(response.error).toBeDefined();
       expect(response.error?.code).toBe(-32603);
-      expect(response.error?.message).toBe('Internal error while executing tool \'search_transcripts\': Tool execution error');
+      // 對外不洩露內部錯誤細節，只回泛用訊息
+      expect(response.error?.message).toBe('Internal error while executing tool \'search_transcripts\'');
     });
   });
 

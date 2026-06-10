@@ -68,7 +68,7 @@ describe('IVOD Detail Page', () => {
         video_start: '09:00:00',
         video_end: '09:10:00',
         video_type: 'speech',
-        video_url: 'https://example.com/video.mp4',
+        video_url: 'https://ivod.ly.gov.tw/video.mp4',
         ivod_url: 'https://example.com/ivod',
         category: '質詢',
         meeting_code: 'TEST001',
@@ -436,7 +436,7 @@ describe('IVOD Detail Page', () => {
         speaker_name: 'Test Speaker',
         committee_names: ['委員會A'],
         video_length: '10:00',
-        video_url: 'https://example.com/video.mp4',
+        video_url: 'https://ivod.ly.gov.tw/video.mp4',
         ai_transcript: 'Test transcript',
         last_updated: '2022-01-01T10:00:00+08:00',
         meeting_time: '2022-01-01T09:00:00+08:00'
@@ -457,7 +457,7 @@ describe('IVOD Detail Page', () => {
       // Video element should be rendered with the src attribute
       const video = document.querySelector('video');
       expect(video).toBeInTheDocument();
-      expect(video).toHaveAttribute('src', 'https://example.com/video.mp4');
+      expect(video).toHaveAttribute('src', 'https://ivod.ly.gov.tw/video.mp4');
     }, { timeout: 5000 });
   });
 

@@ -43,10 +43,10 @@ def main():
     )
     
     parser.add_argument(
-        '--skip-ssl', 
-        action='store_true', 
-        default=True, 
-        help='跳過SSL驗證'
+        '--skip-ssl',
+        action='store_true',
+        default=None,
+        help='跳過SSL驗證（未指定時依 SKIP_SSL 環境變數，預設驗證）'
     )
     
     args = parser.parse_args()

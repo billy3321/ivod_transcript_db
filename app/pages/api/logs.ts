@@ -29,8 +29,9 @@ const logsRateLimiter = new RateLimiter({
 
 function sanitizeMessage(input: unknown): string {
   if (typeof input !== 'string') return '';
+  // 含 \t \n \r — 換行若不過濾，可在 log 檔中偽造整行 log 條目
   // eslint-disable-next-line no-control-regex
-  const stripped = input.replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, ' ');
+  const stripped = input.replace(/[\x00-\x1f\x7f]/g, ' ');
   return stripped.slice(0, MAX_MESSAGE_LENGTH);
 }
 

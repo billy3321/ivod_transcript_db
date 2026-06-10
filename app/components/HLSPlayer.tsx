@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import Hls from 'hls.js';
+import { isAllowedVideoOrigin } from '@/lib/video-allowlist';
 
 interface HLSPlayerProps {
   src: string;
@@ -15,6 +16,13 @@ const HLSPlayer: React.FC<HLSPlayerProps> = ({ src, className = '' }) => {
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
+
+    // 與 VideoDownloader 相同的來源驗證，避免播放器載入非預期網域的 URL
+    if (!isAllowedVideoOrigin(src)) {
+      setError('影片來源不在允許清單，無法播放');
+      setLoading(false);
+      return;
+    }
 
     if (Hls.isSupported()) {
       // HLS.js is supported
