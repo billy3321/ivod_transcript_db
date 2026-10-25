@@ -58,7 +58,7 @@
     "search-query-parser": "^1.6.0",
     "sqlite3": "^6.0.1",
     "tailwindcss": "^4.1.7",
-    "zod": "^3.25.76"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^5.16.5",
