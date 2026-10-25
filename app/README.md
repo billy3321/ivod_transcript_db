@@ -333,7 +333,7 @@ npm start
 容器化部署的範例 `Dockerfile`：
 
 ```dockerfile
-FROM node:18-alpine
+FROM node:24-alpine
 WORKDIR /app
 
 # 複製套件檔案
@@ -385,8 +385,8 @@ docker run -p 3000:3000 \
 ### 9.2 安裝 Node.js
 
 ```bash
-# 安裝 Node.js 18.x
-curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
+# 安裝 Node.js 24.x
+curl -fsSL https://deb.nodesource.com/setup_24.x | sudo -E bash -
 sudo apt-get update
 sudo apt-get install -y nodejs build-essential
 

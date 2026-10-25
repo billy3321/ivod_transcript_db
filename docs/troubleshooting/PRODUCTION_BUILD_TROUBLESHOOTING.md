@@ -31,9 +31,7 @@ npm run build
 The error is common with Node.js v18+ and certain webpack configurations.
 
 **Recommended Node.js versions:**
-- Node.js 16.14.0+ (LTS)
-- Node.js 18.12.0+ (Current)
-- Node.js 20.0.0+ (Latest)
+- Node.js 24.22.1+ (LTS)
 
 **Check your Node.js version:**
 ```bash
@@ -125,7 +123,7 @@ NODE_ENV=production npm run build
 ## Docker Build Example
 
 ```dockerfile
-FROM node:18-alpine
+FROM node:24-alpine
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci --only=production
