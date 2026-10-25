@@ -8,5 +8,5 @@ psycopg2-binary
 beautifulsoup4
 cryptography
 PyMySQL
-elasticsearch>=7.0.0
+elasticsearch>=9,<10
 pytz
